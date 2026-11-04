@@ -283,7 +283,8 @@
 
   .stat-row {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    /* Codex 5 张卡、WorkBuddy 6 张（多一张速度卡），固定 6 列保证标题不换行 */
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -1270,6 +1271,34 @@
     };
   }
 
+  /** 累计用量卡：跟 WorkBuddy 那边对称，两边都六张卡 */
+  function totalCard() {
+    const detail = state.detail;
+    const totals = detail && detail.totals ? detail.totals : null;
+    if (!totals) {
+      return {
+        label: "累计用量",
+        window: "全部时间",
+        num: "—",
+        unit: "tokens",
+        hideMeter: true,
+        foot: "暂无历史数据",
+        hints: []
+      };
+    }
+    const days = detail.series ? detail.series.length : 0;
+    const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
+    return {
+      label: "累计用量",
+      window: days + " 天",
+      num: fmtTokens(totals.totalTokens),
+      unit: "tokens",
+      hideMeter: true,
+      foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次请求",
+      hints: ["缓存命中 " + fmtPercent(cacheRate)]
+    };
+  }
+
   function speedCard() {
     const detail = state.detail;
     const speed = detail && detail.throughput;
@@ -1409,7 +1438,9 @@
         level: "ok",
         foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
         hints: ["每轮重发上下文，命中越高越省"]
-      }
+      },
+      // 速度：function_call → function_call_result 的时间差算出来的整轮吞吐
+      speedCard()
     ];
   }
 
@@ -1426,6 +1457,7 @@
         quotaCard("5 小时额度", "5 小时窗口", quota && quota.session),
         quotaCard("7 天额度", "7 天窗口", quota && quota.weekly),
         todayCard(),
+        totalCard(),
         costCard(),
         speedCard()
       ];
@@ -1837,13 +1869,16 @@
     }
 
     const isWorkBuddy = detail.source === "workbuddy";
-    $("th-speed").textContent = isWorkBuddy ? "积分" : "速度";
+    $("th-speed").textContent = "速度";
     $("session-badge").textContent = detail.sessions + " 个会话";
 
     const rows = detail.sessionList.slice(0, 60);
     body.innerHTML = rows.map(item => {
       const models = item.models && item.models.length ? item.models : ["—"];
       const span = item.firstAt && item.lastAt ? new Date(item.lastAt).getTime() - new Date(item.firstAt).getTime() : 0;
+      const speedCell = item.tps
+        ? item.tps.toFixed(1) + ' <span class="muted">tok/s</span>'
+        : (isWorkBuddy && item.credit ? item.credit.toFixed(1) + ' <span class="muted">积分</span>' : '<span class="muted">—</span>');
       return [
         '<tr>',
         '  <td class="muted" title="' + escapeHtml(item.lastAt || "") + '">' + relTime(item.lastAt) + '</td>',
@@ -1852,9 +1887,7 @@
         '  <td class="num">' + fmtTokens(item.totalTokens) + '</td>',
         '  <td class="num">' + fmtCount(item.records) + '</td>',
         '  <td class="num bar-money">' + (item.cost ? fmtMoney(item.cost) : '<span class="muted">—</span>') + '</td>',
-        '  <td class="num">' + (isWorkBuddy
-          ? (item.credit ? item.credit.toFixed(1) : '<span class="muted">—</span>')
-          : (item.tps ? item.tps.toFixed(1) : '<span class="muted">—</span>')) + '</td>',
+        '  <td class="num">' + speedCell + '</td>',
         '  <td class="num muted">' + fmtDuration(span) + '</td>',
         '</tr>'
       ].join("");

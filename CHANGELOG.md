@@ -1,5 +1,16 @@
 # 更新日志
 
+## 2.1.0 - 2026-11-04
+
+**WorkBuddy 也能看速度了。** 之前只有 Codex 侧有 tok/s，WorkBuddy 的速度位是写死的空值——日志里其实有数据，只是没算。
+
+- WorkBuddy 日志没有 Codex 那种 `duration_ms` 字段，但 `function_call` 与 `function_call_result` 各带一个 `timestamp`，两者的时间差就是这一轮的实际耗时。数据层现在按 `parentId` 配对，算出每轮的输出 tokens 与耗时，得到 tok/s。本机实测 2340 轮配对成功，加权 96.1 tok/s。
+- `workbuddy-store.cjs` 的 `throughput` 结构与 `codex-store.cjs` 完全同构：`turns / outputTokens / durationMs / tps` 外加 `days`、`models`、`hours`（24 桶）、`dayHours`、`modelDays`。看板侧不用区分数据源，`speedCard()`、时段图的速度模式、会话表都能共用同一套渲染逻辑。
+- 模型级与会话级的 `tps` 从写死的 `null` 换成真值。会话表的速度列表头统一叫「速度」；WorkBuddy 会话没有速度样本时退回显示积分，不留空。
+- 卡片行从 5 列改成 6 列：WorkBuddy 多一张「输出速度」卡，Codex 补一张「累计用量」卡，两边卡片数一致，标题不换行。
+- 缓存版本 `CACHE_VERSION` 2 → 3，旧的 WorkBuddy 缓存自动失效重扫一次。
+- 测试从 16 个增加到 18 个，新增 `2.1 WorkBuddy 用 call/result 时间戳配对算速度`（造一份两行日志，断言 400 tokens / 2s = 200 tok/s，以及 days/models/hours/dayHours/modelDays 各维度都在）与 `2.1 两个数据源都有速度卡`。
+
 ## 2.0.0 - 2026-10-30
 
 **改名 TokenBar。** 旧名字 `codex-token-dashboard` 是网页版看板时期的，现在这东西是 Windows 托盘应用，两个数据源、五个指标卡，叫 token dashboard 已经对不上。仓库地址变成 `github.com/xiaoqi8553/tokenbar`（旧链接会重定向）。

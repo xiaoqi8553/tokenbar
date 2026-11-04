@@ -27,8 +27,8 @@ Reads local logs only. No network, no login, no upload.
 
 **完整看板** — 双击图标
 
-- Five metric cards: quota windows, today, cost, output speed, cache hit.
-- 五张指标卡：额度窗口、今日用量、等价花费、输出速度、缓存命中。
+- Six metric cards: quota windows, today, total, cost, output speed, cache hit.
+- 六张指标卡：额度窗口、今日用量、累计用量、等价花费、输出速度、缓存命中。
 - Usage trend by day, switchable between 7 / 14 / 30 days and all time. Below it: range total, range cost, daily average, peak day, period-over-period.
 - 用量趋势按天，可切 7 / 14 / 30 天与全部。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
 - Model and project split, recalculated per range, with money on each row.
@@ -112,8 +112,27 @@ Each model call carries a usage block: `inputTokens` (includes cache), `outputTo
 - 不能按 `conversationRequestId` 去重。一次请求会拆成十几个 step，每个 step 都是一次独立调用、各带一份 usage。按请求 ID 去重会把 985 次压成 27 次。去重键是 `traceId|stepSeq`。
 - **Input includes cache.** `new input = input - cached`. Cache hit rate here is 98%, so the two buckets need to be read separately.
 - 输入含缓存，`新增输入 = input - cached`。本机缓存命中率 98%，两档要分开看。
-- **WorkBuddy has no tok/s.** There is no per-turn duration in `providerData`, so that column shows credits instead.
-- WorkBuddy 没有 tok/s。`providerData` 里没有轮次耗时，所以这一列显示积分。
+- **Speed comes from timestamps, not a duration field.** Codex logs `duration_ms` per turn; WorkBuddy doesn't. But `function_call` and `function_call_result` each carry a `timestamp`, and the gap between them is that turn's wall time. Pairing them by `parentId` gives the same number Codex reports.
+- 速度不是现成字段，是两个时间戳相减出来的。Codex 日志直接给 `duration_ms`，WorkBuddy 没有，但 `function_call` 和 `function_call_result` 各带一个 `timestamp`，两者之差就是这一轮的墙钟耗时，按 `parentId` 配对即可，口径与 Codex 一致。
+
+### Speed / 速度
+
+`tps = output tokens ÷ turn duration`. This is **whole-turn throughput**, not raw streaming decode speed — it includes tool calls and waiting, so a session that spends 30s running a shell command looks slow even if the model replied instantly.
+
+`tps = 输出 tokens ÷ 轮耗时`。这是**整轮吞吐**，不是纯流式解码速度 —— 里面包含了工具调用和等待，所以一轮里跑了 30 秒 shell 命令的会话会显得慢，哪怕模型本身秒回。
+
+| Source | Where the duration comes from |
+|---|---|
+| Codex | `task_complete.duration_ms` per turn, paired with `token_usage_record` by `turn_id` |
+| WorkBuddy | `function_call_result.timestamp − function_call.timestamp`, paired by `parentId` |
+
+Sessions without a matched pair are excluded rather than counted as zero — that keeps the average honest.
+
+配不上的轮次直接不计入，不会当成 0 拉低平均。
+
+Sessions table shows `tok/s` for both sources. A WorkBuddy session with no matched turns falls back to showing its credits, so the column is never blank.
+
+会话表两个数据源都显示 `tok/s`。WorkBuddy 会话如果一轮都配不上，就退回显示它的积分，这一列不会空着。
 
 ## Install / 安装
 
@@ -151,7 +170,7 @@ desktop/
   popover.html                tray popover
   dashboard.html              full dashboard (single file, no build step)
   data/codex-store.cjs        Codex: scan, per-day merge, speed, cost
-  data/workbuddy-store.cjs    WorkBuddy: two roots, dedupe by session id
+  data/workbuddy-store.cjs    WorkBuddy: two roots, dedupe by session id, speed
   data/history-baseline.cjs   old index → per-day summary (with hourly buckets)
   data/pricing.cjs            price table and conversion
 tests/                        data layer and UI assertions

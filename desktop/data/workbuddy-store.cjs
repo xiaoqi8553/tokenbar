@@ -24,8 +24,8 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { normalizeTable, costOfModels, describeTable } = require("./pricing.cjs");
 
-// 2：扫描范围从单一 ~/.workbuddy 扩到国际版 ~/.workbuddy-ai，缓存按会话 id 合并去重
-const CACHE_VERSION = 2;
+// 3：detail 新增 throughput（速度数据），function_call/result 时间戳配对
+const CACHE_VERSION = 3;
 const SCAN_CHUNK_BYTES = 4 * 1024 * 1024;
 
 function pad2(value) {
@@ -219,13 +219,33 @@ class WorkBuddyStore {
       days: {},
       hours: {},
       /** 去重键：traceId|stepSeq，同一个 step 在日志里可能写多行 */
-      keys: []
+      keys: [],
+      /** 速度：function_call 的 id → {timestamp, outputTokens, model, day, hour} */
+      speedCalls: new Map(),
+      /** function_call_result 的 parentId → timestamp */
+      speedResults: new Map()
     };
     const seen = new Set();
 
     const feed = text => {
       for (const line of text.split("\n")) {
         if (line.length < 32) continue;
+
+        // function_call_result：只有 timestamp 和 parentId，拿来做速度配对的终点
+        if (line.indexOf('"function_call_result"') !== -1) {
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === "function_call_result" && obj.parentId && obj.timestamp) {
+              // 同一个 call 可能有多条 result（流式分片），取最早的
+              const ts = Number(obj.timestamp);
+              if (Number.isFinite(ts)) {
+                const prev = detail.speedResults.get(obj.parentId);
+                if (!prev || ts < prev) detail.speedResults.set(obj.parentId, ts);
+              }
+            }
+          } catch { /* ignore */ }
+        }
+
         if (line.indexOf('"providerData"') === -1) continue;
         if (line.indexOf('"usage"') === -1) continue;
         let record;
@@ -288,6 +308,12 @@ class WorkBuddyStore {
           addBucket(detail.modelDays[day][model], bucket);
           const hourKey = `${day}T${pad2(date.getHours())}`;
           detail.hours[hourKey] = (detail.hours[hourKey] || 0) + totalTokens;
+
+          // 速度配对：function_call 的 id → {ts, output, model, day, hour}
+          // finish() 时和 function_call_result 的 timestamp 做差，就是这轮的耗时
+          if (record.id && outputTokens > 0) {
+            detail.speedCalls.set(record.id, { ts: stamp, output: outputTokens, model, day, hour: date.getHours() });
+          }
         }
       }
     };
@@ -296,6 +322,42 @@ class WorkBuddyStore {
       feed,
       finish() {
         detail.project = projectNameOf(detail.cwd) || "WorkBuddy";
+
+        // 速度：把 function_call（起点 + output tokens + 模型 + 时间）
+        // 和 function_call_result（终点 timestamp）按 id 配对，
+        // 差值就是这轮的实际耗时（含工具执行等待，跟 Codex 的整轮口径一致）。
+        const speed = { turns: 0, outputTokens: 0, durationMs: 0, days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {} };
+        const cellOf = (target, key) => {
+          if (!target[key]) target[key] = { turns: 0, outputTokens: 0, durationMs: 0 };
+          return target[key];
+        };
+        for (const [callId, call] of detail.speedCalls) {
+          const resultTs = detail.speedResults.get(callId);
+          if (!resultTs) continue;
+          const dur = resultTs - call.ts;
+          if (dur <= 0) continue;
+          speed.turns += 1;
+          speed.outputTokens += call.output;
+          speed.durationMs += dur;
+          const mergeCell = (cell) => {
+            cell.turns += 1;
+            cell.outputTokens += call.output;
+            cell.durationMs += dur;
+          };
+          mergeCell(cellOf(speed.days, call.day));
+          mergeCell(cellOf(speed.models, call.model));
+          mergeCell(cellOf(speed.hours, String(call.hour)));
+          if (!speed.dayHours[call.day]) speed.dayHours[call.day] = {};
+          mergeCell(cellOf(speed.dayHours[call.day], String(call.hour)));
+          if (!speed.modelDays[call.day]) speed.modelDays[call.day] = {};
+          mergeCell(cellOf(speed.modelDays[call.day], call.model));
+        }
+        detail.throughput = speed.turns > 0 ? speed : null;
+
+        // 配对数据不需要缓存，清掉省空间
+        detail.speedCalls = null;
+        detail.speedResults = null;
+
         // 缓存键随明细一起缓存，跨文件重复（续跑/分叉）靠它对账
         return detail;
       }
@@ -363,6 +425,8 @@ class WorkBuddyStore {
     const seenKeys = new Set();
     const priceTable = this.pricing;
     let credits = 0;
+    /** 输出速度汇总：跟 Codex 结构完全一致 */
+    const speed = { turns: 0, outputTokens: 0, durationMs: 0, days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {} };
 
     for (const entry of this.files.values()) {
       const detail = entry.detail;
@@ -387,7 +451,11 @@ class WorkBuddyStore {
           credit: 0,
           models: new Set(),
           /** 会话内「模型 → 桶」，按各自单价折算成本 */
-          modelBuckets: {}
+          modelBuckets: {},
+          /** 会话级速度累加 */
+          speedTurns: 0,
+          speedOutput: 0,
+          speedDuration: 0
         };
         sessionsById.set(sessionKey, session);
       }
@@ -400,6 +468,34 @@ class WorkBuddyStore {
       if (detail.firstAt && (!session.firstAt || detail.firstAt < session.firstAt)) session.firstAt = detail.firstAt;
       if (detail.lastAt && (!session.lastAt || detail.lastAt > session.lastAt)) session.lastAt = detail.lastAt;
       for (const model of Object.keys(detail.models)) session.models.add(model);
+
+      // 速度合并：文件级 throughput → 全局 speed + 会话级累加
+      const fileSpeed = detail.throughput;
+      if (fileSpeed && fileSpeed.turns) {
+        session.speedTurns += fileSpeed.turns;
+        session.speedOutput += fileSpeed.outputTokens;
+        session.speedDuration += fileSpeed.durationMs;
+        speed.turns += fileSpeed.turns;
+        speed.outputTokens += fileSpeed.outputTokens;
+        speed.durationMs += fileSpeed.durationMs;
+        const mergeSpeedCell = (target, key, cell) => {
+          const dest = target[key] || (target[key] = { turns: 0, outputTokens: 0, durationMs: 0 });
+          dest.turns += cell.turns;
+          dest.outputTokens += cell.outputTokens;
+          dest.durationMs += cell.durationMs;
+        };
+        for (const [day, cell] of Object.entries(fileSpeed.days || {})) mergeSpeedCell(speed.days, day, cell);
+        for (const [model, cell] of Object.entries(fileSpeed.models || {})) mergeSpeedCell(speed.models, model, cell);
+        for (const [hour, cell] of Object.entries(fileSpeed.hours || {})) mergeSpeedCell(speed.hours, hour, cell);
+        for (const [day, hours] of Object.entries(fileSpeed.dayHours || {})) {
+          if (!speed.dayHours[day]) speed.dayHours[day] = {};
+          for (const [hour, cell] of Object.entries(hours)) mergeSpeedCell(speed.dayHours[day], hour, cell);
+        }
+        for (const [day, byModel] of Object.entries(fileSpeed.modelDays || {})) {
+          if (!speed.modelDays[day]) speed.modelDays[day] = {};
+          for (const [model, cell] of Object.entries(byModel)) mergeSpeedCell(speed.modelDays[day], model, cell);
+        }
+      }
 
       addBucket(sum, detail.tokens);
       credits += detail.credits || 0;
@@ -457,14 +553,15 @@ class WorkBuddyStore {
     const models = Object.values(modelTotals)
       .map(item => {
         const cell = modelCost.perModel[item.model] || {};
+        const sc = speed.models[item.model] || {};
         return {
           ...item,
           share: merged.totalTokens ? item.totalTokens / merged.totalTokens : 0,
           cost: cell.unit ? cell.cny : null,
           unit: cell.unit || null,
           estimated: Boolean(cell.estimated),
-          turns: 0,
-          tps: null
+          turns: sc.turns || 0,
+          tps: sc.durationMs > 0 ? (sc.outputTokens || 0) * 1000 / sc.durationMs : null
         };
       })
       .sort((a, b) => b.totalTokens - a.totalTokens);
@@ -484,16 +581,54 @@ class WorkBuddyStore {
     const sessionList = [...sessionsById.values()]
       .filter(item => item.records > 0 && item.totalTokens > 0)
       .map(item => {
-        const { models: modelSet, modelBuckets, ...rest } = item;
+        const { models: modelSet, modelBuckets, speedTurns, speedOutput, speedDuration, ...rest } = item;
         return {
           ...rest,
           models: [...modelSet],
           cost: costOfModels(modelBuckets || {}, priceTable).cny,
-          turns: 0,
-          tps: null
+          turns: speedTurns || 0,
+          tps: speedDuration > 0 ? (speedOutput || 0) * 1000 / speedDuration : null
         };
       })
       .sort((a, b) => String(b.lastAt || "").localeCompare(String(a.lastAt || "")));
+
+    // 输出速度汇总：跟 Codex 的 throughput 结构完全一致，
+    // 看板侧 speedCard / renderHours / renderSessions 可以共用同一套渲染逻辑
+    const speedCell = cell => ({
+      turns: cell.turns,
+      outputTokens: cell.outputTokens,
+      durationMs: cell.durationMs,
+      tps: cell.durationMs > 0 ? cell.outputTokens * 1000 / cell.durationMs : null,
+      ttftMs: null
+    });
+    const throughput = speed.durationMs > 0
+      ? {
+        turns: speed.turns,
+        outputTokens: speed.outputTokens,
+        durationMs: speed.durationMs,
+        tps: speed.outputTokens * 1000 / speed.durationMs,
+        ttftMs: null,
+        days: Object.fromEntries(Object.entries(speed.days).map(([day, cell]) => [day, speedCell(cell)])),
+        models: Object.entries(speed.models)
+          .map(([model, cell]) => ({ model, ...speedCell(cell) }))
+          .sort((a, b) => b.turns - a.turns),
+        hours: Array.from({ length: 24 }, (_, hour) => {
+          const cell = speed.hours[String(hour)];
+          return cell ? speedCell(cell) : { turns: 0, outputTokens: 0, durationMs: 0, tps: null, ttftMs: null };
+        }),
+        dayHours: Object.fromEntries(Object.entries(speed.dayHours).map(([day, byHour]) => [
+          day,
+          Array.from({ length: 24 }, (_, hour) => {
+            const cell = byHour[String(hour)];
+            return cell ? speedCell(cell) : null;
+          })
+        ])),
+        modelDays: Object.fromEntries(Object.entries(speed.modelDays).map(([day, byModel]) => [
+          day,
+          Object.fromEntries(Object.entries(byModel).map(([model, cell]) => [model, speedCell(cell)]))
+        ]))
+      }
+      : null;
 
     return {
       ok: true,
@@ -504,7 +639,7 @@ class WorkBuddyStore {
       /** 数据来自哪几套安装（国际版 ~/.workbuddy-ai、国内版 ~/.workbuddy） */
       roots: this.rootsInfo,
       baseline: null,
-      throughput: null,
+      throughput,
       credits: { total: credits, today: sessionList.reduce((acc, item) => acc + (item.credit || 0), 0) },
       totals: { ...merged, sessions: sessionList.length, cost: modelCost.cny },
       cost: {
