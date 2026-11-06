@@ -440,12 +440,6 @@ if (!gotLock) {
       const target = roots.find(root => fs.existsSync(path.join(root, "projects"))) || roots[0];
       return shell.openPath(path.join(target, "projects"));
     });
-    // 价格表就在 userData 里，点开就能改单价
-    ipcMain.handle("dashboard:open-pricing", () => {
-      const file = userDataPaths().pricing;
-      ensureTableFile(file);
-      return shell.openPath(file);
-    });
     ipcMain.handle("dashboard:open-external", (_event, url) => {
       if (typeof url === "string" && /^https:\/\//i.test(url)) shell.openExternal(url);
       return true;
@@ -570,7 +564,7 @@ if (!gotLock) {
   }
 
   async function initStore(paths, baseline) {
-    // 价格表：首次运行把内置表写到 userData，之后用户改文件即可更新价格
+    // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格
     ensureTableFile(paths.pricing);
     const pricing = loadTable(paths.pricing);
     log(`pricing: ${pricing.entries.length} models, USD→CNY ${pricing.usdCny}`);

@@ -162,6 +162,57 @@ async function main() {
     assert.equal(info.legacyButton, false, "旧版网页看板按钮应该已经删除");
     assert.equal(info.legacyApi, false, "preload 不应该再暴露 openLegacy");
 
+    // 3b. 固定几何：表格框、分布卡、趋势图尺寸与数据源无关
+    const layout = await dashboard.evaluate(() => {
+      const box = sel => {
+        const el = document.querySelector(sel);
+        return el ? Math.round(el.getBoundingClientRect().height) : -1;
+      };
+      return {
+        statRow: box("#stat-row"),
+        table: box(".table-wrap"),
+        chart: box(".chart-wrap"),
+        cols: [...document.querySelectorAll(".cols > .card")].map(el => Math.round(el.getBoundingClientRect().height)),
+        pricingButton: !!document.querySelector("#btn-pricing"),
+        pricingApi: !!window.dashboard && "openPricing" in window.dashboard,
+        modelRows: document.querySelectorAll("#models .bar-row").length,
+        modelMoney: document.querySelectorAll("#models .bar-money").length,
+        projectRows: document.querySelectorAll("#projects .bar-row").length,
+        projectMoney: document.querySelectorAll("#projects .bar-money").length,
+        chartSub: (document.querySelector("#chart-sub") || {}).textContent || "",
+        speedCol: (() => {
+          const el = document.querySelector("#th-speed");
+          return el ? Math.round(el.getBoundingClientRect().width) : -1;
+        })(),
+        footStyle: (() => {
+          const el = document.querySelector(".stat-foot");
+          if (!el) return "";
+          const s = getComputedStyle(el);
+          return s.display + "/" + s.textOverflow;
+        })(),
+        dotDisplay: (() => {
+          const el = document.querySelector(".stat-foot .dot") || document.querySelector(".dot");
+          return el ? getComputedStyle(el).display : "";
+        })(),
+        clippedCells: [...document.querySelectorAll("#session-body td")]
+          .filter(td => td.scrollWidth > td.clientWidth + 1)
+          .map(td => td.textContent.trim() + " [" + td.clientWidth + "/" + td.scrollWidth + "]").slice(0, 8)
+      };
+    });
+    assert.equal(layout.pricingButton, false, "底栏「价格表」按钮应该已经删除");
+    assert.equal(layout.pricingApi, false, "preload 不应该再暴露 openPricing");
+    assert.equal(layout.table, 244, "会话表框固定高度，切数据源不跳");
+    assert.ok(layout.chart >= 260, "趋势图应该拉长到 280px");
+    assert.equal(layout.cols.length, 2, "模型 / 项目两张分布卡");
+    assert.equal(layout.cols[0], layout.cols[1], "两张分布卡应该等高");
+    assert.equal(layout.modelMoney, layout.modelRows, "模型分布每行都要带金额");
+    assert.equal(layout.projectMoney, layout.projectRows, "项目分布每行都要带金额");
+    assert.match(layout.chartSub, /天有记录/);
+    assert.ok(layout.speedCol >= 100, "速度列要够宽，别把 102.7 tok/s 切掉");
+    assert.equal(layout.footStyle, "block/ellipsis", "统计卡底部文案单行省略，不把整行撑高");
+    assert.equal(layout.dotDisplay, "inline-block", "stat-foot 改块级后配额小圆点仍要显示");
+    assert.deepEqual(layout.clippedCells, [], "会话表任何单元格都不该被裁切：" + layout.clippedCells.join(", "));
+
     // 4. 切一次区间，确认活跃时段跟着变
     const before = await dashboard.evaluate(() => (document.querySelector("#hour-badge") || {}).textContent || "");
     await dashboard.click('#range button[data-key="7"]');

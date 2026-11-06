@@ -425,12 +425,14 @@ class WorkBuddyStore {
     const seenKeys = new Set();
     const priceTable = this.pricing;
     let credits = 0;
-    /** 输出速度汇总：跟 Codex 结构完全一致 */
-    const speed = { turns: 0, outputTokens: 0, durationMs: 0, days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {} };
+    /** 输出速度汇总：跟 Codex 结构完全一致（含按项目拆分的 projectDays） */
+    const speed = { turns: 0, outputTokens: 0, durationMs: 0, days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {}, projectDays: {}, projects: {} };
 
     for (const entry of this.files.values()) {
       const detail = entry.detail;
       if (!detail) continue;
+
+      const projectKey = detail.project || "WorkBuddy";
 
       // 跨文件去重后仍保留整份明细：重复只可能整份复制，出现重复说明该文件是续跑副本
       const duplicate = (detail.keys || []).length > 0 && (detail.keys || []).every(key => seenKeys.has(key));
@@ -495,12 +497,16 @@ class WorkBuddyStore {
           if (!speed.modelDays[day]) speed.modelDays[day] = {};
           for (const [model, cell] of Object.entries(byModel)) mergeSpeedCell(speed.modelDays[day], model, cell);
         }
+        // 项目维度的速度：文件归属一个项目，按天摊开后项目分布也能显示 tok/s
+        for (const [day, cell] of Object.entries(fileSpeed.days || {})) {
+          if (!speed.projectDays[day]) speed.projectDays[day] = {};
+          mergeSpeedCell(speed.projectDays[day], projectKey, cell);
+          mergeSpeedCell(speed.projects, projectKey, cell);
+        }
       }
 
       addBucket(sum, detail.tokens);
       credits += detail.credits || 0;
-
-      const projectKey = detail.project || "WorkBuddy";
 
       for (const [day, bucket] of Object.entries(detail.days)) {
         if (!days.has(day)) days.set(day, { day, ...zeroBucket() });
@@ -626,6 +632,13 @@ class WorkBuddyStore {
         modelDays: Object.fromEntries(Object.entries(speed.modelDays).map(([day, byModel]) => [
           day,
           Object.fromEntries(Object.entries(byModel).map(([model, cell]) => [model, speedCell(cell)]))
+        ])),
+        projects: Object.entries(speed.projects)
+          .map(([project, cell]) => ({ project, ...speedCell(cell) }))
+          .sort((a, b) => b.turns - a.turns),
+        projectDays: Object.fromEntries(Object.entries(speed.projectDays).map(([day, byProject]) => [
+          day,
+          Object.fromEntries(Object.entries(byProject).map(([project, cell]) => [project, speedCell(cell)]))
         ]))
       }
       : null;

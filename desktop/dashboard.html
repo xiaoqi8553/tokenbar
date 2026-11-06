@@ -298,22 +298,32 @@
     flex-direction: column;
     gap: 8px;
     min-width: 0;
+    /* 两个数据源的提示行数不同，固定下限保证切换时卡片不忽高忽低 */
+    min-height: 148px;
   }
 
   .stat-top {
     display: flex;
     align-items: baseline;
     gap: 8px;
+    flex-wrap: nowrap;
+    min-width: 0;
   }
 
   .stat-label {
     font-size: 14.5px;
     color: var(--text-2);
     font-weight: 560;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .stat-window {
     margin-left: auto;
+    flex: none;
+    white-space: nowrap;
     font-size: 12px;
     color: var(--text-3);
     padding: 2px 6px;
@@ -355,23 +365,28 @@
   .meter i[data-level="full"] { background: var(--danger); }
 
   .stat-foot {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     font-size: 13.5px;
     color: var(--text-3);
-    min-height: 17px;
+    min-height: 21px;
+    /* 单行：不然「11 个会话 · 2,918 次调用」这类长文案会把整行卡片撑高 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .stat-foot b { color: var(--text-2); font-weight: 560; }
 
   .dot {
+    display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--ok);
+    vertical-align: middle;
     flex: none;
   }
+  /* stat-foot 改成块级单行省略后，原来的 flex gap 没了，用外边距补回间距 */
+  .stat-foot .dot { margin-right: 6px; }
   .dot[data-tone="warn"] { background: var(--warn); }
   .dot[data-tone="muted"] { background: var(--text-3); }
 
@@ -391,6 +406,9 @@
     color: var(--text-3);
     line-height: 1.3;
     margin-top: -3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* 版本徽标 */
@@ -456,7 +474,8 @@
   .chart-wrap {
     position: relative;
     width: 100%;
-    height: 190px;
+    /* 拉高：日常几十 M 的波动在 190px 里几乎是一条直线 */
+    height: 280px;
   }
 
   .chart-wrap svg { display: block; width: 100%; height: 100%; }
@@ -524,12 +543,22 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
-    align-items: start;
+    /* 默认 stretch：模型 / 项目两张卡永远等高，不随行数变化 */
+    align-items: stretch;
   }
 
-  .bars { display: flex; flex-direction: column; gap: 10px; }
+  .cols > .card { display: flex; flex-direction: column; }
 
-  .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
+  .bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 196px;
+  }
+
+  /* 固定行高：切换数据源、行数不同时也不会错位 */
+  .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; min-height: 28px; align-content: start; }
 
   .bar-name {
     font-size: 14.5px;
@@ -537,11 +566,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
 
-  .bar-val { font-size: 13.5px; color: var(--text-3); }
+  .bar-val { font-size: 13.5px; color: var(--text-3); white-space: nowrap; }
   .bar-val b { color: var(--text); font-weight: 560; }
   .bar-extra { color: var(--text-3); }
+  .bar-money { color: var(--text-2); font-weight: 560; }
+  .bar-speed { color: var(--accent); font-weight: 560; }
+  .bar-none { color: var(--text-3); }
+  .bar-sep { color: var(--text-3); }
 
   .bar-track {
     grid-column: 1 / -1;
@@ -623,13 +657,15 @@
   /* ---------------- 会话表 ---------------- */
 
   .table-wrap {
-    max-height: 244px;
+    /* 固定高度：Codex 几十行、WorkBuddy 几行，表格框都一样大，切换不跳 */
+    height: 244px;
     overflow-y: auto;
     border-radius: 10px;
     border: 1px solid var(--line-soft);
   }
 
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  /* 固定列宽：项目名长短不同也不会把两列撑得不一样宽 */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
 
   thead th {
     position: sticky;
@@ -656,7 +692,8 @@
 
   tbody tr:last-child td { border-bottom: 0; }
   tbody tr:hover td { background: var(--panel-soft); }
-  td.num { text-align: right; color: var(--text); font-weight: 540; }
+  /* 数字列两边留白收紧一点：速度「102.7 tok/s」、时长「3 天 12 小时」才不会被切 */
+  td.num { text-align: right; color: var(--text); font-weight: 540; padding-left: 8px; padding-right: 8px; }
   td.proj { color: var(--text); }
   .muted { color: var(--text-3); }
 
@@ -700,6 +737,11 @@
   @media (max-width: 1120px) {
     .stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
+  /* 窄窗口把「时长」收起来，别把项目名挤成几个点 */
+  @media (max-width: 1000px) {
+    .col-duration { display: none; }
   }
 
   @media (max-width: 860px) {
@@ -809,14 +851,14 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 90px">最近活动</th>
+              <th style="width: 100px">最近活动</th>
               <th>项目</th>
-              <th style="width: 172px">模型</th>
+              <th style="width: 186px">模型</th>
               <th style="width: 80px; text-align: right">用量</th>
-              <th style="width: 60px; text-align: right">请求</th>
-              <th style="width: 76px; text-align: right">花费</th>
-              <th style="width: 66px; text-align: right" id="th-speed">速度</th>
-              <th style="width: 74px; text-align: right">时长</th>
+              <th style="width: 68px; text-align: right">请求</th>
+              <th style="width: 88px; text-align: right">花费</th>
+              <th style="width: 104px; text-align: right" id="th-speed">速度</th>
+              <th class="col-duration" style="width: 110px; text-align: right">时长</th>
             </tr>
           </thead>
           <tbody id="session-body"></tbody>
@@ -829,7 +871,6 @@
     <span class="dot" id="status-dot"></span>
     <span id="status-text">—</span>
     <span style="flex:1"></span>
-    <button class="link" id="btn-pricing">价格表</button>
     <button class="link" id="btn-sessions">日志目录</button>
   </footer>
 </div>
@@ -921,6 +962,37 @@
     const cached = Math.min(input, Math.max(0, bucket.cachedInputTokens || 0));
     const output = Math.max(0, bucket.outputTokens || 0);
     return ((input - cached) * unit.input + cached * unit.cached + output * unit.output) / 1e6;
+  }
+
+  /**
+   * 某天的「混合单价」：项目桶是按天聚合的、不分模型，没法直接套某个模型的单价。
+   * 用当天各模型的实际用量加权出三档均价，再套到项目桶上。
+   * 这样项目花费与模型花费出自同一批桶，两边的合计能对上。
+   */
+  function dayUnit(day) {
+    const byModel = state.detail && state.detail.modelDays ? state.detail.modelDays[day] : null;
+    if (!byModel) return null;
+    const acc = { fresh: 0, freshCost: 0, cached: 0, cachedCost: 0, output: 0, outputCost: 0 };
+    for (const [model, bucket] of Object.entries(byModel)) {
+      const unit = unitFor(model);
+      if (!unit) continue;
+      const input = Math.max(0, bucket.inputTokens || 0);
+      const cached = Math.min(input, Math.max(0, bucket.cachedInputTokens || 0));
+      const fresh = input - cached;
+      const output = Math.max(0, bucket.outputTokens || 0);
+      acc.fresh += fresh;
+      acc.freshCost += fresh * unit.input;
+      acc.cached += cached;
+      acc.cachedCost += cached * unit.cached;
+      acc.output += output;
+      acc.outputCost += output * unit.output;
+    }
+    if (!acc.fresh && !acc.cached && !acc.output) return null;
+    return {
+      input: acc.fresh ? acc.freshCost / acc.fresh : 0,
+      cached: acc.cached ? acc.cachedCost / acc.cached : 0,
+      output: acc.output ? acc.outputCost / acc.output : 0
+    };
   }
 
   /** 当前区间内、按模型单价逐天累加的花费 */
@@ -1089,17 +1161,21 @@
     return [...totals.values()]
       .map(item => {
         const speed = speedAcc.get(item.model);
+        const output = speed ? speed.output : 0;
+        const duration = speed ? speed.duration : 0;
         return {
           ...item,
           share: grand ? item.totalTokens / grand : 0,
           turns: speed ? speed.turns : 0,
-          tps: speed && speed.duration > 0 ? speed.output * 1000 / speed.duration : null
+          speedOutput: output,
+          speedDuration: duration,
+          tps: duration > 0 ? output * 1000 / duration : null
         };
       })
       .sort((a, b) => b.totalTokens - a.totalTokens);
   }
 
-  /** 区间内的项目汇总 */
+  /** 区间内的项目汇总：和模型分布同口径，花费与输出速度都补齐 */
   function rangeProjects() {
     const detail = state.detail;
     if (!detail) return [];
@@ -1108,21 +1184,52 @@
       ? Object.keys(detail.projectDays || {})
       : rangeSeries().map(item => item.day);
 
+    const blank = project => ({
+      project,
+      totalTokens: 0,
+      records: 0,
+      cost: 0,
+      turns: 0,
+      speedOutput: 0,
+      speedDuration: 0
+    });
+
     const totals = new Map();
     let grand = 0;
     for (const day of keys) {
       const byProject = (detail.projectDays || {})[day];
       if (!byProject) continue;
+      const unit = dayUnit(day);
       for (const [project, bucket] of Object.entries(byProject)) {
-        const current = totals.get(project) || { project, totalTokens: 0, records: 0, sessions: 0 };
+        const current = totals.get(project) || blank(project);
         current.totalTokens += bucket.totalTokens || 0;
         current.records += bucket.records || 0;
+        if (unit) current.cost += bucketCost(bucket, unit);
         totals.set(project, current);
         grand += bucket.totalTokens || 0;
       }
     }
+
+    // 速度与用量走同一批天：项目级速度由每份日志的完成轮按天归属得到
+    const speedDays = (detail.throughput && detail.throughput.projectDays) || {};
+    for (const day of keys) {
+      const byProject = speedDays[day];
+      if (!byProject) continue;
+      for (const [project, cell] of Object.entries(byProject)) {
+        const current = totals.get(project);
+        if (!current) continue;
+        current.speedOutput += cell.outputTokens || 0;
+        current.speedDuration += cell.durationMs || 0;
+        current.turns += cell.turns || 0;
+      }
+    }
+
     return [...totals.values()]
-      .map(item => ({ ...item, share: grand ? item.totalTokens / grand : 0 }))
+      .map(item => ({
+        ...item,
+        share: grand ? item.totalTokens / grand : 0,
+        tps: item.speedDuration > 0 ? item.speedOutput * 1000 / item.speedDuration : null
+      }))
       .sort((a, b) => b.totalTokens - a.totalTokens);
   }
 
@@ -1324,7 +1431,7 @@
 
     return {
       label: "输出速度",
-      window: "整轮耗时口径",
+      window: "整轮口径",
       num: todaySpeed ? todaySpeed.tps.toFixed(1) : "—",
       unit: todaySpeed ? "tok/s" : "",
       hideMeter: true,
@@ -1467,6 +1574,10 @@
     row.innerHTML = cards.map(card => {
       const level = card.level || meterLevel(card.percent);
       const pace = Number.isFinite(card.pace) ? '<b class="pace" style="left:' + Math.max(0, Math.min(100, card.pace)).toFixed(1) + '%"></b>' : '';
+      // 每张卡都占住额度条和两行提示的位置：Codex / WorkBuddy 切换时高度不跳
+      const hints = (card.hints || []).filter(Boolean).slice(0, 2);
+      while (hints.length < 2) hints.push("");
+      const footText = card.foot.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
       return [
         '<div class="stat"' + (card.title ? ' title="' + escapeHtml(card.title) + '"' : '') + '>',
         '  <div class="stat-top">',
@@ -1477,10 +1588,10 @@
         '    <span class="stat-num' + (card.money ? ' money' : '') + '">' + card.num + '</span>',
         '    <span class="stat-unit">' + (card.unit || "") + '</span>',
         '  </div>',
-        card.hideMeter ? '' : '<div class="meter"><i data-level="' + level + '" style="width:' + Math.max(2, Math.min(100, card.percent)) + '%"></i>' + pace + '</div>',
-        '  <div class="stat-foot">' + card.foot + '</div>',
-        (card.hints || []).filter(Boolean).map(text => '  <div class="stat-hint">' + escapeHtml(text) + '</div>').join(''),
-        card.hintHtml ? '  <div class="stat-hint">' + card.hintHtml + '</div>' : '',
+        '<div class="meter"' + (card.hideMeter ? ' style="visibility:hidden"' : '') + '><i data-level="' + level + '" style="width:' + Math.max(2, Math.min(100, card.percent)) + '%"></i>' + pace + '</div>',
+        '  <div class="stat-foot" title="' + escapeHtml(footText) + '">' + card.foot + '</div>',
+        hints.map(text => '  <div class="stat-hint"' + (text ? ' title="' + escapeHtml(text) + '"' : '') + '>' +
+          (text ? escapeHtml(text) : '&nbsp;') + '</div>').join(""),
         '</div>'
       ].join("");
     }).join("");
@@ -1533,7 +1644,8 @@
     const svg = $("chart");
     const wrap = svg.parentElement;
     const width = Math.max(320, wrap.clientWidth);
-    const height = 190;
+    // 高度跟 CSS 走，改样式不用回来改这里的常量
+    const height = Math.max(200, wrap.clientHeight || 280);
     const padL = 40, padR = 12, padT = 16, padB = 24;
     const innerW = width - padL - padR;
     const innerH = height - padT - padB;
@@ -1548,7 +1660,18 @@
 
     let max = 0;
     for (const item of series) max = Math.max(max, item.totalTokens);
-    const ceiling = niceCeil(max * 1.06 || 1);
+
+    // 纵轴不跟着单日尖峰走：拿 p95 / 中位数撑出一个「日常看得见」的上限。
+    // 极个别超出上限的日子贴顶画，并打上尖角标记，真实值仍在 tooltip 和副标题里。
+    const positives = series.map(item => item.totalTokens).filter(value => value > 0).sort((a, b) => a - b);
+    const percentile = q => positives.length
+      ? positives[Math.min(positives.length - 1, Math.floor(q * (positives.length - 1)))]
+      : 0;
+    const hardCeiling = niceCeil(max * 1.06 || 1);
+    const softCeiling = niceCeil(Math.max(percentile(0.95) * 1.8, percentile(0.5) * 4) || 1);
+    const ceiling = Math.min(hardCeiling, softCeiling);
+    const clipped = series.filter(item => item.totalTokens > ceiling);
+
     const step = series.length === 1 ? 0 : innerW / (series.length - 1);
     const xAt = index => (series.length === 1 ? padL + innerW / 2 : padL + index * step);
     const yAt = value => bottom - (Math.max(0, Math.min(value, ceiling)) / ceiling) * innerH;
@@ -1556,13 +1679,13 @@
 
     const parts = [];
 
-    // 参考线只留 0 / 中 / 顶，且中间那条极淡
-    for (let i = 0; i <= 2; i += 1) {
-      const y = bottom - (innerH * i) / 2;
-      if (i > 0) {
+    // 四等分刻度：压低上限之后，日常几十 M 的起伏也能对着刻度读出来
+    for (let i = 0; i <= 4; i += 1) {
+      const y = bottom - (innerH * i) / 4;
+      if (i > 0 && i < 4) {
         parts.push('<line class="grid-line" x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (padL + innerW) + '" y2="' + y.toFixed(1) + '"/>');
       }
-      parts.push('<text class="axis-text" x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtTokens((ceiling * i) / 2) + '</text>');
+      parts.push('<text class="axis-text" x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtTokens((ceiling * i) / 4) + '</text>');
     }
 
     const points = series.map((item, index) => ({ x: xAt(index), y: yAt(item.totalTokens) }));
@@ -1581,6 +1704,16 @@
 
     parts.push('<path d="' + area + '" fill="url(#g-area)"/>');
     parts.push('<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>');
+
+    // 超出纵轴的日子在顶部打一个橙色尖角：平顶不等于「峰值就这么高」
+    series.forEach((item, index) => {
+      if (item.totalTokens <= ceiling) return;
+      const x = points[index].x;
+      parts.push('<path d="M ' + (x - 4.5).toFixed(1) + ' ' + (padT + 6).toFixed(1) +
+        ' L ' + x.toFixed(1) + ' ' + (padT - 1).toFixed(1) +
+        ' L ' + (x + 4.5).toFixed(1) + ' ' + (padT + 6).toFixed(1) + ' Z" fill="var(--warn)">' +
+        '<title>' + dayLabel(item.day) + ' 实际 ' + fmtTokens(item.totalTokens) + '，超出纵轴</title></path>');
+    });
 
     // 今天：实心点；正在悬停：竖线 + 空心点
     const todayIndex = series.findIndex(item => item.day === todayKey);
@@ -1621,8 +1754,11 @@
     const days = rangeDays();
     const firstDay = series[0].day;
     const lastDay = series[series.length - 1].day;
+    const clippedNote = clipped.length
+      ? " · 纵轴 " + fmtTokens(ceiling) + "，" + clipped.length + " 天超出（峰值 " + fmtTokens(max) + "）"
+      : "";
     $("chart-sub").textContent = (days === 0 ? "全部时间" : "最近 " + days + " 天") +
-      " · " + dayLabel(firstDay) + " – " + dayLabel(lastDay) + " · " + series.length + " 天有记录";
+      " · " + dayLabel(firstDay) + " – " + dayLabel(lastDay) + " · " + series.length + " 天有记录" + clippedNote;
 
     // 环比：跟紧挨着的前一段等长区间比
     let compareValue = "—";
@@ -1731,23 +1867,41 @@
     const rows = head.slice();
 
     if (rest.length) {
-      rows.push({
+      // 「其他 N 项」也要按同样的口径汇总：花费相加，速度用输出 / 耗时重新加权
+      const row = {
         [nameKey]: "其他 " + rest.length + " 项",
-        totalTokens: rest.reduce((acc, item) => acc + item.totalTokens, 0),
-        share: rest.reduce((acc, item) => acc + item.share, 0),
+        totalTokens: 0,
+        share: 0,
+        cost: 0,
+        turns: 0,
+        speedOutput: 0,
+        speedDuration: 0,
         muted: true
-      });
+      };
+      for (const item of rest) {
+        row.totalTokens += item.totalTokens || 0;
+        row.share += item.share || 0;
+        row.cost += item.cost || 0;
+        row.turns += item.turns || 0;
+        row.speedOutput += item.speedOutput || 0;
+        row.speedDuration += item.speedDuration || 0;
+      }
+      row.tps = row.speedDuration > 0 ? row.speedOutput * 1000 / row.speedDuration : null;
+      rows.push(row);
     }
 
     const max = Math.max.apply(null, rows.map(item => item.share).concat([0.0001]));
 
     container.innerHTML = rows.map(item => {
       const width = Math.max(1.5, (item.share / max) * 100);
+      const decorated = options.decorate ? options.decorate(item) : {};
+      const extraHtml = decorated.extraHtml || (item.extra ? escapeHtml(item.extra) : "");
+      const label = decorated.label || item.label || "";
       return [
-        '<div class="bar-row"' + (item.label ? ' title="' + escapeHtml(item.label) + '"' : '') + '>',
+        '<div class="bar-row"' + (label ? ' title="' + escapeHtml(label) + '"' : '') + '>',
         '  <span class="bar-name"' + (item.muted ? ' style="color: var(--text-3)"' : '') + '>' + escapeHtml(item[nameKey]) + '</span>',
         '  <span class="bar-val"><b>' + fmtPercent(item.share * 100, 1) + '</b> · ' + fmtTokens(item.totalTokens) +
-          (item.extra ? ' · <span class="bar-extra">' + escapeHtml(item.extra) + '</span>' : '') + '</span>',
+          (extraHtml ? ' · <span class="bar-extra">' + extraHtml + '</span>' : '') + '</span>',
         '  <span class="bar-track"><i style="width:' + width.toFixed(1) + '%"></i></span>',
         '</div>'
       ].join("");
@@ -1762,16 +1916,38 @@
       .replace(/"/g, "&quot;");
   }
 
+  /** 两张分布卡共用的行尾格式：花费 + 输出速度 */
+  function distExtra(item) {
+    return '<span class="bar-money">' + fmtMoney(item.cost || 0) + '</span>' +
+      '<span class="bar-sep"> · </span>' +
+      (item.tps
+        ? '<span class="bar-speed">' + item.tps.toFixed(1) + ' tok/s</span>'
+        : '<span class="bar-none">—</span>');
+  }
+
+  function distLabel(item) {
+    return (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天") +
+      " · " + fmtMoney(item.cost || 0) +
+      (item.tps ? " · " + item.tps.toFixed(1) + " tok/s（" + fmtCount(item.turns || 0) + " 轮）" : " · 无速度样本");
+  }
+
   function renderModels() {
     const models = rangeModels();
     for (const item of models) {
-      const cost = bucketCost(item, unitFor(item.model));
-      item.cost = cost;
-      // 行尾先给钱（这是最想看的），速度并入 tooltip，避免撑爆一行
-      item.extra = fmtMoney(cost);
-      item.label = (item.tps ? item.tps.toFixed(1) + " tok/s · " : "") + unitText(item.model);
+      item.cost = bucketCost(item, unitFor(item.model));
     }
-    renderBars($("models"), models, { nameKey: "model", limit: 6, empty: "此区间没有模型数据" });
+    renderBars($("models"), models, {
+      nameKey: "model",
+      limit: 6,
+      empty: "此区间没有模型数据",
+      decorate: item => item.muted
+        ? { extraHtml: distExtra(item), label: distLabel(item) }
+        : {
+          extraHtml: distExtra(item),
+          // 模型行额外保留单价说明：鼠标停上去能看到输入 / 命中 / 输出三档
+          label: (item.tps ? item.tps.toFixed(1) + " tok/s · " : "") + unitText(item.model)
+        }
+    });
     const totalCost = models.reduce((acc, item) => acc + (item.cost || 0), 0);
     $("model-badge").textContent = fmtMoney(totalCost) + " · " +
       (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天");
@@ -1779,8 +1955,15 @@
 
   function renderProjects() {
     const projects = rangeProjects();
-    renderBars($("projects"), projects, { nameKey: "project", limit: 6, empty: "此区间没有项目数据" });
-    $("project-badge").textContent = rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天";
+    renderBars($("projects"), projects, {
+      nameKey: "project",
+      limit: 6,
+      empty: "此区间没有项目数据",
+      decorate: item => ({ extraHtml: distExtra(item), label: distLabel(item) })
+    });
+    const totalCost = projects.reduce((acc, item) => acc + (item.cost || 0), 0);
+    $("project-badge").textContent = fmtMoney(totalCost) + " · " +
+      (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天");
   }
 
   function renderHours() {
@@ -1888,7 +2071,7 @@
         '  <td class="num">' + fmtCount(item.records) + '</td>',
         '  <td class="num bar-money">' + (item.cost ? fmtMoney(item.cost) : '<span class="muted">—</span>') + '</td>',
         '  <td class="num">' + speedCell + '</td>',
-        '  <td class="num muted">' + fmtDuration(span) + '</td>',
+        '  <td class="num muted col-duration">' + fmtDuration(span) + '</td>',
         '</tr>'
       ].join("");
     }).join("");
@@ -2082,10 +2265,6 @@
     $("btn-sessions").addEventListener("click", () => {
       if (state.source === "workbuddy" && window.dashboard.openWorkBuddy) window.dashboard.openWorkBuddy();
       else window.dashboard.openSessions();
-    });
-    // 价格表：直接在系统默认编辑器里打开 pricing.json，改完重开看板即生效
-    $("btn-pricing").addEventListener("click", () => {
-      if (window.dashboard.openPricing) window.dashboard.openPricing();
     });
     // 版本号可点：直接在浏览器打开仓库，方便确认「这是哪一版」
     $("app-ver").addEventListener("click", () => {

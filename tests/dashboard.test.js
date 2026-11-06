@@ -144,6 +144,9 @@ test("2.1 WorkBuddy 用 call/result 时间戳配对算速度，结构跟 Codex �
   assert.equal(snap.throughput.hours.length, 24);
   assert.ok(snap.throughput.dayHours["2026-10-30"], "按天×小时");
   assert.ok(snap.throughput.modelDays["2026-10-30"], "按天×模型");
+  assert.ok(snap.throughput.projects.length > 0, "按项目");
+  assert.equal(snap.throughput.projects[0].tps, 200, "项目级速度也能算出来");
+  assert.ok(snap.throughput.projectDays["2026-10-30"], "按天×项目");
 
   // 模型与会话级 tps 不再是写死的 null
   const model = snap.models.find(item => item.model === "deepseek-v4.1-flash");
@@ -166,4 +169,64 @@ test("2.1 两个数据源都有速度卡，WorkBuddy 会话表也显示 tok/s", 
   // 固定六列，Codex 补了「累计用量」卡，两边卡片数一致
   assert.match(dashboard, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(dashboard, /function totalCard\(\)/);
+});
+
+test("2.2 价格表入口整体删掉，计价数据仍在", () => {
+  assert.doesNotMatch(dashboard, /btn-pricing|openPricing|价格表/);
+  assert.doesNotMatch(read("desktop/dashboard-preload.cjs"), /openPricing|dashboard:open-pricing/);
+  assert.doesNotMatch(main, /dashboard:open-pricing/);
+  assert.doesNotMatch(readme, /「价格表」按钮|"price table" button/);
+  // 删的是入口，不是计价：单价文件和折算逻辑都还活着
+  assert.match(main, /loadTable\(/);
+  assert.match(dashboard, /function bucketCost\(/);
+});
+
+test("2.2 趋势图拉长，纵轴不再被单日尖峰拖到 500M", () => {
+  assert.match(dashboard, /height: 280px/);
+  assert.match(dashboard, /wrap\.clientHeight \|\| 280/);
+  assert.match(dashboard, /softCeiling/);
+  assert.match(dashboard, /percentile\(0\.95\)/);
+  assert.match(dashboard, /天超出（峰值/);
+  assert.match(dashboard, /四等分刻度/);
+});
+
+test("2.2 两个数据源共用固定几何，切换不跳", () => {
+  assert.match(dashboard, /table-layout: fixed/);
+  assert.match(dashboard, /height: 244px/);
+  assert.doesNotMatch(dashboard, /max-height: 244px/);
+  assert.match(dashboard, /align-items: stretch/);
+  assert.match(dashboard, /min-height: 196px/);
+  assert.match(dashboard, /min-height: 148px/);
+  assert.match(dashboard, /visibility:hidden/);
+});
+
+test("2.2 模型与项目分布都显示花费和 tok/s", () => {
+  assert.match(dashboard, /function distExtra\(/);
+  assert.match(dashboard, /function dayUnit\(/);
+  assert.match(dashboard, /detail\.throughput && detail\.throughput\.projectDays/);
+  assert.match(dashboard, /bar-speed/);
+  assert.match(dashboard, /decorate: item => \(\{ extraHtml: distExtra\(item\), label: distLabel\(item\) \}\)/);
+  assert.match(read("desktop/data/codex-store.cjs"), /speed\.projectDays/);
+  assert.match(read("desktop/data/workbuddy-store.cjs"), /speed\.projectDays/);
+});
+
+test("2.2 统计卡文案与会话表数值不再被裁切", () => {
+  // stat-foot 改块级单行省略后，配额小圆点必须显式变成 inline-block，否则宽高失效
+  const rule = sel => {
+    const match = dashboard.match(new RegExp("^  " + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " \\{([\\s\\S]*?)^  \\}", "m"));
+    assert.ok(match, "找到 CSS 规则 " + sel);
+    return match[1];
+  };
+  assert.match(rule(".stat-foot"), /text-overflow: ellipsis/);
+  assert.doesNotMatch(rule(".stat-foot"), /display: flex/);
+  assert.match(rule(".dot"), /display: inline-block/);
+  assert.match(dashboard, /\.stat-foot \.dot \{ margin-right: 6px; \}/);
+  // 速度列 66px 装不下「102.7 tok/s」；日期、长模型名、时长也各差几像素
+  assert.match(dashboard, /width: 104px; text-align: right" id="th-speed"/);
+  assert.match(dashboard, /width: 100px">最近活动/);
+  assert.match(dashboard, /width: 186px">模型/);
+  assert.match(dashboard, /width: 110px; text-align: right">时长/);
+  assert.match(dashboard, /td\.num \{[\s\S]*?padding-left: 8px/);
+  assert.match(dashboard, /\.col-duration \{ display: none; \}/);
+  assert.doesNotMatch(dashboard, /width: 66px; text-align: right" id="th-speed"/);
 });

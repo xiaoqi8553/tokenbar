@@ -29,10 +29,10 @@ Reads local logs only. No network, no login, no upload.
 
 - Six metric cards: quota windows, today, total, cost, output speed, cache hit.
 - 六张指标卡：额度窗口、今日用量、累计用量、等价花费、输出速度、缓存命中。
-- Usage trend by day, switchable between 7 / 14 / 30 days and all time. Below it: range total, range cost, daily average, peak day, period-over-period.
-- 用量趋势按天，可切 7 / 14 / 30 天与全部。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
-- Model and project split, recalculated per range, with money on each row.
-- 模型 / 项目分布，跟着区间重算，行尾带金额。
+- Usage trend by day, switchable between 7 / 14 / 30 days and all time. The Y axis ignores one-off spikes so ordinary days stay readable; days above the ceiling are marked and keep their real value in the tooltip. Below it: range total, range cost, daily average, peak day, period-over-period.
+- 用量趋势按天，可切 7 / 14 / 30 天与全部。纵轴不受单日尖峰牵着走，超出上限的日子有标记、真实值留在 tooltip 里。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
+- Model and project split, recalculated per range, with cost and output speed on each row.
+- 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。
 - Active hours: 24 hours × tokens, or switch to tok/s to see output speed per hour.
 - 活跃时段：24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。
 - Sessions table: project, model, tokens, requests, speed, cost.
@@ -98,9 +98,9 @@ Model names match by longest prefix: `glm-5.3-flashx` wins over `glm-5.3-flash`,
 
 模型名用最长前缀匹配：`glm-5.3-flashx` 优先命中自己，其次 `glm-5.3-flash`，最后 `glm-5.3`。表里没有的型号按兜底价估算并标「估算」—— 宁可估，不记 0。
 
-The price table lives at `%APPDATA%/TokenBar/data/pricing.json`. The "price table" button in the footer opens it; edit and reopen the dashboard to apply.
+Price data lives at `%APPDATA%/TokenBar/data/pricing.json`. Edit it and reopen the dashboard to apply.
 
-价格表在 `%APPDATA%/TokenBar/data/pricing.json`，底栏「价格表」按钮直接打开，改完重开看板生效。
+单价数据在 `%APPDATA%/TokenBar/data/pricing.json`，改完重开看板生效。
 
 ### WorkBuddy
 

@@ -1072,7 +1072,8 @@ class CodexStore {
     const dailyHours = {};
     const sum = zeroBucket();
     /** 输出速度汇总：turns/outputTokens/durationMs 三项累加后算加权 tps */
-    const speed = { turns: 0, outputTokens: 0, durationMs: 0, ttft: [], days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {} };
+    // 天 → 项目 → 速度桶：项目分布要显示 tok/s，必须把每份日志的速度归到它自己的项目
+    const speed = { turns: 0, outputTokens: 0, durationMs: 0, ttft: [], days: {}, models: {}, hours: {}, dayHours: {}, modelDays: {}, projectDays: {}, projects: {} };
 
     const todayKey = dayKeyOf(new Date());
     const hourFloor = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -1081,6 +1082,7 @@ class CodexStore {
       const detail = entry.detail;
       if (!detail) continue;
 
+      const projectKey = detail.project || "未标注";
       const sessionKey = detail.sessionId || detail.file;
       let session = sessionsById.get(sessionKey);
       if (!session) {
@@ -1148,6 +1150,12 @@ class CodexStore {
           if (!speed.modelDays[day]) speed.modelDays[day] = {};
           for (const [model, cell] of Object.entries(byModel)) mergeSpeedCell(speed.modelDays[day], model, cell);
         }
+        // 一份日志只属于一个项目，按天摊到「天 → 项目」和「项目」两个维度
+        for (const [day, cell] of Object.entries(fileSpeed.days || {})) {
+          if (!speed.projectDays[day]) speed.projectDays[day] = {};
+          mergeSpeedCell(speed.projectDays[day], projectKey, cell);
+          mergeSpeedCell(speed.projects, projectKey, cell);
+        }
       }
       if (detail.firstAt && (!session.firstAt || detail.firstAt < session.firstAt)) session.firstAt = detail.firstAt;
       if (detail.lastAt && (!session.lastAt || detail.lastAt > session.lastAt)) session.lastAt = detail.lastAt;
@@ -1164,7 +1172,6 @@ class CodexStore {
         for (const key of Object.keys(zeroBucket())) target[key] += bucket[key] || 0;
       }
 
-      const projectKey = detail.project || "未标注";
       let project = projects.get(projectKey);
       if (!project) {
         project = { project: projectKey, cwd: detail.cwd, ...zeroBucket(), sessions: 0 };
@@ -1418,6 +1425,13 @@ class CodexStore {
         modelDays: Object.fromEntries(Object.entries(speed.modelDays).map(([day, byModel]) => [
           day,
           Object.fromEntries(Object.entries(byModel).map(([model, cell]) => [model, speedCell(cell)]))
+        ])),
+        projects: Object.entries(speed.projects)
+          .map(([project, cell]) => ({ project, ...speedCell(cell) }))
+          .sort((a, b) => b.turns - a.turns),
+        projectDays: Object.fromEntries(Object.entries(speed.projectDays).map(([day, byProject]) => [
+          day,
+          Object.fromEntries(Object.entries(byProject).map(([project, cell]) => [project, speedCell(cell)]))
         ]))
       }
       : null;
