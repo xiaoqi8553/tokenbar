@@ -29,8 +29,8 @@ Reads local logs only. No network, no login, no upload.
 
 - Six metric cards: quota windows, today, total, cost, output speed, cache hit.
 - 六张指标卡：额度窗口、今日用量、累计用量、等价花费、输出速度、缓存命中。
-- Usage trend by day, switchable between 7 / 14 / 30 days and all time. Zero-token days are drawn too: hollow dots on the baseline and a gap count in the subtitle. The Y axis ignores one-off spikes so ordinary days stay readable; days above the ceiling are marked and keep their real value in the tooltip. Below it: range total, range cost, daily average, peak day, period-over-period.
-- 用量趋势按天，可切 7 / 14 / 30 天与全部。0 token 的日子也画在图上，基线空心点加副标题里的空白天数。纵轴不受单日尖峰牵着走，超出上限的日子有标记、真实值留在 tooltip 里。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
+- Usage trend by day, switchable between 7 / 14 / 30 days and all time. Zero-token days keep their slot on the calendar, so the line falls back to the baseline instead of skipping the gap; the subtitle counts them. The Y axis ignores one-off spikes so ordinary days stay readable; days above the ceiling are marked and keep their real value in the tooltip. Below it: range total, range cost, daily average, peak day, period-over-period.
+- 用量趋势按天，可切 7 / 14 / 30 天与全部。0 token 的日子照样占着日历上的一格，曲线自己落回基线，缺口不会凭空消失；空白天数写在副标题里。纵轴不受单日尖峰牵着走，超出上限的日子有标记、真实值留在 tooltip 里。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
 - Model and project split, recalculated per range, with cost and output speed on each row.
 - 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。
 - Active hours: 24 hours × tokens, or switch to tok/s to see output speed per hour.

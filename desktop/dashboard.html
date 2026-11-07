@@ -503,7 +503,6 @@
 
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 9px; height: 9px; border-radius: 2.5px; display: inline-block; }
-  .legend i.zero { background: transparent; border: 1.5px solid var(--text-3); border-radius: 50%; }
   .legend i.clip { background: var(--warn); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 
   .tip {
@@ -812,7 +811,6 @@
         <div class="tip" id="tip"></div>
       </div>
       <div class="legend">
-        <span><i class="zero"></i>零用量 · 基线空心点</span>
         <span><i class="clip"></i>超出纵轴 · 顶部尖角</span>
       </div>
     </section>
@@ -1748,29 +1746,9 @@
     parts.push('<path d="' + area + '" fill="url(#g-area)"/>');
     parts.push('<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>');
 
-    // 0 token 的日子也占一格：贴基线画空心点，连续空白段再补一条浅色基线
-    const blankRuns = [];
-    let runStart = -1;
-    series.forEach((item, index) => {
-      if (item.totalTokens <= 0 && runStart < 0) runStart = index;
-      const endsRun = item.totalTokens > 0 || index === series.length - 1;
-      if (endsRun && runStart >= 0) {
-        blankRuns.push([runStart, item.totalTokens > 0 ? index - 1 : index]);
-        runStart = -1;
-      }
-    });
-    for (const [start, end] of blankRuns) {
-      if (end <= start) continue;
-      parts.push('<line x1="' + points[start].x.toFixed(1) + '" y1="' + (bottom - 2) +
-        '" x2="' + points[end].x.toFixed(1) + '" y2="' + (bottom - 2) +
-        '" stroke="var(--text-3)" stroke-width="2" opacity="0.4" stroke-linecap="round"/>');
-    }
-    series.forEach((item, index) => {
-      if (item.totalTokens > 0) return;
-      parts.push('<circle class="zero-dot" cx="' + points[index].x.toFixed(1) + '" cy="' + (bottom - 2) +
-        '" r="2.6" fill="var(--panel)" stroke="var(--text-3)" stroke-width="1.3">' +
-        '<title>' + dayLabel(item.day) + ' · 无用量</title></circle>');
-    });
+    // 0 token 的日子占着 X 轴上的一格，曲线自己落到基线就够了。
+    // 不再给每个空日子打点：一天一个空心圈连成串，比空白本身还扎眼。
+    // 数量交给副标题，hover 到这些日子显示「无用量」。
 
     // 超出纵轴的日子在顶部打一个橙色尖角：平顶不等于「峰值就这么高」
     series.forEach((item, index) => {

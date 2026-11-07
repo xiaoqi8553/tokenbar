@@ -238,13 +238,25 @@ test("2.3 用量趋势把 0 token 的日子也画出来", () => {
   // 全部时间以前直接返回有记录的日子，空白天整个从图上消失
   assert.doesNotMatch(dashboard, /if \(rangeDays\(\) === 0\) return detail\.series\.slice\(\);/);
   assert.match(dashboard, /fillCalendar\(first < todayKey \? first : todayKey, todayKey, byDay\)/);
-  assert.match(dashboard, /class="zero-dot"/);
-  assert.match(dashboard, /blankRuns/);
   assert.match(dashboard, /天零用量/);
   assert.match(dashboard, /无用量/);
-  assert.match(dashboard, /i\.zero/);
   // 环比按日历区间取上一周期，不再依赖首日恰好在 detail.series 里
   assert.match(dashboard, /item\.day >= prevStart && item\.day < firstDay/);
+});
+
+test("2.4 零用量日留在图上，但不再标点", () => {
+  // 一天一个空心圈连成串比空白本身更扎眼：曲线贴基线 + 副标题计数就够了
+  assert.doesNotMatch(dashboard, /class="zero-dot"/);
+  assert.doesNotMatch(dashboard, /blankRuns/);
+  assert.doesNotMatch(dashboard, /基线空心点/);
+  assert.doesNotMatch(dashboard, /\.legend i\.zero/);
+  assert.match(dashboard, /不再给每个空日子打点/);
+  // 顶部尖角是另一个功能：提示哪几天超出纵轴，保留
+  assert.match(dashboard, /i\.clip/);
+  assert.match(dashboard, /超出纵轴 · 顶部尖角/);
+  // 图例只剩这一项
+  const legend = dashboard.match(/<div class="legend">([\s\S]*?)<\/div>/)[1];
+  assert.equal((legend.match(/<span>/g) || []).length, 1);
 });
 
 test("2.3 补零按本地日历逐日，跨月不漏天", () => {

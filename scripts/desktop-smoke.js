@@ -196,7 +196,8 @@ async function main() {
         projectRows: document.querySelectorAll("#projects .bar-row").length,
         projectMoney: document.querySelectorAll("#projects .bar-money").length,
         chartSub: (document.querySelector("#chart-sub") || {}).textContent || "",
-        zeroDots: document.querySelectorAll("#chart .zero-dot").length,
+        zeroMarks: document.querySelectorAll("#chart .zero-dot, #chart .zero-run").length,
+        legend: (document.querySelector(".legend") || {}).textContent || "",
         speedCol: (() => {
           const el = document.querySelector("#th-speed");
           return el ? Math.round(el.getBoundingClientRect().width) : -1;
@@ -226,7 +227,9 @@ async function main() {
     assert.equal(layout.projectMoney, layout.projectRows, "项目分布每行都要带金额");
     assert.match(layout.chartSub, /天有记录/);
     assert.match(layout.chartSub, /天零用量/, "14 天视图要把没用量的日子数出来");
-    assert.ok(layout.zeroDots >= 1, "0 token 的日子要在基线上画出空心点");
+    assert.equal(layout.zeroMarks, 0, "零用量日不再往基线上打点或画浅线");
+    assert.doesNotMatch(layout.legend, /基线空心点/, "图例不该再解释已经删掉的空心点");
+    assert.match(layout.legend, /超出纵轴 · 顶部尖角/, "超出纵轴的尖角图例保留");
     assert.ok(layout.speedCol >= 100, "速度列要够宽，别把 102.7 tok/s 切掉");
     assert.equal(layout.footStyle, "block/ellipsis", "统计卡底部文案单行省略，不把整行撑高");
     assert.equal(layout.dotDisplay, "inline-block", "stat-foot 改块级后配额小圆点仍要显示");
@@ -250,10 +253,10 @@ async function main() {
     );
     const allTime = await dashboard.evaluate(() => ({
       sub: (document.querySelector("#chart-sub") || {}).textContent || "",
-      zeroDots: document.querySelectorAll("#chart .zero-dot").length
+      zeroMarks: document.querySelectorAll("#chart .zero-dot, #chart .zero-run").length
     }));
     assert.match(allTime.sub, /\d+ 天有记录 · \d+ 天零用量/, "全部时间也要显示空白天数");
-    assert.ok(allTime.zeroDots >= 2, "四天前那条日志到今天之间的空白天要画出来：" + allTime.sub);
+    assert.equal(allTime.zeroMarks, 0, "全部时间也不该出现零用量标记：" + allTime.sub);
 
     assert.equal(child.exitCode, null, `测试期间应用不应该退出：\n${processOutput}`);
     process.stdout.write(`desktop smoke passed: ${JSON.stringify({ popover: popoverInfo.title, ...info, bodyText: undefined })}\n`);

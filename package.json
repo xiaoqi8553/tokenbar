@@ -1,6 +1,6 @@
 {
   "name": "tokenbar",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "private": false,
   "description": "Windows 托盘里的 token 用量看板：Codex 与 WorkBuddy 的用量、额度窗口、输出速度和等价花费，只读本地日志。",
   "author": "Xiaoqi",
