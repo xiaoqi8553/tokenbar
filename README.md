@@ -136,22 +136,20 @@ Sessions table shows `tok/s` for both sources. A WorkBuddy session with no match
 
 ## Install / 安装
 
-Portable build:
+This repo is source only — there is no exe to download. Build it once:
 
-```text
-release/desktop/win-unpacked/TokenBar.exe
+仓库里只有源码，没有可直接下载的 exe。先构建一次：
+
+```bash
+npm install
+npm run desktop:dir        # portable folder → release/desktop/win-unpacked/TokenBar.exe
+npm run desktop:build      # NSIS installer → release/desktop/TokenBar-Setup-<version>.exe
+npm run desktop:shortcut   # desktop shortcut
 ```
 
 Runs on double-click, sits in the tray, closing the window doesn't quit.
 
 免安装版双击就跑，托盘常驻，关窗口不退。
-
-```bash
-npm install
-npm run desktop:build      # NSIS installer → release/desktop/TokenBar-Setup-<version>.exe
-npm run desktop:dir        # portable folder only, for debugging
-npm run desktop:shortcut   # desktop shortcut
-```
 
 ## Develop / 开发
 
