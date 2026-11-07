@@ -60,6 +60,22 @@ function writeFixture(sessionsDir) {
     }
   ];
   fs.writeFileSync(path.join(dir, "rollout-desktop-smoke.jsonl"), lines.map(line => JSON.stringify(line)).join("\n") + "\n", "utf8");
+
+  // 四天前再来一条：全部时间视图里就该出现几天的空白，用来验证补零
+  const old = new Date(Date.now() - 4 * 86400000).toISOString();
+  const oldLines = [
+    { timestamp: old, type: "session_meta", payload: { id: "desktop-smoke-old", cwd: root, model_provider: "openai" } },
+    {
+      timestamp: old,
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: { last_token_usage: usage(300, 100, 50), total_token_usage: usage(300, 100, 50) },
+        rate_limits: { primary: { used_percent: 8, window_minutes: 300, resets_in_seconds: 5400 } }
+      }
+    }
+  ];
+  fs.writeFileSync(path.join(dir, "rollout-desktop-smoke-old.jsonl"), oldLines.map(line => JSON.stringify(line)).join("\n") + "\n", "utf8");
 }
 
 async function findPage(browser, match, timeout) {
@@ -180,6 +196,7 @@ async function main() {
         projectRows: document.querySelectorAll("#projects .bar-row").length,
         projectMoney: document.querySelectorAll("#projects .bar-money").length,
         chartSub: (document.querySelector("#chart-sub") || {}).textContent || "",
+        zeroDots: document.querySelectorAll("#chart .zero-dot").length,
         speedCol: (() => {
           const el = document.querySelector("#th-speed");
           return el ? Math.round(el.getBoundingClientRect().width) : -1;
@@ -208,6 +225,8 @@ async function main() {
     assert.equal(layout.modelMoney, layout.modelRows, "模型分布每行都要带金额");
     assert.equal(layout.projectMoney, layout.projectRows, "项目分布每行都要带金额");
     assert.match(layout.chartSub, /天有记录/);
+    assert.match(layout.chartSub, /天零用量/, "14 天视图要把没用量的日子数出来");
+    assert.ok(layout.zeroDots >= 1, "0 token 的日子要在基线上画出空心点");
     assert.ok(layout.speedCol >= 100, "速度列要够宽，别把 102.7 tok/s 切掉");
     assert.equal(layout.footStyle, "block/ellipsis", "统计卡底部文案单行省略，不把整行撑高");
     assert.equal(layout.dotDisplay, "inline-block", "stat-foot 改块级后配额小圆点仍要显示");
@@ -221,6 +240,20 @@ async function main() {
       before,
       { timeout: 10_000 }
     );
+
+    // 4b. 全部时间也要按日历补齐空白天，而不是只画有记录的那几天
+    await dashboard.click('#range button[data-key="0"]');
+    await dashboard.waitForFunction(
+      () => /全部时间/.test((document.querySelector("#chart-sub") || {}).textContent || ""),
+      null,
+      { timeout: 10_000 }
+    );
+    const allTime = await dashboard.evaluate(() => ({
+      sub: (document.querySelector("#chart-sub") || {}).textContent || "",
+      zeroDots: document.querySelectorAll("#chart .zero-dot").length
+    }));
+    assert.match(allTime.sub, /\d+ 天有记录 · \d+ 天零用量/, "全部时间也要显示空白天数");
+    assert.ok(allTime.zeroDots >= 2, "四天前那条日志到今天之间的空白天要画出来：" + allTime.sub);
 
     assert.equal(child.exitCode, null, `测试期间应用不应该退出：\n${processOutput}`);
     process.stdout.write(`desktop smoke passed: ${JSON.stringify({ popover: popoverInfo.title, ...info, bodyText: undefined })}\n`);

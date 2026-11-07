@@ -230,3 +230,48 @@ test("2.2 统计卡文案与会话表数值不再被裁切", () => {
   assert.match(dashboard, /\.col-duration \{ display: none; \}/);
   assert.doesNotMatch(dashboard, /width: 66px; text-align: right" id="th-speed"/);
 });
+
+test("2.3 用量趋势把 0 token 的日子也画出来", () => {
+  assert.match(dashboard, /function parseDayKey\(/);
+  assert.match(dashboard, /function fillCalendar\(from, to, byDay\)/);
+  assert.match(dashboard, /const MAX_CHART_DAYS = 730/);
+  // 全部时间以前直接返回有记录的日子，空白天整个从图上消失
+  assert.doesNotMatch(dashboard, /if \(rangeDays\(\) === 0\) return detail\.series\.slice\(\);/);
+  assert.match(dashboard, /fillCalendar\(first < todayKey \? first : todayKey, todayKey, byDay\)/);
+  assert.match(dashboard, /class="zero-dot"/);
+  assert.match(dashboard, /blankRuns/);
+  assert.match(dashboard, /天零用量/);
+  assert.match(dashboard, /无用量/);
+  assert.match(dashboard, /i\.zero/);
+  // 环比按日历区间取上一周期，不再依赖首日恰好在 detail.series 里
+  assert.match(dashboard, /item\.day >= prevStart && item\.day < firstDay/);
+});
+
+test("2.3 补零按本地日历逐日，跨月不漏天", () => {
+  const script = dashboard.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const source = name => {
+    const match = script.match(new RegExp("^  function " + name + "\\(([\\s\\S]*?)^  \\}", "m"));
+    assert.ok(match, "找到函数 " + name);
+    return "function " + name + "(" + match[1] + "  }";
+  };
+  const { fillCalendar } = new Function(
+    ["parseDayKey", "localDayKey", "emptyDay", "fillCalendar"]
+      .map(source).join("\n") + "\nreturn { fillCalendar };"
+  )();
+
+  const byDay = new Map([
+    ["2026-10-30", { day: "2026-10-30", totalTokens: 500 }],
+    ["2026-11-07", { day: "2026-11-07", totalTokens: 900 }]
+  ]);
+  const out = fillCalendar("2026-10-30", "2026-11-07", byDay);
+  assert.equal(out.length, 9, "10/30 到 11/7 一共 9 个日历日");
+  assert.deepEqual(out.map(item => item.day), [
+    "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03",
+    "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07"
+  ]);
+  assert.equal(out.filter(item => item.totalTokens === 0).length, 7);
+  assert.deepEqual(out[1], {
+    day: "2026-10-31", totalTokens: 0, inputTokens: 0,
+    cachedInputTokens: 0, outputTokens: 0, records: 0
+  });
+});

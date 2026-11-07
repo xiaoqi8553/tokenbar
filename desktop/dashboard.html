@@ -503,6 +503,8 @@
 
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 9px; height: 9px; border-radius: 2.5px; display: inline-block; }
+  .legend i.zero { background: transparent; border: 1.5px solid var(--text-3); border-radius: 50%; }
+  .legend i.clip { background: var(--warn); border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 
   .tip {
     position: absolute;
@@ -809,6 +811,10 @@
         <svg id="chart" role="img" aria-label="每日 token 用量"></svg>
         <div class="tip" id="tip"></div>
       </div>
+      <div class="legend">
+        <span><i class="zero"></i>零用量 · 基线空心点</span>
+        <span><i class="clip"></i>超出纵轴 · 顶部尖角</span>
+      </div>
     </section>
 
     <div class="cols">
@@ -1083,31 +1089,66 @@
     return state.range > 0 ? state.range : 0;
   }
 
-  /** 取区间内的每日序列，补齐没有用量的空白日 */
-  function rangeSeries() {
-    const detail = state.detail;
-    if (!detail) return [];
-    if (rangeDays() === 0) return detail.series.slice();
+  /** YYYY-MM-DD 按本地日历解析；new Date("2026-11-07") 会被当成 UTC，别用 */
+  function parseDayKey(key) {
+    const [year, month, day] = String(key).split("-").map(Number);
+    return new Date(year, (month || 1) - 1, day || 1, 0, 0, 0, 0);
+  }
 
-    const byDay = new Map(detail.series.map(item => [item.day, item]));
+  function emptyDay(day) {
+    return {
+      day,
+      totalTokens: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      records: 0
+    };
+  }
+
+  /**
+   * 按本地日历把 [from, to] 逐日列出来，没记录的日子填 0。
+   * 少一天就会把「有量的日子」挤到一起，看不出哪几天根本没开过机。
+   */
+  function fillCalendar(from, to, byDay) {
     const out = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let offset = rangeDays() - 1; offset >= 0; offset -= 1) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - offset);
-      const key = localDayKey(date);
-      const found = byDay.get(key);
-      out.push(found || {
-        day: key,
-        totalTokens: 0,
-        inputTokens: 0,
-        cachedInputTokens: 0,
-        outputTokens: 0,
-        records: 0
-      });
+    const end = parseDayKey(to);
+    let cursor = parseDayKey(from);
+    // 日志里混进远古日期时别生成几千个 SVG 点：最多补两年
+    const MAX_CHART_DAYS = 730;
+    if ((end - cursor) / 86400000 >= MAX_CHART_DAYS) {
+      cursor = parseDayKey(to);
+      cursor.setDate(cursor.getDate() - (MAX_CHART_DAYS - 1));
+    }
+    while (cursor <= end) {
+      const key = localDayKey(cursor);
+      out.push(byDay.get(key) || emptyDay(key));
+      cursor.setDate(cursor.getDate() + 1);
     }
     return out;
+  }
+
+  /** 取区间内的每日序列，补齐没有用量的空白日（全部时间也一样补） */
+  function rangeSeries() {
+    const detail = state.detail;
+    if (!detail || !detail.series || !detail.series.length) return [];
+    const byDay = new Map(detail.series.map(item => [item.day, item]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = localDayKey(today);
+
+    const days = rangeDays();
+    if (days > 0) {
+      const start = new Date(today);
+      start.setDate(start.getDate() - (days - 1));
+      return fillCalendar(localDayKey(start), todayKey, byDay);
+    }
+    // 全部时间：从最早一条记录到今天，0 token 的日子不能凭空消失
+    const first = detail.series.reduce(
+      (min, item) => (item.day < min ? item.day : min),
+      detail.series[0].day
+    );
+    return fillCalendar(first < todayKey ? first : todayKey, todayKey, byDay);
   }
 
   /** 区间内的模型汇总（用 天×模型 维度重算，而不是全量占比） */
@@ -1671,6 +1712,8 @@
     const softCeiling = niceCeil(Math.max(percentile(0.95) * 1.8, percentile(0.5) * 4) || 1);
     const ceiling = Math.min(hardCeiling, softCeiling);
     const clipped = series.filter(item => item.totalTokens > ceiling);
+    const activeCount = series.filter(item => item.totalTokens > 0).length;
+    const blankCount = series.length - activeCount;
 
     const step = series.length === 1 ? 0 : innerW / (series.length - 1);
     const xAt = index => (series.length === 1 ? padL + innerW / 2 : padL + index * step);
@@ -1704,6 +1747,30 @@
 
     parts.push('<path d="' + area + '" fill="url(#g-area)"/>');
     parts.push('<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>');
+
+    // 0 token 的日子也占一格：贴基线画空心点，连续空白段再补一条浅色基线
+    const blankRuns = [];
+    let runStart = -1;
+    series.forEach((item, index) => {
+      if (item.totalTokens <= 0 && runStart < 0) runStart = index;
+      const endsRun = item.totalTokens > 0 || index === series.length - 1;
+      if (endsRun && runStart >= 0) {
+        blankRuns.push([runStart, item.totalTokens > 0 ? index - 1 : index]);
+        runStart = -1;
+      }
+    });
+    for (const [start, end] of blankRuns) {
+      if (end <= start) continue;
+      parts.push('<line x1="' + points[start].x.toFixed(1) + '" y1="' + (bottom - 2) +
+        '" x2="' + points[end].x.toFixed(1) + '" y2="' + (bottom - 2) +
+        '" stroke="var(--text-3)" stroke-width="2" opacity="0.4" stroke-linecap="round"/>');
+    }
+    series.forEach((item, index) => {
+      if (item.totalTokens > 0) return;
+      parts.push('<circle class="zero-dot" cx="' + points[index].x.toFixed(1) + '" cy="' + (bottom - 2) +
+        '" r="2.6" fill="var(--panel)" stroke="var(--text-3)" stroke-width="1.3">' +
+        '<title>' + dayLabel(item.day) + ' · 无用量</title></circle>');
+    });
 
     // 超出纵轴的日子在顶部打一个橙色尖角：平顶不等于「峰值就这么高」
     series.forEach((item, index) => {
@@ -1747,7 +1814,7 @@
     // ------------------------------------------------------------------
     const sumRange = series.reduce((acc, item) => acc + item.totalTokens, 0);
     const sumRecords = series.reduce((acc, item) => acc + item.records, 0);
-    const activeDays = series.filter(item => item.totalTokens > 0).length || series.length;
+    const activeDays = activeCount || series.length;
     const avg = activeDays ? sumRange / activeDays : 0;
     const peak = series.reduce((acc, item) => (!acc || item.totalTokens > acc.totalTokens ? item : acc), null);
 
@@ -1758,7 +1825,8 @@
       ? " · 纵轴 " + fmtTokens(ceiling) + "，" + clipped.length + " 天超出（峰值 " + fmtTokens(max) + "）"
       : "";
     $("chart-sub").textContent = (days === 0 ? "全部时间" : "最近 " + days + " 天") +
-      " · " + dayLabel(firstDay) + " – " + dayLabel(lastDay) + " · " + series.length + " 天有记录" + clippedNote;
+      " · " + dayLabel(firstDay) + " – " + dayLabel(lastDay) + " · " + activeCount + " 天有记录" +
+      (blankCount ? " · " + blankCount + " 天零用量" : "") + clippedNote;
 
     // 环比：跟紧挨着的前一段等长区间比
     let compareValue = "—";
@@ -1767,8 +1835,11 @@
     if (detail && detail.series) {
       if (days > 0) {
         const all = detail.series;
-        const index = all.findIndex(item => item.day === firstDay);
-        const prev = all.slice(Math.max(0, index - days), Math.max(0, index));
+        // 按日历取紧挨着的上一段等长区间：首日可能完全没有记录，不能靠 findIndex 定位
+        const start = parseDayKey(firstDay);
+        start.setDate(start.getDate() - days);
+        const prevStart = localDayKey(start);
+        const prev = all.filter(item => item.day >= prevStart && item.day < firstDay);
         const prevSum = prev.reduce((acc, item) => acc + item.totalTokens, 0);
         if (prevSum > 0) {
           const ratio = sumRange / prevSum;
@@ -1822,18 +1893,23 @@
         renderChart();
       }
       const item = series[index];
+      const empty = item.totalTokens <= 0 && !item.records;
       const cached = Math.max(0, item.cachedInputTokens);
       const uncached = Math.max(0, (item.inputTokens || 0) - cached);
       const speed = state.detail && state.detail.throughput ? state.detail.throughput.days[item.day] : null;
-      tip.innerHTML = [
-        '<div class="tip-title">' + item.day + (item.day === localDayKey(new Date()) ? " · 今天" : "") + '</div>',
-        '<div class="tip-row"><span>合计</span><b>' + fmtTokens(item.totalTokens) + '</b></div>',
-        '<div class="tip-row"><span>缓存命中</span><b>' + fmtTokens(cached) + '</b></div>',
-        '<div class="tip-row"><span>输入</span><b>' + fmtTokens(uncached) + '</b></div>',
-        '<div class="tip-row"><span>输出</span><b>' + fmtTokens(item.outputTokens) + '</b></div>',
-        '<div class="tip-row"><span>请求</span><b>' + fmtCount(item.records) + '</b></div>',
-        speed && speed.tps ? '<div class="tip-row"><span>速度</span><b>' + speed.tps.toFixed(1) + ' tok/s</b></div>' : ''
-      ].join("");
+      const rows = (empty
+        ? ['<div class="tip-row"><span>状态</span><b>这天没有 token 记录</b></div>']
+        : [
+          '<div class="tip-row"><span>合计</span><b>' + fmtTokens(item.totalTokens) + '</b></div>',
+          '<div class="tip-row"><span>缓存命中</span><b>' + fmtTokens(cached) + '</b></div>',
+          '<div class="tip-row"><span>输入</span><b>' + fmtTokens(uncached) + '</b></div>',
+          '<div class="tip-row"><span>输出</span><b>' + fmtTokens(item.outputTokens) + '</b></div>',
+          '<div class="tip-row"><span>请求</span><b>' + fmtCount(item.records) + '</b></div>',
+          speed && speed.tps ? '<div class="tip-row"><span>速度</span><b>' + speed.tps.toFixed(1) + ' tok/s</b></div>' : ''
+        ]).join("");
+      tip.innerHTML = '<div class="tip-title">' + item.day +
+        (item.day === localDayKey(new Date()) ? " · 今天" : "") +
+        (empty ? " · 无用量" : "") + '</div>' + rows;
       const px = step ? padL + index * step : padL + innerW / 2;
       tip.style.left = Math.min(Math.max(px, 90), rect.width - 90) + "px";
       tip.style.top = (event.clientY - rect.top - 12) + "px";
