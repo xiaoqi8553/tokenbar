@@ -75,10 +75,12 @@ test("baseline day key follows local time, not the UTC date field", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("store merges baseline hourly buckets so the activity chart follows the range", () => {
+test("store adds baseline hourly buckets to the deduplicated log buckets", () => {
   const source = fs.readFileSync(
     path.join(__dirname, "..", "desktop", "data", "codex-store.cjs"),
     "utf8"
   );
-  assert.match(source, /dailyHours\[day\] = baseDay\.hours\.slice\(\)/);
+  // v3 起磁盘日志与历史基线按请求指纹全局去重，两边互补，逐小时相加
+  assert.match(source, /dailyHours\[day\]\[hour\] \+= baseDay\.hours\[hour\]/);
+  assert.doesNotMatch(source, /dailyHours\[day\] = baseDay\.hours\.slice\(\)/);
 });

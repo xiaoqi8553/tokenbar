@@ -2,10 +2,15 @@
 "use strict";
 
 /**
- * 校验「累计」口径：磁盘日志 ∪ 历史索引 合并后，总量是否与旧版索引的原始总量一致。
+ * 校验「累计」口径：按请求指纹去重后，磁盘日志与历史索引的合并结果是否合理。
  *
- * 合并规则是按天取大者，所以合并结果应当 ≥ 索引总量，且增量只来自索引构建之后
- * 新增的用量。如果结果明显小于索引总量，说明合并没有生效（例如 baseline 读失败），
+ * v3 起历史索引自身先按请求指纹去重（fork/resume 的 replay 历史不再重复计入），
+ * 明细扫描再以同一批签名打底，跳过磁盘上重复的那一份，两边相加得到最终累计。
+ * 快扫 / 全量扫描只做相邻重复快照去重，与历史索引仍按天取大者，是明细就绪前
+ * 的过渡口径，因此允许与明细有小额差额；明细才是界面最终显示的数字，且明细
+ * 就绪后 snapshot() 会复用它的日聚合，弹窗与看板必须完全一致。
+ *
+ * 如果结果明显小于索引总量，说明合并没有生效（例如 baseline 读失败），
  * 界面上就会退回「只看磁盘日志」的偏小数字。
  *
  * 用法：
@@ -37,7 +42,10 @@ function fmt(n) {
 
 async function main() {
   const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-  const defaultIndex = path.join(appData, "codex-token-dashboard", "data", "usage-index.json");
+  const currentIndex = path.join(appData, "TokenBar", "data", "usage-index.json");
+  const legacyIndex = path.join(appData, "codex-token-dashboard", "data", "usage-index.json");
+  // v2.0.0 改名后 userData 迁到 TokenBar，旧目录只作为兼容回退
+  const defaultIndex = fs.existsSync(currentIndex) ? currentIndex : legacyIndex;
   const indexPath = argOf("--index", defaultIndex);
   const sessionsDir = argOf("--sessions", path.join(os.homedir(), ".codex", "sessions"));
 
@@ -56,6 +64,9 @@ async function main() {
   const baselineDays = Object.keys(baseline.days).length;
   const baselineSessions = Object.keys(baseline.sessions).length;
   console.log(`历史索引  ${fmt(baseline.totalTokens)}  ${baseline.records} 条 / ${baselineDays} 天 / ${baselineSessions} 会话`);
+  if (baseline.duplicates) {
+    console.log(`          请求去重：扫过 ${baseline.scannedRecords} 条，剔除 replay 重复 ${baseline.duplicates} 条 / ${fmt(baseline.duplicateTokens)}`);
+  }
   console.log(`          ${indexPath}`);
   console.log(`          构建耗时 ${Date.now() - startedAt}ms`);
 
@@ -71,27 +82,36 @@ async function main() {
   console.log(`快速扫描  ${fmt(fast.totals.totalTokens)}  ${fast.totals.records} 条（只扫最近若干文件，启动瞬间用）`);
 
   const full = await store.buildFull();
-  console.log(`全量扫描  ${fmt(full.totals.totalTokens)}  ${full.totals.records} 条（弹窗的「累计」用这个）`);
+  console.log(`全量扫描  ${fmt(full.totals.totalTokens)}  ${full.totals.records} 条（明细就绪前的过渡值，不参与断言）`);
 
   const detail = await store.buildDetail();
   console.log(`看板明细  ${fmt(detail.totals.totalTokens)}  ${detail.totals.records} 条 / ${detail.series.length} 天 / ${detail.sessions} 会话`);
 
+  // 明细就绪后 snapshot() 会改用同一份日聚合，弹窗与看板必须显示同一个累计。
+  const popover = store.snapshot();
   const delta = full.totals.totalTokens - baseline.totalTokens;
-  const diff = Math.abs(full.totals.totalTokens - detail.totals.totalTokens);
+  const finalDelta = detail.totals.totalTokens - baseline.totalTokens;
+  const transitional = Math.abs(full.totals.totalTokens - detail.totals.totalTokens);
+  const diff = Math.abs(popover.totals.totalTokens - detail.totals.totalTokens);
 
   console.log("");
-  console.log(`合并 - 索引 = ${fmt(delta)}（索引构建之后新增的用量，正常应为较小的正数）`);
-  console.log(`弹窗 - 看板 = ${fmt(diff)}（两条路径必须一致）`);
+  console.log(`过渡扫描 - 索引 = ${fmt(delta)}（索引构建之后新增的用量，正常应为较小的正数）`);
+  console.log(`明细 - 索引     = ${fmt(finalDelta)}（去重后磁盘日志相对基线的净新增）`);
+  console.log(`过渡差额        = ${fmt(transitional)}（快扫按天取大者 / 只去相邻重复，允许与明细有小额差异）`);
+  console.log(`弹窗 - 看板     = ${fmt(diff)}（明细就绪后两条路径共用同一份日聚合，必须为 0）`);
 
   const problems = [];
   if (full.totals.totalTokens < baseline.totalTokens) {
-    problems.push("合并后总量小于索引总量：baseline 未生效，界面会显示偏小的数字");
+    problems.push("过渡扫描总量小于索引总量：baseline 未生效，首屏会显示偏小的数字");
   }
   if (delta > baseline.totalTokens * 0.5) {
-    problems.push("合并后比索引多出超过 50%：可能存在重复计入");
+    problems.push("过渡扫描比索引多出超过 50%：可能存在重复计入");
   }
-  if (diff > 2e6) {
-    problems.push("弹窗与看板口径不一致：full 扫描与明细扫描结果不同");
+  if (detail.totals.totalTokens < baseline.totalTokens) {
+    problems.push("明细总量小于索引总量：历史基线没有并入，累计会偏小");
+  }
+  if (diff > 0) {
+    problems.push("弹窗与看板口径不一致：明细就绪后 snapshot() 未复用明细的日聚合");
   }
 
   if (problems.length) {

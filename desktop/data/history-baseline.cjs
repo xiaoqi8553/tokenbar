@@ -5,7 +5,14 @@
  *
  * 为什么需要它：Codex 会清理早期的 rollout 会话文件，磁盘上现在只剩最近一段
  * 时间。旧版看板有个持久索引，把历史上扫到过的每一条请求记录都存了下来
- * （本机 40956 条、134 天、5.70B），这是日志里已经找不到的历史。
+ * （本机 42151 条），这是日志里已经找不到的历史。
+ *
+ * 为什么必须去重：Codex 在 resume / fork 时会把整段历史重放进新 rollout 文件，
+ * 旧索引又按 filePath:lineNumber 逐行存，于是同一批请求在多个文件里各留一份。
+ * 本机实测 42151 条里 10607 条是重复的，合计 1.357B（22.7%），早期 5～7 月
+ * 的累计因此虚高近 4 倍。现在按 event-dedupe.cjs 的请求指纹全局去重，
+ * 与 CC Switch v4 一样「按请求行去重后累加」；去重后的签名集合还会写进基线，
+ * 供 CodexStore 在合并磁盘日志时跳过同一批请求。
  *
  * 索引很大（160MB+），这里逐条解析、边解析边聚合，不构建完整对象数组，
  * 产出只有几 MB 的按天摘要，之后每次直接读摘要。
@@ -13,9 +20,11 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { recordSignature } = require("./event-dedupe.cjs");
 
+// v3：请求级去重（v2 逐行累加会把 fork/resume 的 replay 历史重复计入）
 // v2：按本地日期归集，并给每天补 24 小时分布（活跃时段图要能被 7/14/30/全部 切换驱动）
-const BASELINE_VERSION = 2;
+const BASELINE_VERSION = 3;
 
 function emptyBucket() {
   return { totalTokens: 0, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, records: 0 };
@@ -105,8 +114,12 @@ function buildBaseline(indexPath, { onProgress } = {}) {
   /** @type {Record<string, any>} sessionId -> 聚合 */
   const sessions = {};
   const models = {};
+  /** 已计入的请求指纹：跨文件、跨会话、跨天全局唯一 */
+  const seen = new Set();
   let total = 0;
   let processed = 0;
+  let duplicates = 0;
+  let duplicateTokens = 0;
 
   const count = forEachRecord(text, record => {
     // 索引里的 date 是 UTC 日期，直接当本地日期用会让跨零点的记录落到错误的「天」，
@@ -122,6 +135,16 @@ function buildBaseline(indexPath, { onProgress } = {}) {
       outputTokens: Number(record.outputTokens) || 0
     };
     if (!bucket.totalTokens && !bucket.inputTokens) return;
+
+    // 同一个请求被 replay 写进多个 rollout 文件时，五元组指纹完全相同。
+    // 只保留首次出现的那一条（索引按扫描顺序累积，首次即最早的原始会话）。
+    const signature = recordSignature(record);
+    if (seen.has(signature)) {
+      duplicates += 1;
+      duplicateTokens += bucket.totalTokens;
+      return;
+    }
+    seen.add(signature);
 
     const sessionId = record.sessionId || "unknown";
     const model = record.model || record.turnModel || "unknown";
@@ -178,8 +201,13 @@ function buildBaseline(indexPath, { onProgress } = {}) {
     sourceMtimeMs: stat.mtimeMs,
     sourceSize: stat.size,
     records: processed,
+    scannedRecords: count,
+    duplicates,
+    duplicateTokens,
     totalTokens: total,
     hourTokens: Object.values(days).reduce((acc, day) => acc + (day.hours || []).reduce((a, b) => a + b, 0), 0),
+    /** 去重后的请求指纹：CodexStore 合并磁盘日志时用它跳过同一批请求 */
+    signatures: [...seen],
     days,
     sessions,
     models

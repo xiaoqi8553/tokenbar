@@ -1,5 +1,19 @@
 # 更新日志
 
+## 2.3.0 - 2026-11-09
+
+**累计口径对齐 CC Switch v4：按请求去重，不再按天取大者。** 起因是用户看到 CC Switch 显示 4.87B、TokenBar 显示 6.58B，核对后确认是 TokenBar 多算了约 1.71B。
+
+- **根因：fork / resume 把历史整段重放。** 本机 2026-07-24 的四个 rollout 文件有 721～746 轮完全相同的 `token_count` 公共前缀；旧 `usage-index.json` / 历史基线按 `file:line` 累加，四份全加是 365.8M，按请求签名去重后只有 94.7M。把文件 1 的前 721 轮签名拿去 CC Switch 账本比对，708 个里 707 个已在 7/14～7/15 的原始会话里记过 —— CC Switch 没漏算，是 TokenBar 重复计入。
+- **新增 `desktop/data/event-dedupe.cjs`**：请求指纹 = `(input, cached_input, output, total, reasoning_output)` 五元组。旧索引记录与磁盘 `token_count` 事件共用同一份签名函数，因此能跨文件、跨来源、跨基线去重。没有改用 `total_token_usage` 差分 —— CC Switch v3 的差分在本机实测会把 0.714B 算成 1.283B。
+- **历史基线升到 v3**：构建时按指纹全局去重，输出 `signatures` / `scannedRecords` / `duplicates` / `duplicateTokens`。本机 42,151 条索引记录保留 31,544 条，剔掉 10,607 条 replay / 1.357B（22.7%），基线从 5.982B 降到 4.625B。
+- **明细扫描改为全局去重**：`createDetailBuilder` 先做文件内去重并留下精简 `events`；`detailSnapshot()` 用 `baseline.signatures` 初始化 `globalSeen`，按 `firstAt` 从早到晚遍历，`effectiveDetail()` 只保留首次出现的请求并重建 tokens / models / modelDays / days / hours。后面的会话、模型、项目、小时聚合不用改就自动得到「去重后逐条累加」的结果。
+- **合并从「按天取大者」改成「去重后相加」**：磁盘与基线现在互补（基线已记过的请求在磁盘侧跳过），逐天、逐模型、逐项目、逐小时相加。快扫路径也补上相邻重复快照去重（CC Switch 的 `duplicate_snapshot`），弹窗过渡期的花费摘要同样走请求指纹去重。
+- **结果**：Codex 累计 6.58B → **5.13B**；与 CC Switch 4.87B 的差距从 1.714B 收敛到约 0.26B，8 月以后逐日吻合。剩余差额是 2,732 条 / 0.389B 的 `.zst` / `archived_sessions` 真实历史请求，CC Switch 从未导入过，91.3% 的基线唯一记录能在它的账本里逐条匹配，因此不强行删掉。WorkBuddy 另计 0.45B，两边合计约 5.58B。
+- **缓存版本**：`BASELINE_VERSION` 2 → 3、`CACHE_VERSION` 3 → 4、`DETAIL_CACHE_VERSION` 6 → 7，旧缓存自动失效重建一次（本机约 1.5 秒），不改写 `userData` 里的原始索引。
+- **验证脚本** `scripts/verify-usage-merge.cjs` 改成按最终口径断言：明细就绪后 `snapshot()` 必须复用明细的日聚合，实测 `弹窗 - 看板 = 0`；快扫 / 全量作为过渡值只展示不参与断言（本机过渡差额 2.8M）。默认索引路径也修正为 v2.0.0 改名后的 `%APPDATA%/TokenBar/data/`，旧目录保留兼容回退。
+- 测试 26 → **34** 个：新增 `tests/event-dedupe.test.js`（签名一致性、基线去重、fork 公共前缀、基线 + 磁盘互补相加、文件内重复快照、源码口径静态断言、弹窗与看板累计一致、过渡花费与明细同口径），并更新 `tests/baseline-hours.test.js` 的小时桶断言为逐小时相加。README 的「累计」章节与项目结构一并重写。
+
 ## 2.2.2 - 2026-11-07
 
 - **零用量日不再打点。** 基线上一天一个空心圈连成串，比空白本身还扎眼。现在只保留日历占位：0 token 的日子仍在 X 轴上，曲线自己落到基线，缺口自然看得见。图例里的「零用量 · 基线空心点」一并删掉，顶部尖角图例保留。

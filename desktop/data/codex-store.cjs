@@ -17,9 +17,12 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { normalizeTable, costOfModels, costOfBucket, describeTable, unitPriceCny, priceEntry } = require("./pricing.cjs");
+const { usageSignature } = require("./event-dedupe.cjs");
 
-const CACHE_VERSION = 3;
-const DETAIL_CACHE_VERSION = 6;
+// v4：快扫路径也做相邻重复快照去重（v3 逐行累加）
+const CACHE_VERSION = 4;
+// v7：明细带请求指纹，合并时与历史基线全局去重（v6 按天取大者，会把 fork 重放算多遍）
+const DETAIL_CACHE_VERSION = 7;
 const TAIL_BYTES = 8 * 1024 * 1024;
 const FAST_FILE_COUNT = 3;
 /** 明细扫描的分块大小：大文件流式读，不整块进内存 */
@@ -80,6 +83,59 @@ function zeroBucket() {
     totalTokens: 0,
     records: 0
   };
+}
+
+/**
+ * 跨文件请求去重后，重建单份日志的聚合桶。
+ *
+ * createDetailBuilder 已经做过「文件内」去重；但 fork/resume 会让同一批请求
+ * 出现在多个 rollout 文件里，且历史基线里可能也存着同一批请求。这里按文件
+ * 时间从早到晚依次处理，用调用方传入的全局指纹集合只保留首次出现的请求，
+ * 再把通过的事件重新聚合成与原 detail 完全同构的桶。
+ *
+ * 这样 detailSnapshot 后面的会话 / 模型 / 项目 / 小时聚合无需改动即可自动
+ * 得到「按请求行去重后累加」的结果，与 CC Switch v4 一致。
+ */
+function effectiveDetail(detail, globalSeen) {
+  const events = detail && detail.events;
+  if (!Array.isArray(events) || !events.length) return detail;
+
+  const tokens = zeroBucket();
+  const models = {};
+  const modelDays = {};
+  const days = {};
+  const hours = {};
+
+  for (const ev of events) {
+    if (globalSeen.has(ev.s)) continue;
+    globalSeen.add(ev.s);
+
+    const usage = {
+      input_tokens: ev.i,
+      cached_input_tokens: ev.c,
+      output_tokens: ev.o,
+      reasoning_output_tokens: ev.r,
+      total_tokens: ev.t
+    };
+    addToBucket(tokens, usage, 1);
+
+    const model = ev.m || "unknown";
+    if (!models[model]) models[model] = zeroBucket();
+    addToBucket(models[model], usage, 1);
+
+    const day = ev.d;
+    if (!days[day]) days[day] = zeroBucket();
+    addToBucket(days[day], usage, 1);
+
+    if (!modelDays[day]) modelDays[day] = {};
+    if (!modelDays[day][model]) modelDays[day][model] = zeroBucket();
+    addToBucket(modelDays[day][model], usage, 1);
+
+    const hourKey = `${day}T${pad2(ev.h)}`;
+    hours[hourKey] = (hours[hourKey] || 0) + usage.total_tokens;
+  }
+
+  return { ...detail, tokens, models, modelDays, days, hours };
 }
 
 function normalizeRateLimits(raw, timestamp) {
@@ -347,26 +403,33 @@ class CodexStore {
 
     const lines = text.split("\n");
     let touched = false;
+    /** 相邻重复快照：同一用量被连写两行时只算一次（CC Switch 的 duplicate_snapshot） */
+    let previousSignature = null;
     for (const line of lines) {
       const event = parseTokenCountLine(line);
       if (!event) continue;
       touched = true;
 
       if (event.usage) {
-        const day = dayKeyFromTimestamp(event.timestamp) || dayKeyOf(new Date());
-        let fileBucket = entry.days.get(day);
-        if (!fileBucket) {
-          fileBucket = zeroBucket();
-          entry.days.set(day, fileBucket);
-        }
-        addToBucket(fileBucket, event.usage, 1);
+        const signature = usageSignature(event.usage);
+        const duplicate = signature === previousSignature;
+        previousSignature = signature;
+        if (!duplicate) {
+          const day = dayKeyFromTimestamp(event.timestamp) || dayKeyOf(new Date());
+          let fileBucket = entry.days.get(day);
+          if (!fileBucket) {
+            fileBucket = zeroBucket();
+            entry.days.set(day, fileBucket);
+          }
+          addToBucket(fileBucket, event.usage, 1);
 
-        let globalBucket = this.daily.get(day);
-        if (!globalBucket) {
-          globalBucket = zeroBucket();
-          this.daily.set(day, globalBucket);
+          let globalBucket = this.daily.get(day);
+          if (!globalBucket) {
+            globalBucket = zeroBucket();
+            this.daily.set(day, globalBucket);
+          }
+          addToBucket(globalBucket, event.usage, 1);
         }
-        addToBucket(globalBucket, event.usage, 1);
       }
 
       if (event.sessionTotal) entry.sessionTotal = event.sessionTotal;
@@ -454,9 +517,11 @@ class CodexStore {
   // -- 输出 --------------------------------------------------------------
 
   /**
-   * 某一天的最终桶：磁盘日志与历史索引按天取大者。
-   * 两边扫的是同一批 rollout，同一天的数据只会重叠、不会互补，所以取大者
-   * 既能补上被清理的历史，又不会把同一天算两遍。
+   * 快扫过渡口径：磁盘日志与历史索引按天取大者。
+   *
+   * 只在明细扫描尚未完成时供弹窗首屏使用。明细就绪后 snapshot() 走
+   * detailSnapshot() 的「请求指纹全局去重 + 两边相加」，那才是最终口径。
+   * 这里保留取大者是为了让首屏不至于把同一天算两遍，不追求与明细完全一致。
    */
   mergedDay(key) {
     const logDay = this.daily.get(key) || null;
@@ -595,7 +660,8 @@ class CodexStore {
       // 会话数取「磁盘文件数」与「历史索引会话数」的较大者：
       // 索引里的 223 个会话覆盖了磁盘上已清理的那部分
       sessions: Math.max(this.sessionCount || 0, legacy ? legacy.sessions : 0),
-      // 累计口径：按每轮 last_token_usage 逐条累加，再与历史索引按天取大者合并。
+      // 累计口径：按每轮 last_token_usage 逐条累加，并按请求指纹全局去重后
+      // 与历史索引相加（明细路径）；快扫过渡期按天取大者。
       // 不能用各会话 total_token_usage 相加——续跑（resume）会生成新会话文件，
       // 其 total 携带了此前的累计值，相加会把历史用量重复计算。
       totals: {
@@ -756,6 +822,11 @@ class CodexStore {
       firstAt: null,
       lastAt: null,
       tokens: zeroBucket(),
+      /**
+       * 文件内去重后的请求事件（精简五元组 + 归属维度）。
+       * detailSnapshot 会用它做跨文件 / 跨基线去重后重建聚合桶。
+       */
+      events: [],
       /** Codex 自己维护的线程累计（total_token_usage 的最大值） */
       sessionTotal: 0,
       models: {},
@@ -771,6 +842,8 @@ class CodexStore {
       quota: null
     };
     let currentModel = null;
+    /** 单文件内已计入的请求指纹（相邻重复快照、文件内 replay） */
+    const fileSeen = new Set();
 
     const feed = text => {
       for (const line of text.split("\n")) {
@@ -866,19 +939,39 @@ class CodexStore {
 
         if (payload.info && payload.info.last_token_usage) {
           const usage = payload.info.last_token_usage;
-          addToBucket(detail.tokens, usage, 1);
 
-          // 同时记下线程累计：这是 Codex 自己的账，包含已被清理的早期历史
+          // 线程累计与去重无关，始终更新（resume 文件的 total 自带历史累计）
           const runningTotal = payload.info.total_token_usage && Number(payload.info.total_token_usage.total_tokens);
           if (runningTotal && runningTotal > detail.sessionTotal) detail.sessionTotal = runningTotal;
 
-          const model = currentModel || "unknown";
-          if (!detail.models[model]) detail.models[model] = zeroBucket();
-          addToBucket(detail.models[model], usage, 1);
+          // 请求指纹：文件内先去重一次，跨文件/跨基线由 effectiveDetail 再裁一遍
+          const signature = usageSignature(usage);
+          if (!fileSeen.has(signature)) {
+            fileSeen.add(signature);
 
-          const date = stamp ? new Date(stamp) : new Date();
-          if (!Number.isNaN(date.getTime())) {
-            const day = dayKeyOf(date);
+            const model = currentModel || "unknown";
+            const date = stamp ? new Date(stamp) : new Date();
+            const valid = !Number.isNaN(date.getTime());
+            const day = valid ? dayKeyOf(date) : dayKeyOf(new Date());
+            const hour = valid ? date.getHours() : new Date().getHours();
+
+            detail.events.push({
+              s: signature,
+              i: Number(usage.input_tokens) || 0,
+              c: Number(usage.cached_input_tokens) || 0,
+              o: Number(usage.output_tokens) || 0,
+              r: Number(usage.reasoning_output_tokens) || 0,
+              t: Number(usage.total_tokens) || 0,
+              d: day,
+              h: hour,
+              m: model
+            });
+
+            addToBucket(detail.tokens, usage, 1);
+
+            if (!detail.models[model]) detail.models[model] = zeroBucket();
+            addToBucket(detail.models[model], usage, 1);
+
             if (!detail.days[day]) detail.days[day] = zeroBucket();
             addToBucket(detail.days[day], usage, 1);
 
@@ -888,7 +981,7 @@ class CodexStore {
             addToBucket(detail.modelDays[day][model], usage, 1);
 
             // 全天候保留小时桶：活跃时段图要跟着 7/14/30/全部 区间切换
-            const hourKey = `${day}T${pad2(date.getHours())}`;
+            const hourKey = `${day}T${pad2(hour)}`;
             detail.hours[hourKey] = (detail.hours[hourKey] || 0) + (usage.total_tokens || 0);
           }
         }
@@ -994,16 +1087,26 @@ class CodexStore {
 
   /**
    * 花费摘要：只做聚合，不生成完整明细。
-   * 弹窗在明细扫描之前也要能显示「等价花费」，所以单独给一条轻量路径。
+   * 弹窗在明细扫描之前也要能显示「等价花费」，所以单独给一条轻量路径；
+   * 它同样按请求指纹全局去重，避免过渡期金额比明细高出一截。
    */
   costSummary() {
     if (!this.detailFiles.size && !this.baseline) return null;
 
     /** 天 → { totalTokens, models: 模型 → 桶 } */
     const days = new Map();
-    for (const entry of this.detailFiles.values()) {
-      const detail = entry && entry.detail;
-      if (!detail) continue;
+    const baseline = this.baseline;
+    // 与明细路径共用同一份请求指纹：基线已记过的请求在磁盘侧跳过，
+    // 两边互补，成本才不会把 fork 重放的历史再算一遍。
+    const globalSeen = new Set(
+      baseline && Array.isArray(baseline.signatures) ? baseline.signatures : []
+    );
+    const entries = [...this.detailFiles.values()]
+      .filter(entry => entry && entry.detail)
+      .sort((a, b) => String(a.detail.firstAt || "").localeCompare(String(b.detail.firstAt || "")));
+
+    for (const entry of entries) {
+      const detail = effectiveDetail(entry.detail, globalSeen);
       for (const [day, byModel] of Object.entries(detail.modelDays || {})) {
         let cell = days.get(day);
         if (!cell) {
@@ -1019,18 +1122,21 @@ class CodexStore {
       }
     }
 
-    // 与历史索引按天取大者：Codex 清理掉的旧 rollout 只在索引里
-    const baseline = this.baseline;
+    // 基线里被 Codex 清理掉的旧 rollout 只在索引里，按天补进来（互补，不是取大者）
     if (baseline && baseline.days) {
       for (const [day, baseDay] of Object.entries(baseline.days)) {
         if (!baseDay || !baseDay.totalTokens) continue;
-        const local = days.get(day);
-        if (local && local.totalTokens >= baseDay.totalTokens) continue;
-        const models = {};
-        for (const [model, bucket] of Object.entries(baseDay.models || {})) {
-          models[model] = { ...zeroBucket(), ...bucket };
+        let cell = days.get(day);
+        if (!cell) {
+          cell = { totalTokens: 0, models: {} };
+          days.set(day, cell);
         }
-        days.set(day, { totalTokens: baseDay.totalTokens, models });
+        cell.totalTokens += baseDay.totalTokens;
+        for (const [model, bucket] of Object.entries(baseDay.models || {})) {
+          if (!cell.models[model]) cell.models[model] = zeroBucket();
+          const target = cell.models[model];
+          for (const key of Object.keys(zeroBucket())) target[key] += bucket[key] || 0;
+        }
       }
     }
 
@@ -1078,9 +1184,18 @@ class CodexStore {
     const todayKey = dayKeyOf(new Date());
     const hourFloor = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    for (const entry of this.detailFiles.values()) {
-      const detail = entry.detail;
-      if (!detail) continue;
+    // 历史基线里已计入的请求先占位：磁盘上若还留着同一批 rollout，
+    // 这些请求会被跳过，磁盘与基线变成互补关系，后面可以直接相加。
+    const globalSeen = new Set(
+      this.baseline && Array.isArray(this.baseline.signatures) ? this.baseline.signatures : []
+    );
+    const entries = [...this.detailFiles.values()]
+      .filter(entry => entry && entry.detail)
+      // 时间从早到晚：fork/replay 的公共前缀归到最早的原始会话，而不是新文件
+      .sort((a, b) => String(a.detail.firstAt || "").localeCompare(String(b.detail.firstAt || "")));
+
+    for (const entry of entries) {
+      const detail = effectiveDetail(entry.detail, globalSeen);
 
       const projectKey = detail.project || "未标注";
       const sessionKey = detail.sessionId || detail.file;
@@ -1220,34 +1335,39 @@ class CodexStore {
     // 与历史基线合并
     //
     // Codex 会清理/压缩旧的 rollout，磁盘上的日志往往只有最近一段。
-    // 旧版索引把历史上扫到过的请求都留了下来（本机 135 天、5.70B）。
-    // 这里按「天」逐个裁决：哪边的量大就用哪边，避免重复计入同一天。
+    // 旧版索引把历史上扫到过的请求都留了下来，且 v3 已按请求指纹去重。
+    //
+    // 关键：上面的 globalSeen 以 baseline.signatures 打底，磁盘日志里凡是
+    // 基线已记过的请求都被跳过，因此两边不再重叠、而是互补。这里按天**相加**，
+    // 与 CC Switch v4 的 SUM(去重后的请求行) 同口径。旧版「按天取大者」是
+    // 在无法区分同一请求时的近似，会把 fork 重放的历史整段算多遍，已废弃。
     // ------------------------------------------------------------------
     const baseline = this.baseline;
     if (baseline && baseline.days) {
       for (const [day, baseDay] of Object.entries(baseline.days)) {
         if (!baseDay || !baseDay.totalTokens) continue;
-        const logDay = days.get(day);
-        const useBaseline = !logDay || baseDay.totalTokens > (logDay.totalTokens || 0);
-        if (!useBaseline) continue;
 
-        days.set(day, {
-          day,
-          totalTokens: baseDay.totalTokens,
-          inputTokens: baseDay.inputTokens,
-          cachedInputTokens: baseDay.cachedInputTokens,
-          outputTokens: baseDay.outputTokens,
-          records: baseDay.records
-        });
+        let logDay = days.get(day);
+        if (!logDay) {
+          logDay = { day, ...zeroBucket() };
+          days.set(day, logDay);
+        }
+        logDay.totalTokens += baseDay.totalTokens || 0;
+        logDay.inputTokens += baseDay.inputTokens || 0;
+        logDay.cachedInputTokens += baseDay.cachedInputTokens || 0;
+        logDay.outputTokens += baseDay.outputTokens || 0;
+        logDay.records += baseDay.records || 0;
 
-        // 模型维度整体替换为基线的（保证同一天内各维度口径一致）
-        modelDays[day] = {};
+        // 模型维度：同一天两边互补，逐个相加
+        if (!modelDays[day]) modelDays[day] = {};
         for (const [model, bucket] of Object.entries(baseDay.models || {})) {
-          modelDays[day][model] = { ...zeroBucket(), ...bucket };
+          if (!modelDays[day][model]) modelDays[day][model] = zeroBucket();
+          const target = modelDays[day][model];
+          for (const key of Object.keys(zeroBucket())) target[key] += bucket[key] || 0;
         }
 
         // 项目维度同理
-        projectDays[day] = {};
+        if (!projectDays[day]) projectDays[day] = {};
         for (const cell of Object.values(baseDay.sessions || {})) {
           const project = cell.project || "历史索引";
           if (!projectDays[day][project]) projectDays[day][project] = zeroBucket();
@@ -1259,10 +1379,10 @@ class CodexStore {
           target.records += cell.records || 0;
         }
 
-        // 小时分布：整天被基线接管时，用基线的小时桶覆盖日志的那一份，
-        // 否则活跃时段图只统计得到本机残留日志（约 1/3 量），切区间看着像没反应。
+        // 小时分布：两边互补，逐小时相加而不是让基线整天覆盖日志
         if (Array.isArray(baseDay.hours) && baseDay.hours.length === 24) {
-          dailyHours[day] = baseDay.hours.slice();
+          if (!dailyHours[day]) dailyHours[day] = new Array(24).fill(0);
+          for (let hour = 0; hour < 24; hour += 1) dailyHours[day][hour] += baseDay.hours[hour] || 0;
         }
       }
 
@@ -1380,7 +1500,7 @@ class CodexStore {
       .map(item => ({ ...item, share: merged.totalTokens ? item.totalTokens / merged.totalTokens : 0 }))
       .sort((a, b) => b.totalTokens - a.totalTokens);
 
-    // 累计口径 = 磁盘日志 ∪ 历史索引，按天去重后求和。
+    // 累计口径 = 磁盘日志 ∪ 历史索引，按请求指纹全局去重后相加。
     // 这就是「总共用了多少」，不需要再叠加任何线程计数器。
     const legacy = this.baselineMeta();
 

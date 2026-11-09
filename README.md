@@ -59,20 +59,33 @@ WorkBuddy 国际版和国内版写日志的目录不同。两边的会话经常�
 
 ### Total / 累计
 
-Two different numbers live in the logs, and mixing them gives absurd totals. The total is disk logs ∪ history index, taking the larger value per day, then summed.
+Two different numbers live in the logs, and mixing them gives absurd totals. **The total is disk logs ∪ history index, deduplicated by request fingerprint, then summed.**
 
-日志里有两套数字，混用会算出离谱的总量。累计 = 磁盘日志 ∪ 历史索引，**按天取大者**后再求和。
+日志里有两套数字，混用会算出离谱的总量。**累计 = 磁盘日志 ∪ 历史索引，按请求指纹全局去重后相加**（v2.3.0 起）。
+
+A request's fingerprint is its usage quintuple `(input, cached_input, output, total, reasoning_output)`. Both the old index records and the on-disk `token_count` events go through the same `event-dedupe.cjs`, so a request already stored in the history index is skipped when the same rollout is still on disk. The two sides become complementary and can simply be added.
+
+请求指纹是这条请求的用量五元组 `(input, cached_input, output, total, reasoning_output)`。旧索引记录与磁盘上的 `token_count` 事件共用 `event-dedupe.cjs`：历史索引里已记过的请求，磁盘上若还留着同一份 rollout 就会跳过。两边因此互补，可以直接相加。
 
 | Approach | Result on this machine | Verdict |
 |---|---|---|
-| Disk logs ∪ index, larger per day | **5.8B** over 135 days | what the UI shows |
-| Disk logs only | 2.4B | early rollouts were cleaned up, misses more than half |
+| Dedupe by request fingerprint, add disk + index | **5.13B** over 144 days | what the UI shows |
+| Old: larger per day over an un-deduped index | 6.58B | **1.36B too high** — fork replay counted up to 4× |
+| Disk logs only (net new after dedupe) | 0.50B | early rollouts were cleaned up |
 | Sum each file's last `total` | 3.78B | wrong, resumed sessions double count |
 | Max `total_token_usage` per session, summed | 6.1B | wrong, resumed sessions carry old totals |
 
-Two traps pull in opposite directions: `resume` splits one session into several rollout files, each carrying the previous running total; and Codex deletes old rollouts, so disk only holds the recent stretch. So you accumulate per turn *and* backfill the deleted history from the old index.
+Two traps pull in opposite directions: `resume` / `fork` replays the whole earlier conversation into a new rollout file, so counting by `file:line` charges the same request many times; and Codex deletes old rollouts, so disk only holds the recent stretch. On 2026-07-24 four rollout files shared a **721–746 event common prefix** — all four summed to 365.8M, but only 94.7M were distinct requests.
 
-Per-day larger-of works only where both sides cover the same day: overlapping days take the larger, missing days come from the index. It is not addition, so nothing is counted twice.
+两个坑方向相反：`resume` / `fork` 会把此前整段会话重放进新的 rollout 文件，按 `file:line` 累加就把同一批请求算了很多遍；而 Codex 又会清理旧 rollout，磁盘上只剩最近一段。本机 2026-07-24 的四个 rollout 文件有 **721～746 轮完全相同的公共前缀**，四份全加是 365.8M，按签名去重后只有 94.7M。
+
+The old "larger value per day" was an approximation for when identical requests couldn't be told apart. Rebuilding the v3 baseline removed **10,607 replay records / 1.357B** from 42,151 indexed rows; the resulting Codex total dropped from 6.58B to 5.13B. For reference, CC Switch v4 reports 4.87B Codex-only on this machine: from August onward the two agree day by day, and the remaining ~0.26B is history from `.zst` / `archived_sessions` that CC Switch never imported — real requests, not double counting. WorkBuddy adds another 0.45B; don't compare its combined number against CC Switch's Codex-only figure.
+
+旧的「按天取大者」是在无法区分同一请求时的近似。重建 v3 基线后，从 42,151 条索引记录里剔掉 **10,607 条 replay / 1.357B**，Codex 累计从 6.58B 降到 5.13B。作为参照，CC Switch v4 在这台机器上显示 4.87B（只含 Codex）：8 月以后两边逐日吻合，剩下的约 0.26B 是 CC Switch 从未导入过的 `.zst` / `archived_sessions` 历史请求，是真实用量而不是重复计算。WorkBuddy 另加约 0.45B；不要把两边合计拿去跟 CC Switch 的 Codex 单源数字对比。
+
+Baseline version 3, usage cache version 4 and detail cache version 7 all invalidate their predecessors, so the first launch after upgrading rebuilds once (about 1.5s on this machine). Nothing in `userData` is rewritten by hand — deleting the caches only forces a rescan.
+
+基线版本 3、用量缓存版本 4、明细缓存版本 7 都会让旧缓存自动失效，升级后首次启动会重建一次（本机约 1.5 秒）。不会手工改写 `userData` 里的原始文件，删缓存也只会触发重扫。
 
 ### Cost / 花费
 
@@ -158,7 +171,7 @@ npm install
 npm start                  # Electron in dev mode
 npm test                   # data layer + UI assertions
 npm run usage:audit        # compare the total-accounting approaches
-npm run usage:verify       # check merged totals against the raw index
+npm run usage:verify       # verify the deduplicated total against the raw index
 npm run desktop:smoke      # startup, tray, window lifecycle
 ```
 
@@ -167,9 +180,10 @@ desktop/
   main.cjs                    main process: tray, popover, dashboard window, IPC
   popover.html                tray popover
   dashboard.html              full dashboard (single file, no build step)
-  data/codex-store.cjs        Codex: scan, per-day merge, speed, cost
+  data/codex-store.cjs        Codex: scan, per-request dedupe, speed, cost
+  data/event-dedupe.cjs       request fingerprint shared by index and disk logs
   data/workbuddy-store.cjs    WorkBuddy: two roots, dedupe by session id, speed
-  data/history-baseline.cjs   old index → per-day summary (with hourly buckets)
+  data/history-baseline.cjs   old index → per-day summary (v3: deduplicated)
   data/pricing.cjs            price table and conversion
 tests/                        data layer and UI assertions
 ```
