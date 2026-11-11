@@ -239,6 +239,46 @@ async function main() {
     assert.equal(layout.dotDisplay, "inline-block", "stat-foot 改块级后配额小圆点仍要显示");
     assert.deepEqual(layout.clippedCells, [], "会话表任何单元格都不该被裁切：" + layout.clippedCells.join(", "));
 
+    // 3c. 会话日志：模型不折叠、请求明细视图、点行展开详情
+    const sessionView = await dashboard.evaluate(() => ({
+      tabs: [...document.querySelectorAll("#session-tabs button")].map(el => el.dataset.view),
+      chips: document.querySelectorAll("#session-body .model-chips .chip").length,
+      folded: /\+[1-9]/.test((document.querySelector("#session-body") || {}).textContent || ""),
+      logHidden: document.querySelector("#log-table").hidden
+    }));
+    assert.deepEqual(sessionView.tabs, ["sessions", "requests"]);
+    assert.ok(sessionView.chips > 0, "模型列要把模型名完整列出来");
+    assert.equal(sessionView.folded, false, "模型列不该再有 +N 折叠");
+    assert.equal(sessionView.logHidden, true, "默认停在会话视图");
+
+    await dashboard.click('#session-tabs button[data-view="requests"]');
+    await dashboard.waitForFunction(() => document.querySelectorAll("#log-body tr").length > 0);
+    const logView = await dashboard.evaluate(() => ({
+      hidden: document.querySelector("#log-table").hidden,
+      rows: document.querySelectorAll("#log-body tr").length,
+      head: (document.querySelector("#log-table thead") || {}).textContent || "",
+      modelText: [...document.querySelectorAll("#log-body td.model-cell")].map(el => el.textContent.trim()),
+      badge: (document.querySelector("#session-badge") || {}).textContent || ""
+    }));
+    assert.equal(logView.hidden, false, "切到请求明细后明细表可见");
+    assert.ok(logView.rows > 0, "请求明细要逐行摊开");
+    assert.match(logView.head, /新增输入/);
+    assert.match(logView.head, /缓存命中/);
+    assert.ok(logView.modelText.length > 0 && logView.modelText.every(Boolean), "每行都要有完整模型名");
+    assert.match(logView.badge, /行/, "明细视图徽标显示行数");
+
+    await dashboard.click('#session-tabs button[data-view="sessions"]');
+    await dashboard.waitForFunction(() => document.querySelectorAll("#session-body tr.session-row").length > 0);
+    await dashboard.click("#session-body tr.session-row");
+    const expanded = await dashboard.evaluate(() => ({
+      rows: document.querySelectorAll("#session-body tr.detail-row").length,
+      models: document.querySelectorAll("#session-body .detail-table tbody tr").length,
+      meta: (document.querySelector(".detail-meta") || {}).textContent || ""
+    }));
+    assert.equal(expanded.rows, 1, "点会话行展开一条明细面板");
+    assert.ok(expanded.models > 0, "展开面板里逐行列出模型");
+    assert.ok(expanded.meta.length > 0, "展开面板带上路径与时间范围");
+
     // 4. 切一次区间，确认活跃时段跟着变
     const before = await dashboard.evaluate(() => (document.querySelector("#hour-badge") || {}).textContent || "");
     await dashboard.click('#range button[data-key="7"]');

@@ -1428,12 +1428,30 @@ class CodexStore {
     const sessions = [...sessionsById.values()]
       .map(item => {
         const { modelSet, modelBuckets, speedTurns, speedOutput, speedDuration, ...rest } = item;
+        const buckets = modelBuckets || {};
+        const modelCost = costOfModels(buckets, priceTable);
+        // 会话日志要能按「模型逐行」展开：模型名、四档 token、请求数、花费都要完整
+        // 带出去，前端才不用把多模型折叠成 +N（对齐 CC Switch 请求日志的可查明细）。
+        const modelDetails = Object.entries(buckets)
+          .map(([model, bucket]) => ({
+            model,
+            inputTokens: bucket.inputTokens || 0,
+            cachedInputTokens: bucket.cachedInputTokens || 0,
+            outputTokens: bucket.outputTokens || 0,
+            totalTokens: bucket.totalTokens || 0,
+            records: bucket.records || 0,
+            cost: (modelCost.perModel[model] || {}).cny || 0,
+            estimated: Boolean((modelCost.perModel[model] || {}).estimated)
+          }))
+          .sort((a, b) => b.totalTokens - a.totalTokens);
         return {
           ...rest,
-          models: [...modelSet],
+          // 按用量降序，会话表里第一个 chip 就是该会话的主要模型
+          models: modelDetails.map(entry => entry.model),
+          modelDetails,
           turns: speedTurns || 0,
           // 会话成本：按会话内各模型各自的单价折算
-          cost: costOfModels(modelBuckets || {}, priceTable).cny,
+          cost: modelCost.cny,
           // 会话级加权速度：总输出 ÷ 总耗时，避免被单个极快/极慢的轮次带偏
           tps: speedDuration > 0 ? (speedOutput || 0) * 1000 / speedDuration : null
         };

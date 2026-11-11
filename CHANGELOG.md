@@ -1,5 +1,15 @@
 # 更新日志
 
+## 2.3.2 - 2026-11-11
+
+**会话记录改成 CC Switch 式可查明细，模型名不再折叠成 `+N`。** 用户反馈多模型会话只显示第一个模型加一个 `+2`，看不全用了哪些模型。
+
+- 数据层 `CodexStore` / `WorkBuddyStore` 原本在构建会话时就算好了「会话内每个模型」的完整桶，却在输出 `sessionList` 时丢掉，前端只拿到一个模型名数组。现在补出 `modelDetails`：每个模型的 `inputTokens / cachedInputTokens / outputTokens / totalTokens / records / cost / estimated`，按用量降序；`models` 也跟着按用量排序。模型行花费合计与会话花费严格相等。
+- 会话视图：模型列 186 → **230px**，同一会话的所有模型以可换行 chips 完整列出并带用量占比，长模型名用 `overflow-wrap: anywhere` 断行不裁切；点会话行展开内嵌明细表（模型 / 新增输入 / 缓存命中 / 输出 / 用量 / 请求 / 花费，外加完整路径与时间范围）。
+- 新增「**请求明细**」视图：一行一个「会话 × 模型」的扁平日志，列含时间 / 项目 / 完整模型名 / 新增输入 / 缓存命中 / 输出 / 用量 / 请求 / 花费 / 速度，按最近活动倒序，最多 400 行并注明总数。视图选择存 `localStorage`。
+- `新增输入 = input - cached`（input 含缓存命中），与成本公式、CC Switch 的 `billable_input_tokens` 同口径；表格框仍固定 244px，两个数据源切换不跳。
+- 新增 `tests/session-log.test.js`（两个数据源的模型逐行明细 + 用量/花费对齐，前端静态断言）；`tests/dashboard.test.js` 更新列宽断言；`scripts/desktop-smoke.js` 增加真实 Electron 交互断言（Tab 切换、明细行、点行展开、无单元格裁切）。测试 37 → **40** 个，冒烟与 `usage:verify`（弹窗 − 看板 = 0）全绿。
+
 ## 2.3.1 - 2026-11-11
 
 **WorkBuddy 数据源不再只在启动时扫一次。** 排查「今天新增用量没检测到」时发现：`wbStore.build()` 只在 `initStore()` 里调用，之后 30 秒轮询的 `refreshTrayStatus()` 只刷 Codex，托盘/弹窗的 WorkBuddy 摘要会一直停在启动那一刻。本机 `workbuddy-detail-cache.json` 从 09:44 冻结到下午，期间两个会话日志继续增长，重扫后补回 **3.24M tokens**（477.1M → 480.3M）。

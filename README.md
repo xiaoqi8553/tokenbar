@@ -35,8 +35,8 @@ Reads local logs only. No network, no login, no upload.
 - 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。
 - Active hours: 24 hours × tokens, or switch to tok/s to see output speed per hour.
 - 活跃时段：24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。
-- Sessions table: project, model, tokens, requests, speed, cost.
-- 会话表：项目、模型、用量、请求数、速度、花费。
+- Session log with two views: **Sessions** lists every model of a session (no `+N` folding) and clicking a row expands its per-model breakdown; **Request details** is a CC Switch-style flat log, one row per session × model, with full model name, fresh input, cache hit, output, tokens, requests, cost and speed. The choice is remembered.
+- 会话记录有两个视图：**会话**把每个会话用到的模型全部列出（不再折叠成 `+N`），点某行展开该会话的模型明细；**请求明细**是 CC Switch 式的逐行日志，一行一个「会话 × 模型」，含完整模型名、新增输入、缓存命中、输出、用量、请求数、花费与速度。视图选择会被记住。
 
 The top bar switches between `Codex` and `WorkBuddy`; both reuse the same charts.
 

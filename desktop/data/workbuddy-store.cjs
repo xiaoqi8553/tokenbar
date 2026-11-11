@@ -588,10 +588,26 @@ class WorkBuddyStore {
       .filter(item => item.records > 0 && item.totalTokens > 0)
       .map(item => {
         const { models: modelSet, modelBuckets, speedTurns, speedOutput, speedDuration, ...rest } = item;
+        const buckets = modelBuckets || {};
+        const modelCost = costOfModels(buckets, priceTable);
+        // 与 CodexStore 同构：每个模型一行的完整明细，供「请求明细」视图逐行展示
+        const modelDetails = Object.entries(buckets)
+          .map(([model, bucket]) => ({
+            model,
+            inputTokens: bucket.inputTokens || 0,
+            cachedInputTokens: bucket.cachedInputTokens || 0,
+            outputTokens: bucket.outputTokens || 0,
+            totalTokens: bucket.totalTokens || 0,
+            records: bucket.records || 0,
+            cost: (modelCost.perModel[model] || {}).cny || 0,
+            estimated: Boolean((modelCost.perModel[model] || {}).estimated)
+          }))
+          .sort((a, b) => b.totalTokens - a.totalTokens);
         return {
           ...rest,
-          models: [...modelSet],
-          cost: costOfModels(modelBuckets || {}, priceTable).cny,
+          models: modelDetails.map(entry => entry.model),
+          modelDetails,
+          cost: modelCost.cny,
           turns: speedTurns || 0,
           tps: speedDuration > 0 ? (speedOutput || 0) * 1000 / speedDuration : null
         };

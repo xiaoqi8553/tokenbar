@@ -268,6 +268,8 @@
   }
 
   .card-head .range { margin-left: auto; }
+  /* 会话卡同时有视图 Tab 和徽标：Tab 负责吃掉剩余空间，徽标紧贴其右 */
+  .card-head #session-badge { margin-left: 12px; }
 
   .badge {
     margin-left: auto;
@@ -661,6 +663,7 @@
     /* 固定高度：Codex 几十行、WorkBuddy 几行，表格框都一样大，切换不跳 */
     height: 244px;
     overflow-y: auto;
+    overflow-x: auto;
     border-radius: 10px;
     border: 1px solid var(--line-soft);
   }
@@ -707,6 +710,32 @@
     font-size: 12.5px;
     font-weight: 540;
   }
+
+  /* ---------------- 会话日志 / 请求明细 ---------------- */
+
+  /* 模型名不再折叠成 +N：整列换行列出，长名字也不截断 */
+  td.model-cell, th.model-col { white-space: normal; }
+  .model-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: flex-start; }
+  .model-chips .chip { max-width: 100%; overflow-wrap: anywhere; white-space: normal; line-height: 1.35; }
+  .chip small { color: var(--text-3); font-weight: 500; margin-left: 4px; }
+
+  /* 点会话行展开模型明细（CC Switch 请求日志的点开形式） */
+  tr.session-row { cursor: pointer; }
+  tr.session-row.is-open > td { background: var(--panel-soft); }
+  .row-caret { display: inline-block; width: 11px; color: var(--text-3); transition: transform .15s ease; }
+  tr.is-open .row-caret { transform: rotate(90deg); }
+  tr.detail-row > td { padding: 4px 12px 12px; background: var(--panel-soft); white-space: normal; }
+  .detail-panel { border-left: 2px solid var(--accent-2); padding-left: 12px; }
+  .detail-meta { font-size: 12px; color: var(--text-3); margin-bottom: 8px; overflow-wrap: anywhere; }
+  .detail-table { table-layout: auto !important; font-size: 12.5px !important; }
+  .detail-table th { position: static; padding: 4px 8px; font-size: 12px; }
+  .detail-table td { padding: 4px 8px; border-bottom: 1px solid var(--line-soft); }
+  .detail-table .model-name { color: var(--text); font-weight: 540; overflow-wrap: anywhere; white-space: normal; }
+
+  /* 请求明细：一行一个「会话 × 模型」，列多就横向滚，但绝不裁模型名 */
+  table.log-table { min-width: 1040px; }
+  table.log-table td.model-cell { color: var(--text); font-weight: 540; overflow-wrap: anywhere; }
+  .log-note { color: var(--text-3); font-size: 12px; padding: 8px 12px; }
 
   /* ---------------- 底栏 ---------------- */
 
@@ -849,15 +878,19 @@
     <section class="card">
       <div class="card-head">
         <div><h2>会话记录</h2></div>
+        <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
+          <button type="button" data-view="sessions" aria-pressed="true">会话</button>
+          <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+        </div>
         <span class="badge" id="session-badge">—</span>
       </div>
       <div class="table-wrap">
-        <table>
+        <table id="session-table">
           <thead>
             <tr>
               <th style="width: 100px">最近活动</th>
               <th>项目</th>
-              <th style="width: 186px">模型</th>
+              <th class="model-col" style="width: 230px">模型</th>
               <th style="width: 80px; text-align: right">用量</th>
               <th style="width: 68px; text-align: right">请求</th>
               <th style="width: 88px; text-align: right">花费</th>
@@ -866,6 +899,23 @@
             </tr>
           </thead>
           <tbody id="session-body"></tbody>
+        </table>
+        <table class="log-table" id="log-table" hidden>
+          <thead>
+            <tr>
+              <th style="width: 100px">最近活动</th>
+              <th style="width: 150px">项目</th>
+              <th class="model-col" style="width: 230px">模型</th>
+              <th style="width: 92px; text-align: right">新增输入</th>
+              <th style="width: 92px; text-align: right">缓存命中</th>
+              <th style="width: 76px; text-align: right">输出</th>
+              <th style="width: 84px; text-align: right">用量</th>
+              <th style="width: 68px; text-align: right">请求</th>
+              <th style="width: 88px; text-align: right">花费</th>
+              <th style="width: 96px; text-align: right">速度</th>
+            </tr>
+          </thead>
+          <tbody id="log-body"></tbody>
         </table>
       </div>
     </section>
@@ -904,6 +954,10 @@
     range: Number(localStorage.getItem("codex.range") || 14) || 14,
     hourMetric: localStorage.getItem("codex.hourMetric") || "tokens",
     theme: localStorage.getItem("codex.theme") || "auto",
+    /** 日志视图：sessions = 按会话汇总，requests = 按会话×模型逐行（CC Switch 式） */
+    logView: localStorage.getItem("codex.logView") === "requests" ? "requests" : "sessions",
+    /** 当前点开的会话 id（会话视图里的行内明细） */
+    openSession: null,
     hover: -1
   };
 
@@ -2096,7 +2150,68 @@
     }).join("");
   }
 
-  function renderSessions() {
+  /**
+   * 一行「模型明细」的六个数字列。新增输入 = input - cached（input 含缓存命中），
+   * 与成本公式、CC Switch 的 billable_input_tokens 是同一口径。
+   */
+  function modelDetailCells(d) {
+    const input = Number(d.inputTokens) || 0;
+    const cached = Math.min(input, Math.max(0, Number(d.cachedInputTokens) || 0));
+    const fresh = Math.max(0, input - cached);
+    return [
+      '<td class="num">' + fmtTokens(fresh) + '</td>',
+      '<td class="num">' + fmtTokens(cached) + '</td>',
+      '<td class="num">' + fmtTokens(d.outputTokens) + '</td>',
+      '<td class="num">' + fmtTokens(d.totalTokens) + '</td>',
+      '<td class="num">' + fmtCount(d.records) + '</td>',
+      '<td class="num bar-money">' + fmtMoney(d.cost) + '</td>'
+    ].join("");
+  }
+
+  /** 模型名永远完整显示：允许换行，鼠标停上去还有原名 */
+  function modelNameCell(d) {
+    return '<td class="model-cell" title="' + escapeHtml(d.model) + '">' +
+      escapeHtml(d.model) +
+      (d.estimated ? ' <span class="muted">估算</span>' : '') +
+      '</td>';
+  }
+
+  /** 点开会话行后的展开面板：一行一个模型，外加完整路径与时间范围 */
+  function sessionDetailHtml(item) {
+    const details = item.modelDetails || [];
+    const stampText = value => value ? escapeHtml(String(value).replace("T", " ").slice(0, 19)) : "";
+    const meta = [
+      item.cwd ? escapeHtml(item.cwd) : "无本地路径",
+      item.firstAt ? "始于 " + stampText(item.firstAt) : "",
+      item.lastAt ? "止于 " + stampText(item.lastAt) : "",
+      item.files ? item.files + " 个日志" : ""
+    ].filter(Boolean).join(" · ");
+    const body = details.length
+      ? details.map(d => '<tr>' + modelNameCell(d) + modelDetailCells(d) + '</tr>').join("")
+      : '<tr><td colspan="7" class="empty">该会话没有可展开的模型明细</td></tr>';
+    return [
+      '<tr class="detail-row"><td colspan="8">',
+      '  <div class="detail-panel">',
+      '    <div class="detail-meta">' + meta + '</div>',
+      '    <table class="detail-table">',
+      '      <thead><tr>',
+      '        <th>模型</th>',
+      '        <th style="text-align:right">新增输入</th>',
+      '        <th style="text-align:right">缓存命中</th>',
+      '        <th style="text-align:right">输出</th>',
+      '        <th style="text-align:right">用量</th>',
+      '        <th style="text-align:right">请求</th>',
+      '        <th style="text-align:right">花费</th>',
+      '      </tr></thead>',
+      '      <tbody>' + body + '</tbody>',
+      '    </table>',
+      '  </div>',
+      '</td></tr>'
+    ].join("");
+  }
+
+  /** 视图一：按会话汇总，模型名全部列出、不再折叠成 +N；点行展开明细 */
+  function renderSessionRows() {
     const detail = state.detail;
     const body = $("session-body");
     if (!detail || !detail.sessionList.length) {
@@ -2111,24 +2226,84 @@
 
     const rows = detail.sessionList.slice(0, 60);
     body.innerHTML = rows.map(item => {
-      const models = item.models && item.models.length ? item.models : ["—"];
+      const details = item.modelDetails || [];
+      // 多模型时逐个 chips 换行列出，并带上该模型在本会话里的用量占比
+      const chips = details.length
+        ? details.map(d => {
+          const pct = item.totalTokens ? (d.totalTokens / item.totalTokens) * 100 : 0;
+          return '<span class="chip" title="' + escapeHtml(d.model) + ' · ' + fmtTokens(d.totalTokens) +
+            ' tokens · ' + pct.toFixed(1) + '%">' + escapeHtml(d.model) +
+            '<small>· ' + pct.toFixed(0) + '%</small></span>';
+        }).join("")
+        : ((item.models || []).map(m => '<span class="chip">' + escapeHtml(m) + '</span>').join("") || '<span class="muted">—</span>');
       const span = item.firstAt && item.lastAt ? new Date(item.lastAt).getTime() - new Date(item.firstAt).getTime() : 0;
       const speedCell = item.tps
         ? item.tps.toFixed(1) + ' <span class="muted">tok/s</span>'
         : (isWorkBuddy && item.credit ? item.credit.toFixed(1) + ' <span class="muted">积分</span>' : '<span class="muted">—</span>');
+      const open = state.openSession === item.id;
       return [
-        '<tr>',
+        '<tr class="session-row' + (open ? ' is-open' : '') + '" data-session="' + escapeHtml(item.id) + '">',
         '  <td class="muted" title="' + escapeHtml(item.lastAt || "") + '">' + relTime(item.lastAt) + '</td>',
-        '  <td class="proj" title="' + escapeHtml(item.cwd || "") + '">' + escapeHtml(item.project) + '</td>',
-        '  <td><span class="chip">' + escapeHtml(models[0]) + '</span>' + (models.length > 1 ? ' <span class="muted">+' + (models.length - 1) + '</span>' : '') + '</td>',
+        '  <td class="proj" title="' + escapeHtml(item.cwd || "") + '"><span class="row-caret">▸</span>' + escapeHtml(item.project) + '</td>',
+        '  <td class="model-cell"><div class="model-chips">' + chips + '</div></td>',
         '  <td class="num">' + fmtTokens(item.totalTokens) + '</td>',
         '  <td class="num">' + fmtCount(item.records) + '</td>',
         '  <td class="num bar-money">' + (item.cost ? fmtMoney(item.cost) : '<span class="muted">—</span>') + '</td>',
         '  <td class="num">' + speedCell + '</td>',
         '  <td class="num muted col-duration">' + fmtDuration(span) + '</td>',
-        '</tr>'
+        '</tr>',
+        open ? sessionDetailHtml(item) : ''
       ].join("");
     }).join("");
+  }
+
+  /** 视图二：CC Switch 式请求日志，一行一个「会话 × 模型」，字段逐项摊开 */
+  function renderLog() {
+    const detail = state.detail;
+    const body = $("log-body");
+    if (!detail || !detail.sessionList.length) {
+      body.innerHTML = '<tr><td colspan="10" class="empty">暂无请求明细</td></tr>';
+      $("session-badge").textContent = "0";
+      return;
+    }
+
+    const rows = [];
+    for (const item of detail.sessionList) {
+      for (const d of (item.modelDetails || [])) rows.push({ item, d });
+    }
+    rows.sort((a, b) =>
+      String(b.item.lastAt || "").localeCompare(String(a.item.lastAt || "")) || b.d.totalTokens - a.d.totalTokens);
+
+    const LIMIT = 400;
+    const shown = rows.slice(0, LIMIT);
+    $("session-badge").textContent = detail.sessions + " 个会话 · " + rows.length + " 行";
+
+    body.innerHTML = shown.map(({ item, d }) => {
+      const speed = item.tps
+        ? item.tps.toFixed(1) + ' <span class="muted">tok/s</span>'
+        : '<span class="muted">—</span>';
+      return [
+        '<tr>',
+        '  <td class="muted" title="' + escapeHtml(item.lastAt || "") + '">' + relTime(item.lastAt) + '</td>',
+        '  <td class="proj" title="' + escapeHtml(item.cwd || "") + '">' + escapeHtml(item.project) + '</td>',
+        modelNameCell(d),
+        modelDetailCells(d),
+        '  <td class="num">' + speed + '</td>',
+        '</tr>'
+      ].join("");
+    }).join("") + (rows.length > LIMIT
+      ? '<tr><td colspan="10" class="log-note">共 ' + rows.length + ' 行，按最近活动只显示前 ' + LIMIT + ' 行</td></tr>'
+      : "");
+  }
+
+  function renderSessions() {
+    const isLog = state.logView === "requests";
+    $("session-table").hidden = isLog;
+    $("log-table").hidden = !isLog;
+    for (const button of $("session-tabs").querySelectorAll("button[data-view]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.view === state.logView));
+    }
+    if (isLog) renderLog(); else renderSessionRows();
   }
 
   function renderStatus() {
@@ -2310,6 +2485,23 @@
 
   function bindButtons() {
     $("btn-refresh").addEventListener("click", () => load({ refresh: true }));
+    // 会话汇总 / 请求明细两个视图，选择会记住；切视图时收起行内展开
+    $("session-tabs").addEventListener("click", event => {
+      const button = event.target.closest("button[data-view]");
+      if (!button) return;
+      state.logView = button.dataset.view;
+      localStorage.setItem("codex.logView", state.logView);
+      state.openSession = null;
+      renderSessions();
+    });
+    // 点会话行展开该会话的模型明细（对齐 CC Switch 请求日志的点开形式）
+    $("session-body").addEventListener("click", event => {
+      const row = event.target.closest("tr.session-row");
+      if (!row) return;
+      const id = row.dataset.session;
+      state.openSession = state.openSession === id ? null : id;
+      renderSessionRows();
+    });
     $("btn-theme").addEventListener("click", () => {
       state.theme = state.theme === "dark" ? "light" : state.theme === "light" ? "auto" : "dark";
       localStorage.setItem("codex.theme", state.theme);

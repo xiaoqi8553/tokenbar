@@ -224,7 +224,8 @@ test("2.2 统计卡文案与会话表数值不再被裁切", () => {
   // 速度列 66px 装不下「102.7 tok/s」；日期、长模型名、时长也各差几像素
   assert.match(dashboard, /width: 104px; text-align: right" id="th-speed"/);
   assert.match(dashboard, /width: 100px">最近活动/);
-  assert.match(dashboard, /width: 186px">模型/);
+  // 2.3.2：模型列从 186px 加宽到 230px，多模型换行列出，不再折叠成 +N
+  assert.match(dashboard, /width: 230px">模型/);
   assert.match(dashboard, /width: 110px; text-align: right">时长/);
   assert.match(dashboard, /td\.num \{[\s\S]*?padding-left: 8px/);
   assert.match(dashboard, /\.col-duration \{ display: none; \}/);
