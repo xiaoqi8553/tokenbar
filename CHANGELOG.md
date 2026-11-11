@@ -1,5 +1,14 @@
 # 更新日志
 
+## 2.3.1 - 2026-11-11
+
+**WorkBuddy 数据源不再只在启动时扫一次。** 排查「今天新增用量没检测到」时发现：`wbStore.build()` 只在 `initStore()` 里调用，之后 30 秒轮询的 `refreshTrayStatus()` 只刷 Codex，托盘/弹窗的 WorkBuddy 摘要会一直停在启动那一刻。本机 `workbuddy-detail-cache.json` 从 09:44 冻结到下午，期间两个会话日志继续增长，重扫后补回 **3.24M tokens**（477.1M → 480.3M）。
+
+- `refreshTrayStatus()` 每轮触发一次 `wbStore.build()`：内部已有 `_promise` 防并发，且只重扫 `size/mtime` 变过的文件，不阻塞 Codex 刷新；扫完把摘要挂回最新快照。
+- 新增 `tests/live-refresh.test.js`：静态断言（轮询刷新、增量扫描、防并发）＋ 一条真实功能测试（会话日志追加新请求后，非 force 重扫补回用量、并发复用 `_promise`、重启从缓存恢复不回退）。测试 34 → **37** 个，全绿。
+- `scripts/desktop-smoke.js` 启动 Electron 前剔除继承来的 `ELECTRON_RUN_AS_NODE`：宿主是 Electron 应用时会带 `=1`，让 `electron.exe` 退化成纯 Node、`app` 变 undefined，冒烟脚本会误报「Electron 提前退出」。
+- 口径边界写进 README：TokenBar 只统计本地 rollout `token_count` 事件。Codex Desktop 里 `source_kind=chatgpt` 的**云端线程**（`local_thread_catalog` 中挂在 `chatgpt:<account>` host 下）不写本地 rollout，本地只有标题/时间元数据，额度照扣但任何本地看板都读不到 token 明细。
+
 ## 2.3.0 - 2026-11-09
 
 **累计口径对齐 CC Switch v4：按请求去重，不再按天取大者。** 起因是用户看到 CC Switch 显示 4.87B、TokenBar 显示 6.58B，核对后确认是 TokenBar 多算了约 1.71B。

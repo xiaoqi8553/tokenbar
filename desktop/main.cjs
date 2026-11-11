@@ -502,6 +502,14 @@ if (!gotLock) {
 
   async function refreshTrayStatus(force = false) {
     if (!store) return;
+    // WorkBuddy 是第二个数据源：以前只在启动时 build 一次，之后新会话
+    // 一直不进弹窗/托盘。build() 自带 _promise 防并发，且只重扫 size/mtime
+    // 变过的文件，放进 30 秒轮询不会重复劳动；不 await，避免拖慢托盘刷新。
+    if (wbStore) {
+      wbStore.build()
+        .then(() => attachWorkBuddySummary())
+        .catch(error => log(`workbuddy refresh failed: ${error.message}`));
+    }
     try {
       latestStatus = await store.refresh({ full: false });
       startupError = "";

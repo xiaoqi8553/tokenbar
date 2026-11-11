@@ -55,6 +55,12 @@ WorkBuddy has two installs with different log directories. They often hold the s
 
 WorkBuddy 国际版和国内版写日志的目录不同。两边的会话经常是同一批 —— 国际版首次启动会把旧目录整份搬过去。扫描时按会话 id 去重，只留体积更大的那份，不会重复计。
 
+### What is NOT counted / 不计入的部分
+
+TokenBar only reads `token_count` events from **local rollout files**. Codex Desktop also lists **cloud threads**: in `~/.codex/sqlite/codex.db` (`local_thread_catalog`) they have `source_kind = 'chatgpt'`, a `chatgpt:<account>` host, no `cwd`, and no rollout on disk. They do consume ChatGPT subscription quota, but the machine keeps only their title and timestamps — no token detail. Neither TokenBar nor CC Switch can reconstruct their token counts locally: CC Switch's `proxy_request_logs` is likewise filled by parsing local rollouts unless the local proxy is enabled. To get a session counted, run it as a local Codex session (VS Code extension / CLI / Desktop local mode), or route it through CC Switch's local proxy so the requests are logged.
+
+TokenBar 只统计**本地 rollout** 里的 `token_count` 事件。Codex Desktop 里还有一类**云端线程**：在 `~/.codex/sqlite/codex.db` 的 `local_thread_catalog` 中，它们 `source_kind = 'chatgpt'`、host 是 `chatgpt:<账号>`、没有 `cwd`，磁盘上也不写 rollout。这类会话照样扣 ChatGPT 订阅额度，但本机只留下标题和时间，**没有 token 明细**，TokenBar 和 CC Switch 都无法从本地补算（CC Switch 的 `proxy_request_logs` 默认也是解析本地 rollout 得来的，除非开启本地代理）。想让用量进看板，要么用本地 Codex 会话（VS Code 扩展 / CLI / Desktop 的 local 模式），要么让请求经过 CC Switch 本地代理被记账。
+
 ## Accounting / 口径
 
 ### Total / 累计

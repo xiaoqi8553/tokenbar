@@ -99,6 +99,10 @@ async function main() {
   const debugPort = await freePort();
   const packagedExecutable = process.env.CODEX_TOKEN_DESKTOP_SMOKE_EXE;
   const electronPath = packagedExecutable || require("electron");
+  // 宿主是 Electron 应用时，子进程常会继承 ELECTRON_RUN_AS_NODE=1；
+  // 带着它启动 electron.exe 会退化成纯 Node，main.cjs 里的 app 就是 undefined。
+  const smokeEnv = { ...process.env };
+  delete smokeEnv.ELECTRON_RUN_AS_NODE;
   const electronArgs = [
     ...(packagedExecutable ? [] : [root]),
     `--user-data-dir=${path.join(temporaryRoot, "profile")}`,
@@ -107,7 +111,7 @@ async function main() {
   const child = spawn(electronPath, electronArgs, {
     cwd: root,
     env: {
-      ...process.env,
+      ...smokeEnv,
       CODEX_HOME: temporaryRoot,
       WORKBUDDY_HOME: path.join(temporaryRoot, "no-workbuddy"),
       CODEX_TOKEN_DASHBOARD_SMOKE: "1",
