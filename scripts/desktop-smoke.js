@@ -199,6 +199,8 @@ async function main() {
         modelMoney: document.querySelectorAll("#models .bar-money").length,
         projectRows: document.querySelectorAll("#projects .bar-row").length,
         projectMoney: document.querySelectorAll("#projects .bar-money").length,
+        barsOverflow: [...document.querySelectorAll(".bars")].map(el => getComputedStyle(el).overflowY),
+        barsHeight: [...document.querySelectorAll(".bars")].map(el => Math.round(el.getBoundingClientRect().height)),
         chartSub: (document.querySelector("#chart-sub") || {}).textContent || "",
         zeroMarks: document.querySelectorAll("#chart .zero-dot, #chart .zero-run").length,
         legend: (document.querySelector(".legend") || {}).textContent || "",
@@ -229,6 +231,8 @@ async function main() {
     assert.equal(layout.cols[0], layout.cols[1], "两张分布卡应该等高");
     assert.equal(layout.modelMoney, layout.modelRows, "模型分布每行都要带金额");
     assert.equal(layout.projectMoney, layout.projectRows, "项目分布每行都要带金额");
+    assert.deepEqual(layout.barsOverflow, ["auto", "auto"], "两张分布卡都要能卡内滚动");
+    assert.deepEqual(layout.barsHeight, [244, 244], "分布卡高度与会话表一致");
     assert.match(layout.chartSub, /天有记录/);
     assert.match(layout.chartSub, /天零用量/, "14 天视图要把没用量的日子数出来");
     assert.equal(layout.zeroMarks, 0, "零用量日不再往基线上打点或画浅线");
@@ -278,6 +282,25 @@ async function main() {
     assert.equal(expanded.rows, 1, "点会话行展开一条明细面板");
     assert.ok(expanded.models > 0, "展开面板里逐行列出模型");
     assert.ok(expanded.meta.length > 0, "展开面板带上路径与时间范围");
+
+    // 3d. 分布条不再折叠：全是真实行，点开能看到四档 token
+    await dashboard.click("#models .bar-row");
+    const modelBar = await dashboard.evaluate(() => ({
+      open: document.querySelectorAll("#models .bar-row.open").length,
+      detail: document.querySelectorAll("#models .bar-detail:not([hidden])").length,
+      text: (document.querySelector("#models .bar-detail:not([hidden])") || {}).textContent || ""
+    }));
+    assert.equal(modelBar.open, 1, "模型分布点行展开一行");
+    assert.equal(modelBar.detail, 1, "同时只展开一行");
+    assert.match(modelBar.text, /新增输入/);
+    assert.match(modelBar.text, /缓存命中/);
+    await dashboard.click("#projects .bar-row");
+    const projectBar = await dashboard.evaluate(() => ({
+      open: document.querySelectorAll("#projects .bar-row.open").length,
+      text: (document.querySelector("#projects .bar-detail:not([hidden])") || {}).textContent || ""
+    }));
+    assert.equal(projectBar.open, 1, "项目分布也能点开");
+    assert.match(projectBar.text, /新增输入/);
 
     // 4. 切一次区间，确认活跃时段跟着变
     const before = await dashboard.evaluate(() => (document.querySelector("#hour-badge") || {}).textContent || "");

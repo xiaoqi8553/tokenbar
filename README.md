@@ -31,8 +31,8 @@ Reads local logs only. No network, no login, no upload.
 - 六张指标卡：额度窗口、今日用量、累计用量、等价花费、输出速度、缓存命中。
 - Usage trend by day, switchable between 7 / 14 / 30 days and all time. Zero-token days keep their slot on the calendar, so the line falls back to the baseline instead of skipping the gap; the subtitle counts them. The Y axis ignores one-off spikes so ordinary days stay readable; days above the ceiling are marked and keep their real value in the tooltip. Below it: range total, range cost, daily average, peak day, period-over-period.
 - 用量趋势按天，可切 7 / 14 / 30 天与全部。0 token 的日子照样占着日历上的一格，曲线自己落回基线，缺口不会凭空消失；空白天数写在副标题里。纵轴不受单日尖峰牵着走，超出上限的日子有标记、真实值留在 tooltip 里。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
-- Model and project split, recalculated per range, with cost and output speed on each row.
-- 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。
+- Model and project split, recalculated per range, with cost and output speed on each row. Both cards scroll inside a fixed 244px frame and list **every** entry — no `Top 6 + Others` folding. Click a row to expand its fresh input / cache hit / output / requests / cost / speed; the expanded row and scroll position survive a refresh.
+- 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。两张卡在固定 244px 框内滚动，**全量列出**每个条目（没有「前 6 + 其他 N 项」折叠）；点某行展开新增输入 / 缓存命中 / 输出 / 请求 / 花费 / 速度，刷新后展开状态与滚动位置都保留。
 - Active hours: 24 hours × tokens, or switch to tok/s to see output speed per hour.
 - 活跃时段：24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。
 - Session log with two views: **Sessions** lists every model of a session (no `+N` folding) and clicking a row expands its per-model breakdown; **Request details** is a CC Switch-style flat log, one row per session × model, with full model name, fresh input, cache hit, output, tokens, requests, cost and speed. The choice is remembered.

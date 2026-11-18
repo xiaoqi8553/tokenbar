@@ -555,20 +555,40 @@
   .bars {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    flex: 1;
+    gap: 8px;
+    /* 2.3.3：跟会话记录一样固定高度、卡内滚动。以前截断成「前 6 + 其他 N 项」，
+       剩下几十个模型 / 项目根本点不开，等于摆设；现在全量渲染，往下翻就能看全。 */
+    flex: none;
+    height: 244px;
     min-height: 196px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
   }
 
-  /* 固定行高：切换数据源、行数不同时也不会错位 */
-  .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; min-height: 28px; align-content: start; }
+  /* 固定行高：切换数据源、行数不同时也不会错位；整行可点开明细 */
+  .bar-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 10px;
+    min-height: 28px;
+    align-content: start;
+    padding: 3px 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    /* .bars 是固定高度 flex column：不禁止收缩的话，行多/展开明细时
+       浏览器会把每行压扁，展开的文字就叠到下一行上，必须 flex:none。 */
+    flex: none;
+  }
+
+  .bar-row:hover { background: var(--panel-soft); }
 
   .bar-name {
     font-size: 14.5px;
     color: var(--text-2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* 长模型名 / 项目名完整换行，不再用省略号吞掉后半截 */
+    overflow-wrap: anywhere;
+    white-space: normal;
     min-width: 0;
   }
 
@@ -595,6 +615,21 @@
     background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--accent-3)));
     transition: width .4s cubic-bezier(.3, .8, .3, 1);
   }
+
+  /* 点行展开的四档 token 明细；hidden 必须显式声明，否则会被下面的 display 覆盖 */
+  .bar-detail {
+    grid-column: 1 / -1;
+    margin-top: 3px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--panel-soft);
+    color: var(--text-3);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+
+  .bar-detail b { color: var(--text-2); font-weight: 560; }
+  .bar-detail[hidden] { display: none; }
 
   .empty {
     color: var(--text-3);
@@ -958,6 +993,8 @@
     logView: localStorage.getItem("codex.logView") === "requests" ? "requests" : "sessions",
     /** 当前点开的会话 id（会话视图里的行内明细） */
     openSession: null,
+    /** 两张分布卡各自点开的行名（切区间 / 刷新后仍保持展开） */
+    openBars: { models: null, projects: null },
     hover: -1
   };
 
@@ -1280,6 +1317,10 @@
     const blank = project => ({
       project,
       totalTokens: 0,
+      // 2.3.3：点行展开要显示四档 token，项目侧也得把这三个桶带上
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
       records: 0,
       cost: 0,
       turns: 0,
@@ -1296,6 +1337,9 @@
       for (const [project, bucket] of Object.entries(byProject)) {
         const current = totals.get(project) || blank(project);
         current.totalTokens += bucket.totalTokens || 0;
+        current.inputTokens += bucket.inputTokens || 0;
+        current.cachedInputTokens += bucket.cachedInputTokens || 0;
+        current.outputTokens += bucket.outputTokens || 0;
         current.records += bucket.records || 0;
         if (unit) current.cost += bucketCost(bucket, unit);
         totals.set(project, current);
@@ -1961,7 +2005,6 @@
   // 渲染：分布
   // ---------------------------------------------------------------------
   function renderBars(container, items, options) {
-    const limit = options.limit || 6;
     const nameKey = options.nameKey;
     const emptyText = options.empty;
 
@@ -1970,50 +2013,32 @@
       return;
     }
 
-    const head = items.slice(0, limit);
-    const rest = items.slice(limit);
-    const rows = head.slice();
+    // 2.3.3：全量渲染。以前这里 slice(0, 6) + 「其他 N 项」，剩下的条目
+    // 既看不到也点不开；现在卡片固定 244px 滚动，所有条目都能往下翻到。
+    // items 已按 totalTokens 倒序，比例条仍以最大一项为满格。
+    const max = Math.max.apply(null, items.map(item => item.share).concat([0.0001]));
+    const scrollTop = container.scrollTop || 0;
+    const openName = options.openName || null;
 
-    if (rest.length) {
-      // 「其他 N 项」也要按同样的口径汇总：花费相加，速度用输出 / 耗时重新加权
-      const row = {
-        [nameKey]: "其他 " + rest.length + " 项",
-        totalTokens: 0,
-        share: 0,
-        cost: 0,
-        turns: 0,
-        speedOutput: 0,
-        speedDuration: 0,
-        muted: true
-      };
-      for (const item of rest) {
-        row.totalTokens += item.totalTokens || 0;
-        row.share += item.share || 0;
-        row.cost += item.cost || 0;
-        row.turns += item.turns || 0;
-        row.speedOutput += item.speedOutput || 0;
-        row.speedDuration += item.speedDuration || 0;
-      }
-      row.tps = row.speedDuration > 0 ? row.speedOutput * 1000 / row.speedDuration : null;
-      rows.push(row);
-    }
-
-    const max = Math.max.apply(null, rows.map(item => item.share).concat([0.0001]));
-
-    container.innerHTML = rows.map(item => {
+    container.innerHTML = items.map(item => {
       const width = Math.max(1.5, (item.share / max) * 100);
       const decorated = options.decorate ? options.decorate(item) : {};
       const extraHtml = decorated.extraHtml || (item.extra ? escapeHtml(item.extra) : "");
       const label = decorated.label || item.label || "";
+      const detail = options.detail ? options.detail(item) : "";
+      const open = openName !== null && openName === item[nameKey] && detail;
       return [
-        '<div class="bar-row"' + (label ? ' title="' + escapeHtml(label) + '"' : '') + '>',
-        '  <span class="bar-name"' + (item.muted ? ' style="color: var(--text-3)"' : '') + '>' + escapeHtml(item[nameKey]) + '</span>',
+        '<div class="bar-row' + (open ? ' open' : '') + '" data-name="' + escapeHtml(item[nameKey]) + '"' + (label ? ' title="' + escapeHtml(label) + '"' : '') + '>',
+        '  <span class="bar-name">' + escapeHtml(item[nameKey]) + '</span>',
         '  <span class="bar-val"><b>' + fmtPercent(item.share * 100, 1) + '</b> · ' + fmtTokens(item.totalTokens) +
           (extraHtml ? ' · <span class="bar-extra">' + extraHtml + '</span>' : '') + '</span>',
         '  <span class="bar-track"><i style="width:' + width.toFixed(1) + '%"></i></span>',
+        detail ? '  <div class="bar-detail"' + (open ? '' : ' hidden') + '>' + detail + '</div>' : '',
         '</div>'
       ].join("");
     }).join("");
+    // 重渲染（切区间 / 手动刷新）后仍停在同一位置，不然翻到第 70 项就被弹回顶部
+    container.scrollTop = scrollTop;
   }
 
   function escapeHtml(value) {
@@ -2039,6 +2064,21 @@
       (item.tps ? " · " + item.tps.toFixed(1) + " tok/s（" + fmtCount(item.turns || 0) + " 轮）" : " · 无速度样本");
   }
 
+  /** 点分布行展开的四档明细，和请求明细同口径：新增输入 = input − 缓存命中 */
+  function distDetail(item) {
+    const input = item.inputTokens || 0;
+    const cached = Math.min(input, item.cachedInputTokens || 0);
+    const parts = [
+      '新增输入 <b>' + fmtTokens(input - cached) + '</b>',
+      '缓存命中 <b>' + fmtTokens(cached) + '</b>',
+      '输出 <b>' + fmtTokens(item.outputTokens || 0) + '</b>',
+      '请求 <b>' + fmtCount(item.records || 0) + '</b>',
+      '花费 <b>' + fmtMoney(item.cost || 0) + '</b>'
+    ];
+    if (item.tps) parts.push('速度 <b>' + item.tps.toFixed(1) + ' tok/s</b>（' + fmtCount(item.turns || 0) + ' 轮）');
+    return parts.join(' · ');
+  }
+
   function renderModels() {
     const models = rangeModels();
     for (const item of models) {
@@ -2046,32 +2086,32 @@
     }
     renderBars($("models"), models, {
       nameKey: "model",
-      limit: 6,
       empty: "此区间没有模型数据",
-      decorate: item => item.muted
-        ? { extraHtml: distExtra(item), label: distLabel(item) }
-        : {
-          extraHtml: distExtra(item),
-          // 模型行额外保留单价说明：鼠标停上去能看到输入 / 命中 / 输出三档
-          label: (item.tps ? item.tps.toFixed(1) + " tok/s · " : "") + unitText(item.model)
-        }
+      openName: state.openBars.models,
+      detail: distDetail,
+      decorate: item => ({
+        extraHtml: distExtra(item),
+        // 模型行额外保留单价说明：鼠标停上去能看到输入 / 命中 / 输出三档
+        label: (item.tps ? item.tps.toFixed(1) + " tok/s · " : "") + unitText(item.model)
+      })
     });
     const totalCost = models.reduce((acc, item) => acc + (item.cost || 0), 0);
     $("model-badge").textContent = fmtMoney(totalCost) + " · " +
-      (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天");
+      (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天") + " · " + models.length + " 项";
   }
 
   function renderProjects() {
     const projects = rangeProjects();
     renderBars($("projects"), projects, {
       nameKey: "project",
-      limit: 6,
       empty: "此区间没有项目数据",
+      openName: state.openBars.projects,
+      detail: distDetail,
       decorate: item => ({ extraHtml: distExtra(item), label: distLabel(item) })
     });
     const totalCost = projects.reduce((acc, item) => acc + (item.cost || 0), 0);
     $("project-badge").textContent = fmtMoney(totalCost) + " · " +
-      (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天");
+      (rangeDays() === 0 ? "全部时间" : "最近 " + rangeDays() + " 天") + " · " + projects.length + " 项";
   }
 
   function renderHours() {
@@ -2494,6 +2534,18 @@
       state.openSession = null;
       renderSessions();
     });
+    // 点分布行展开四档明细；两个容器共用，重渲染不会重复绑定
+    const toggleBarDetail = event => {
+      const row = event.target.closest(".bar-row");
+      if (!row || !row.querySelector(".bar-detail")) return;
+      const key = event.currentTarget === $("models") ? "models" : "projects";
+      const name = row.dataset.name;
+      state.openBars[key] = state.openBars[key] === name ? null : name;
+      if (key === "models") renderModels();
+      else renderProjects();
+    };
+    $("models").addEventListener("click", toggleBarDetail);
+    $("projects").addEventListener("click", toggleBarDetail);
     // 点会话行展开该会话的模型明细（对齐 CC Switch 请求日志的点开形式）
     $("session-body").addEventListener("click", event => {
       const row = event.target.closest("tr.session-row");
