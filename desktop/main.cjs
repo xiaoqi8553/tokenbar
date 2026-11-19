@@ -1,11 +1,13 @@
-const { app, BrowserWindow, Menu, Tray, shell, ipcMain, screen, nativeImage } = require("electron");
+const { app, BrowserWindow, Menu, Tray, shell, ipcMain, screen, nativeImage, safeStorage, Notification } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { CodexStore } = require("./data/codex-store.cjs");
 const { WorkBuddyStore } = require("./data/workbuddy-store.cjs");
 const { loadTable, ensureTableFile } = require("./data/pricing.cjs");
 const { buildBaseline, baselineIsFresh, loadBaseline, saveBaseline } = require("./data/history-baseline.cjs");
+const { createAbleSciStore } = require("./data/ablesci-store.cjs");
 
 const PRODUCT_NAME = "TokenBar";
 const APP_ROOT = app.getAppPath();
@@ -85,6 +87,8 @@ if (!gotLock) {
   let store = null;
   /** @type {WorkBuddyStore|null} WorkBuddy 用量：国际版 ~/.workbuddy-ai、国内版 ~/.workbuddy */
   let wbStore = null;
+  /** @type {ReturnType<createAbleSciStore>|null} 科研通签到（多账号 + 本地加密凭证） */
+  let ablesciStore = null;
   /** 启动诊断日志的落盘位置，start() 阶段才确定 */
   let logFile = null;
 
@@ -121,7 +125,49 @@ if (!gotLock) {
       usageIndex: path.join(userData, "data", "usage-index.json"),
       baseline: path.join(userData, "data", "history-baseline.json"),
       workbuddyCache: path.join(userData, "data", "workbuddy-detail-cache.json"),
-      pricing: path.join(userData, "data", "pricing.json")
+      pricing: path.join(userData, "data", "pricing.json"),
+      ablesciAccounts: path.join(userData, "data", "ablesci-accounts.json"),
+      ablesciState: path.join(userData, "data", "ablesci-state.json")
+    };
+  }
+
+  /**
+   * 科研通账号密码的加密器：优先 Electron safeStorage（Windows DPAPI / macOS Keychain），
+   * 不可用时退回本机派生的 AES-256-GCM（至少不明文落盘）。加密结果统一 base64 字符串存储。
+   */
+  function makeCipher() {
+    let backend = "safeStorage";
+    let available = false;
+    try { available = Boolean(safeStorage && safeStorage.isEncryptionAvailable()); } catch { available = false; }
+    if (available) {
+      return {
+        backend,
+        encrypt(text) { return safeStorage.encryptString(String(text)).toString("base64"); },
+        decrypt(stored) { return safeStorage.decryptString(Buffer.from(String(stored), "base64")); }
+      };
+    }
+    backend = "local-aes-gcm";
+    log(`safeStorage 不可用，科研通凭证使用本机派生密钥加密 (${backend})`);
+    const key = crypto.createHash("sha256")
+      .update("tokenbar.ablesci.v1|" + app.getPath("userData") + "|" + os.hostname())
+      .digest();
+    return {
+      backend,
+      encrypt(text) {
+        const iv = crypto.randomBytes(12);
+        const c = crypto.createCipheriv("aes-256-gcm", key, iv);
+        const enc = Buffer.concat([c.update(String(text), "utf8"), c.final()]);
+        return "gcm:" + Buffer.concat([iv, c.getAuthTag(), enc]).toString("base64");
+      },
+      decrypt(stored) {
+        const raw = Buffer.from(String(stored).replace(/^gcm:/, ""), "base64");
+        const iv = raw.subarray(0, 12);
+        const tag = raw.subarray(12, 28);
+        const enc = raw.subarray(28);
+        const d = crypto.createDecipheriv("aes-256-gcm", key, iv);
+        d.setAuthTag(tag);
+        return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
+      }
     };
   }
 
@@ -316,6 +362,12 @@ if (!gotLock) {
     popover.webContents.send("popover:status", latestStatus || { ok: false, phase: store ? store.phase : "idle" });
   }
 
+  /** 科研通状态变了，让打开的弹窗重新拉一次签到状态 */
+  function pushAbleSciChanged() {
+    if (!popover || popover.isDestroyed() || !popoverReady) return;
+    popover.webContents.send("ablesci:changed");
+  }
+
   function registerPopoverHandlers() {
     ipcMain.handle("popover:refresh", async () => {
       await refreshTrayStatus(true);
@@ -362,6 +414,30 @@ if (!gotLock) {
       if (process.platform === "win32") app.setLoginItemSettings({ openAtLogin: Boolean(enabled), path: process.execPath });
       updateTray();
       return { launchAtLogin: preferences.launchAtLogin };
+    });
+
+    // ---- 科研通签到（弹窗与完整看板共用） ----
+    ipcMain.handle("ablesci:list", () => {
+      if (!ablesciStore) return { accounts: [], today: "" };
+      try { return ablesciStore.list(); } catch (e) { return { accounts: [], today: "", error: e.message }; }
+    });
+    ipcMain.handle("ablesci:add", (_event, email, password) => {
+      if (!ablesciStore) throw new Error("签到模块尚未就绪");
+      return ablesciStore.addAccount(email, password);
+    });
+    ipcMain.handle("ablesci:remove", (_event, id) => {
+      if (!ablesciStore) throw new Error("签到模块尚未就绪");
+      return ablesciStore.removeAccount(id);
+    });
+    ipcMain.handle("ablesci:sign", async () => {
+      if (!ablesciStore) throw new Error("签到模块尚未就绪");
+      const result = await ablesciStore.sign();
+      log(`ablesci sign: ${result.summary}`);
+      return result;
+    });
+    ipcMain.handle("ablesci:open-site", () => {
+      shell.openExternal("https://www.ablesci.com/");
+      return true;
     });
   }
 
@@ -454,6 +530,31 @@ if (!gotLock) {
     return String(number);
   }
 
+  /** 托盘右键「科研通签到」：签到后用系统通知反馈结果，不依赖弹窗是否打开 */
+  async function runTraySign() {
+    if (!ablesciStore) return;
+    if (ablesciStore.list().accounts.length === 0) {
+      showPopover();
+      return;
+    }
+    try {
+      const result = await ablesciStore.sign();
+      const detail = (result.results || []).map(r => `${r.masked}：${r.msg}`).join("\n");
+      if (typeof Notification === "function" && Notification.isSupported()) {
+        new Notification({
+          title: result.results && result.results.some(r => !r.ok) ? "科研通签到（部分失败）" : "科研通签到完成",
+          body: (result.summary + "\n" + detail).slice(0, 400),
+          silent: true
+        }).show();
+      }
+      // 同步弹窗里的状态徽标
+      pushAbleSciChanged();
+      log(`tray ablesci sign: ${result.summary}`);
+    } catch (e) {
+      log(`tray ablesci sign failed: ${e.message}`);
+    }
+  }
+
   function updateTray() {
     if (!tray) return;
     const data = latestStatus;
@@ -473,6 +574,10 @@ if (!gotLock) {
       { label: `WorkBuddy 今日：${formatTokens(data?.workbuddy?.today?.totalTokens)} tokens`, enabled: false },
       { type: "separator" },
       { label: "立即同步数据", click: () => { refreshTrayStatus(true); } },
+      {
+        label: "科研通签到",
+        click: () => { runTraySign(); }
+      },
       {
         label: "登录 Windows 时启动",
         type: "checkbox",
@@ -572,6 +677,13 @@ if (!gotLock) {
   }
 
   async function initStore(paths, baseline) {
+    // 科研通签到：凭证用 safeStorage 加密，账号/状态落在 userData/data 下
+    ablesciStore = createAbleSciStore({
+      accountsFile: paths.ablesciAccounts,
+      stateFile: paths.ablesciState,
+      cipher: makeCipher()
+    });
+
     // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格
     ensureTableFile(paths.pricing);
     const pricing = loadTable(paths.pricing);

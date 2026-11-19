@@ -153,6 +153,51 @@ async function main() {
     assert.equal(popoverInfo.title, "TokenBar");
     assert.ok(popoverInfo.hasDashboardButton, "弹窗里应该有打开完整看板的按钮");
 
+    // 1b. 科研通签到卡片：渲染 / 展开管理 / 添加账号 / 列表脱敏
+    await popover.waitForFunction(
+      () => document.querySelector("#sign-badge") && document.querySelector("#sign-badge").textContent !== "加载中…",
+      { timeout: 15_000 }
+    );
+    const signInitial = await popover.evaluate(() => ({
+      hasCard: !!document.querySelector("#sign-card"),
+      badge: document.querySelector("#sign-badge").textContent,
+      nowText: document.querySelector("#sign-now").textContent,
+      manageHidden: document.querySelector("#sign-manage").hidden
+    }));
+    assert.ok(signInitial.hasCard, "弹窗里应该有科研通签到卡片");
+    assert.equal(signInitial.badge, "未配置", "冒烟环境无账号，徽标应为未配置");
+    assert.equal(signInitial.nowText, "配置账号", "没账号时主按钮应引导配置");
+    assert.equal(signInitial.manageHidden, true, "管理区默认收起");
+
+    // 展开管理，添加一个测试账号（密码经 safeStorage/派生密钥加密，不落明文）
+    await popover.click("#sign-manage-btn");
+    await popover.type("#sign-email", "smoke@example.com");
+    await popover.type("#sign-password", "smoke-pass-123");
+    await popover.click("#sign-add");
+    await popover.waitForFunction(
+      () => document.querySelectorAll("#sign-acct-list .acct-row").length === 1,
+      { timeout: 10_000 }
+    );
+    const signAdded = await popover.evaluate(() => ({
+      badge: document.querySelector("#sign-badge").textContent,
+      nowText: document.querySelector("#sign-now").textContent,
+      acctText: document.querySelector("#sign-acct-list").innerText,
+      msg: document.querySelector("#sign-msg").textContent
+    }));
+    assert.match(signAdded.badge, /1\/1|已签/, "加号后徽标应反映账号状态");
+    assert.equal(signAdded.nowText, "立即签到", "有账号后主按钮变成签到");
+    assert.match(signAdded.acctText, /sm\*\*\*@example\.com/, "列表只显示脱敏邮箱");
+    assert.doesNotMatch(signAdded.acctText, /smoke@example\.com/, "列表不能出现明文邮箱");
+    assert.doesNotMatch(signAdded.acctText, /smoke-pass/, "列表不能出现密码");
+    assert.match(signAdded.msg, /已添加/, "添加后应有成功提示");
+
+    // 清理测试账号，避免污染后续断言
+    await popover.click("#sign-acct-list .acct-del");
+    await popover.waitForFunction(
+      () => document.querySelectorAll("#sign-acct-list .acct-row").length === 0,
+      { timeout: 10_000 }
+    );
+
     // 2. 从弹窗点开完整看板
     await popover.click("#dashboard");
     const dashboard = await findPage(browser, "dashboard.html", 20_000);
@@ -170,9 +215,15 @@ async function main() {
       hourMetrics: [...document.querySelectorAll("#hour-tabs [data-metric]")].map(el => el.dataset.metric),
       hourBadge: (document.querySelector("#hour-badge") || {}).textContent || "",
       bodyText: document.body.innerText,
+      hasSignButton: !!document.querySelector("#btn-sign"),
+      hasSignModal: !!document.querySelector("#sign-modal"),
+      signApi: !!window.dashboard && typeof window.dashboard.ablesciSign === "function",
       legacyButton: !!document.querySelector("#btn-legacy, [data-action='open-legacy']"),
       legacyApi: !!window.dashboard && "openLegacy" in window.dashboard
     }));
+    assert.ok(info.hasSignButton, "完整看板顶栏应该有科研通签到按钮");
+    assert.ok(info.hasSignModal, "完整看板应该有科研通签到面板");
+    assert.ok(info.signApi, "看板 preload 应暴露签到 API");
     assert.match(info.title, /TokenBar/);
     assert.deepEqual(info.sources.sort(), ["codex", "workbuddy"]);
     assert.deepEqual(info.ranges.sort(), ["0", "14", "30", "7"]);
@@ -181,6 +232,38 @@ async function main() {
     assert.match(info.bodyText, /等价花费/);
     assert.equal(info.legacyButton, false, "旧版网页看板按钮应该已经删除");
     assert.equal(info.legacyApi, false, "preload 不应该再暴露 openLegacy");
+
+    // 3a. 科研通签到面板：打开 → 添加账号 → 脱敏展示 → 关闭
+    await dashboard.click("#btn-sign");
+    await dashboard.waitForFunction(
+      () => document.querySelector("#sign-modal") && !document.querySelector("#sign-modal").hidden,
+      { timeout: 10_000 }
+    );
+    await dashboard.type("#m-email", "dash@example.com");
+    await dashboard.type("#m-password", "dash-pass-456");
+    await dashboard.click("#m-add");
+    await dashboard.waitForFunction(
+      () => document.querySelectorAll("#m-accounts .m-acct").length === 1,
+      { timeout: 10_000 }
+    );
+    const dashSign = await dashboard.evaluate(() => ({
+      badge: document.querySelector("#m-badge").textContent,
+      acctText: document.querySelector("#m-accounts").innerText,
+      topLabel: document.querySelector("#sign-top-label").textContent,
+      signLabel: document.querySelector("#m-sign").textContent
+    }));
+    assert.match(dashSign.acctText, /da\*\*\*@example\.com/, "看板账号列表也要脱敏");
+    assert.doesNotMatch(dashSign.acctText, /dash@example\.com|dash-pass/);
+    assert.equal(dashSign.signLabel, "立即签到", "有账号后主按钮变成签到");
+    assert.match(dashSign.topLabel, /签到|已签/, "顶栏按钮同步账号状态");
+    // 清理
+    await dashboard.click("#m-accounts .m-del");
+    await dashboard.waitForFunction(
+      () => document.querySelectorAll("#m-accounts .m-acct").length === 0,
+      { timeout: 10_000 }
+    );
+    await dashboard.click("#m-close");
+    await dashboard.waitForFunction(() => document.querySelector("#sign-modal").hidden, { timeout: 5_000 });
 
     // 3b. 固定几何：表格框、分布卡、趋势图尺寸与数据源无关
     const layout = await dashboard.evaluate(() => {

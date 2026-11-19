@@ -4,9 +4,9 @@
 
 Windows 托盘里的 token 用量看板。Codex 和 WorkBuddy 用了多少、折多少钱、跑得多快，点一下图标就能看到。
 
-Reads local logs only. No network, no login, no upload.
+Usage stats read local logs only — no network, no login, no upload. The **科研通签到 (AbleSci sign-in)** button is the one exception: it connects to ablesci.com only when you click it, using accounts you add yourself.
 
-只读本地日志。不联网、不登录、不上传。
+用量统计只读本地日志——不联网、不登录、不上传。**科研通签到**按钮是唯一例外：只有你主动点击时才联网访问 ablesci.com，且只使用你自己添加的账号。
 
 ## What it shows / 看什么
 
@@ -22,6 +22,8 @@ Reads local logs only. No network, no login, no upload.
 - WorkBuddy 今日、累计、积分。
 - Equivalent cost, Codex + WorkBuddy combined.
 - 等价花费，Codex 与 WorkBuddy 合计。
+- **科研通签到**卡片：状态徽标（未配置 / `N/N 已签` / 今日已签 ✓）、一键签到按钮，可展开的账号管理（脱敏列表、添加、删除）。
+- **AbleSci sign-in** card: status badge (not configured / `N/N signed` / signed today ✓), one-tap sign button, and expandable account management (masked list, add, remove).
 
 **Dashboard** — double-click the tray icon
 
@@ -37,6 +39,14 @@ Reads local logs only. No network, no login, no upload.
 - 活跃时段：24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。
 - Session log with two views: **Sessions** lists every model of a session (no `+N` folding) and clicking a row expands its per-model breakdown; **Request details** is a CC Switch-style flat log, one row per session × model, with full model name, fresh input, cache hit, output, tokens, requests, cost and speed. The choice is remembered.
 - 会话记录有两个视图：**会话**把每个会话用到的模型全部列出（不再折叠成 `+N`），点某行展开该会话的模型明细；**请求明细**是 CC Switch 式的逐行日志，一行一个「会话 × 模型」，含完整模型名、新增输入、缓存命中、输出、用量、请求数、花费与速度。视图选择会被记住。
+- Top bar **科研通签到** button opens the same sign-in panel (shared accounts across popover and dashboard).
+- 顶栏**科研通签到**按钮打开同一个签到面板（弹窗与看板共用账号）。
+
+### 科研通签到 / AbleSci sign-in
+
+Add one or more AbleSci accounts (email + password) in the popover or dashboard. Passwords are encrypted with the OS keystore (Electron `safeStorage`, DPAPI on Windows) and stored only in `%APPDATA%/TokenBar/data/`; only masked emails ever appear in the UI. Clicking **签到** logs each account in and hits `https://www.ablesci.com/user/sign`, reporting success / already-signed / failure per account. Accounts are signed in series to avoid triggering anti-bot checks. Token usage stats never use this connection — it happens only on click.
+
+在弹窗或看板里添加一个或多个科研通账号（邮箱 + 密码）。密码用系统密钥库加密（Electron `safeStorage`，Windows 上是 DPAPI），只存在 `%APPDATA%/TokenBar/data/`，界面里只出现脱敏邮箱。点**签到**会为每个账号登录并请求 `https://www.ablesci.com/user/sign`，逐账号报告成功 / 今日已签 / 失败。多账号串行签到以避免触发风控。用量统计不走这条连接——只有点击时才会联网。
 
 The top bar switches between `Codex` and `WorkBuddy`; both reuse the same charts.
 

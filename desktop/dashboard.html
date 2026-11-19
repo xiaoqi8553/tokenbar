@@ -230,6 +230,98 @@
   .icon-btn[data-busy="1"] svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .sign-top {
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text-2);
+    font: 540 12.5px/1 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    cursor: pointer;
+    position: relative;
+    transition: color .16s ease, border-color .16s ease, background .16s ease;
+  }
+  .sign-top:hover { color: var(--text); border-color: color-mix(in srgb, var(--text-3) 50%, transparent); }
+  .sign-top svg { color: #8b5cf6; }
+  .sign-top[data-busy="1"] { opacity: .6; pointer-events: none; }
+  .sign-dot {
+    position: absolute;
+    top: -3px; right: -3px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid var(--panel);
+  }
+  .sign-dot[hidden] { display: none; }
+
+  /* 科研通签到模态 */
+  .modal-mask {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, .42);
+    display: grid;
+    place-items: center;
+    z-index: 50;
+  }
+  .modal-mask[hidden] { display: none; }
+  .sign-modal {
+    width: min(440px, calc(100vw - 40px));
+    max-height: min(620px, calc(100vh - 60px));
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .3);
+    padding: 20px 22px;
+  }
+  .sign-modal h3 { font-size: 16px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+  .sign-modal h3 svg { color: #8b5cf6; }
+  .sign-modal .m-sub { color: var(--text-3); font-size: 12px; margin-bottom: 16px; }
+  .sign-modal .m-badge {
+    float: right; font-size: 11.5px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px;
+    background: var(--line-soft); color: var(--text-2);
+  }
+  .sign-modal .m-badge.done { background: rgba(34,197,94,.16); color: #16a34a; }
+  .sign-modal .m-badge.todo { background: rgba(245,158,11,.16); color: #d97706; }
+  .m-acct {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border: 1px solid var(--line-soft);
+    border-radius: 9px; margin-bottom: 7px; font-size: 13px;
+  }
+  .m-acct .m-mail { flex: 1; }
+  .m-acct .m-state { font-size: 11.5px; color: var(--text-3); }
+  .m-acct .m-state.ok { color: #16a34a; }
+  .m-acct .m-del {
+    background: none; border: 0; color: var(--text-3);
+    font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 5px;
+  }
+  .m-acct .m-del:hover { color: #e11d48; background: var(--line-soft); }
+  .m-form { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .m-form input {
+    height: 34px; padding: 0 11px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--text); font: inherit; font-size: 13px; outline: none;
+  }
+  .m-form input:focus { border-color: var(--accent); }
+  .m-form-row { display: flex; gap: 8px; }
+  .m-form-row input { flex: 1; min-width: 0; }
+  .m-btn {
+    height: 36px; padding: 0 14px; border: 0; border-radius: 8px;
+    background: var(--accent); color: #fff; font: 600 13px/1 "Segoe UI", sans-serif; cursor: pointer;
+  }
+  .m-btn:disabled { opacity: .5; cursor: wait; }
+  .m-btn.ghost { background: transparent; color: var(--text-2); border: 1px solid var(--line); }
+  .m-primary { width: 100%; margin-top: 16px; background: linear-gradient(135deg, #5b5ce2, #7c5ce6); }
+  .m-msg { font-size: 12.5px; color: var(--text-2); margin-top: 12px; line-height: 1.6; white-space: pre-line; }
+  .m-msg.err { color: #e11d48; }
+  .m-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+  .m-link { background: none; border: 0; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .m-close { background: none; border: 0; color: var(--text-3); font-size: 13px; cursor: pointer; }
+
   main {
     overflow-y: auto;
     overflow-x: hidden;
@@ -851,6 +943,11 @@
         <path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>
       </svg>
     </button>
+    <button class="sign-top" id="btn-sign" title="科研通签到" aria-label="科研通签到">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
+      <span id="sign-top-label">科研通签到</span>
+      <i class="sign-dot" id="sign-dot" hidden></i>
+    </button>
     <button class="icon-btn" id="btn-theme" title="切换深色模式" aria-label="切换深色模式">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/>
@@ -962,6 +1059,31 @@
     <span style="flex:1"></span>
     <button class="link" id="btn-sessions">日志目录</button>
   </footer>
+
+  <div class="modal-mask" id="sign-modal" hidden>
+    <div class="sign-modal" role="dialog" aria-modal="true" aria-label="科研通签到">
+      <h3>
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
+        科研通签到
+        <span class="m-badge" id="m-badge">—</span>
+      </h3>
+      <div class="m-sub" id="m-sub">添加科研通账号，一键签到领积分（凭证本机加密保存）</div>
+      <div id="m-accounts"></div>
+      <div class="m-form">
+        <input type="email" id="m-email" placeholder="科研通邮箱" autocomplete="username" spellcheck="false">
+        <div class="m-form-row">
+          <input type="password" id="m-password" placeholder="密码（本机加密，不上传）" autocomplete="current-password">
+          <button class="m-btn" id="m-add">添加账号</button>
+        </div>
+      </div>
+      <button class="m-btn m-primary" id="m-sign">立即签到</button>
+      <div class="m-msg" id="m-msg" hidden></div>
+      <div class="m-foot">
+        <button class="m-link" id="m-open-site">打开科研通官网</button>
+        <button class="m-close" id="m-close">关闭</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -2523,6 +2645,138 @@
     setTimeout(() => { boot.style.display = "none"; }, 320);
   }
 
+  // --------------------------------------------------------------- 科研通签到
+  function signMsg(text, isErr) {
+    const node = $("m-msg");
+    if (!node) return;
+    node.textContent = text || "";
+    node.hidden = !text;
+    node.className = "m-msg" + (isErr ? " err" : "");
+  }
+
+  async function loadAbleSci() {
+    const d = window.dashboard;
+    if (!d || !d.ablesciList) return;
+    try {
+      const data = await d.ablesciList();
+      renderAbleSci(data || { accounts: [] });
+    } catch {
+      $("m-badge").textContent = "读取失败";
+    }
+  }
+
+  function renderAbleSci(data) {
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const signed = accounts.filter(a => a.signedToday).length;
+    // 顶栏按钮状态
+    const dot = $("sign-dot");
+    if (accounts.length === 0) {
+      $("sign-top-label").textContent = "科研通签到";
+      dot.hidden = true;
+    } else if (signed === accounts.length) {
+      $("sign-top-label").textContent = "今日已签 ✓";
+      dot.hidden = false;
+    } else {
+      $("sign-top-label").textContent = `签到 ${signed}/${accounts.length}`;
+      dot.hidden = true;
+    }
+    // 徽标
+    const badge = $("m-badge");
+    if (!accounts.length) { badge.textContent = "未配置"; badge.className = "m-badge"; }
+    else if (signed === accounts.length) { badge.textContent = "今日已签 ✓"; badge.className = "m-badge done"; }
+    else { badge.textContent = `${signed}/${accounts.length} 已签`; badge.className = "m-badge todo"; }
+    $("m-sub").textContent = accounts.length
+      ? `${accounts.length} 个账号 · ${signed} 个今日已签到`
+      : "添加科研通账号，一键签到领积分（凭证本机加密保存）";
+    $("m-sign").textContent = accounts.length ? "立即签到" : "添加账号后签到";
+    // 账号列表
+    const list = $("m-accounts");
+    if (!accounts.length) {
+      list.innerHTML = '<div class="m-sub" style="margin:0 0 4px">还没有账号，在下方添加。</div>';
+    } else {
+      list.innerHTML = accounts.map(a => [
+        '<div class="m-acct">',
+        '  <span class="m-mail">' + escapeHtml(a.masked) + '</span>',
+        '  <span class="m-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? '今日已签 ✓' : '待签到') + '</span>',
+        '  <button class="m-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
+        '</div>'
+      ].join("")).join("");
+    }
+  }
+
+  function openSignModal() { $("sign-modal").hidden = false; loadAbleSci(); }
+  function closeSignModal() { $("sign-modal").hidden = true; }
+
+  async function doSign() {
+    const d = window.dashboard;
+    const btn = $("m-sign");
+    const state = await d.ablesciList().catch(() => ({ accounts: [] }));
+    if (!state.accounts || !state.accounts.length) {
+      $("m-email").focus();
+      signMsg("请先在下方添加一个科研通账号", true);
+      return;
+    }
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "签到中…";
+    signMsg("");
+    try {
+      const result = await d.ablesciSign();
+      if (!result || !result.results) { signMsg(result && result.summary || "签到未返回结果", true); return; }
+      const lines = result.results.map(r => (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg);
+      signMsg(result.summary + "\n" + lines.join("\n"), result.results.some(r => !r.ok));
+      await loadAbleSci();
+    } catch (e) {
+      signMsg("签到失败：" + (e && e.message ? e.message : String(e)), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  async function addAbleSciAccount() {
+    const d = window.dashboard;
+    const email = $("m-email").value.trim();
+    const password = $("m-password").value;
+    if (!email || !password) { signMsg("请填写邮箱和密码", true); return; }
+    const btn = $("m-add");
+    btn.disabled = true;
+    try {
+      const data = await d.ablesciAdd(email, password);
+      $("m-email").value = "";
+      $("m-password").value = "";
+      renderAbleSci(data || { accounts: [] });
+      signMsg("账号已添加，密码已加密保存在本机");
+    } catch (e) {
+      signMsg("添加失败：" + (e && e.message ? e.message : String(e)), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function bindSign() {
+    $("btn-sign").addEventListener("click", openSignModal);
+    $("m-close").addEventListener("click", closeSignModal);
+    $("sign-modal").addEventListener("click", event => { if (event.target === $("sign-modal")) closeSignModal(); });
+    $("m-sign").addEventListener("click", doSign);
+    $("m-add").addEventListener("click", addAbleSciAccount);
+    $("m-email").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addAbleSciAccount(); } });
+    $("m-password").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addAbleSciAccount(); } });
+    $("m-open-site").addEventListener("click", () => window.dashboard.ablesciOpenSite && window.dashboard.ablesciOpenSite());
+    $("m-accounts").addEventListener("click", async event => {
+      const del = event.target.closest(".m-del");
+      if (!del) return;
+      try {
+        const data = await window.dashboard.ablesciRemove(del.getAttribute("data-id"));
+        renderAbleSci(data || { accounts: [] });
+        signMsg("账号已删除");
+      } catch (e) {
+        signMsg("删除失败：" + (e && e.message ? e.message : String(e)), true);
+      }
+    });
+    document.addEventListener("keydown", event => { if (event.key === "Escape" && !$("sign-modal").hidden) closeSignModal(); });
+  }
+
   function bindButtons() {
     $("btn-refresh").addEventListener("click", () => load({ refresh: true }));
     // 会话汇总 / 请求明细两个视图，选择会记住；切视图时收起行内展开
@@ -2587,6 +2841,8 @@
   buildHourTabs();
   buildSourceTabs();
   bindButtons();
+  bindSign();
+  loadAbleSci();
   bindChartHover();
 
   if (window.dashboard) {

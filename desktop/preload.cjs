@@ -13,5 +13,15 @@ contextBridge.exposeInMainWorld("codexBar", {
   setLaunchAtLogin: enabled => ipcRenderer.invoke("popover:set-launch-at-login", Boolean(enabled)),
   getPrefs: () => ipcRenderer.invoke("popover:prefs"),
   quit: () => ipcRenderer.invoke("popover:quit"),
-  close: () => ipcRenderer.invoke("popover:close")
+  close: () => ipcRenderer.invoke("popover:close"),
+  // 科研通签到
+  ablesciList: () => ipcRenderer.invoke("ablesci:list"),
+  ablesciAdd: (email, password) => ipcRenderer.invoke("ablesci:add", email, password),
+  ablesciRemove: id => ipcRenderer.invoke("ablesci:remove", id),
+  ablesciSign: () => ipcRenderer.invoke("ablesci:sign"),
+  ablesciOpenSite: () => ipcRenderer.invoke("ablesci:open-site"),
+  onAbleSciChanged(callback) {
+    if (typeof callback !== "function") return;
+    ipcRenderer.on("ablesci:changed", () => callback());
+  }
 });

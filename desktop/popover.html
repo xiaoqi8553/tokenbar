@@ -330,6 +330,193 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* ------------------------------------------------------------ ableSci sign */
+
+  .sign-card {
+    margin: 8px 12px 4px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: var(--hover);
+    border: 1px solid var(--hair);
+  }
+
+  .sign-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sign-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #5b5ce2, #8b5cf6);
+    color: #fff;
+    flex: none;
+  }
+
+  .sign-icon svg { width: 15px; height: 15px; }
+
+  .sign-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .sign-sub {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+
+  .sign-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    background: var(--track);
+    color: var(--text-2);
+  }
+
+  .sign-badge.done {
+    background: rgba(34, 197, 94, 0.16);
+    color: #16a34a;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .sign-badge.done { color: #4ade80; }
+  }
+
+  .sign-badge.todo {
+    background: rgba(245, 158, 11, 0.16);
+    color: #d97706;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .sign-badge.todo { color: #fbbf24; }
+  }
+
+  .sign-actions {
+    display: flex;
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .sign-btn {
+    flex: 1;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    font: 600 12.5px/1 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    cursor: default;
+    background: linear-gradient(135deg, #5b5ce2, #7c5ce6);
+    color: #fff;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+  }
+
+  .sign-btn:hover { filter: brightness(1.07); }
+  .sign-btn:disabled { opacity: 0.55; cursor: wait; }
+
+  .sign-btn.ghost {
+    flex: none;
+    min-width: 56px;
+    padding: 0 10px;
+    background: transparent;
+    color: var(--text-2);
+    border: 1px solid var(--track);
+  }
+
+  .sign-btn.ghost:hover { background: var(--hover); }
+
+  .sign-manage {
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid var(--hair);
+  }
+
+  .sign-manage[hidden] { display: none; }
+
+  .acct-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+  }
+
+  .acct-mail { color: var(--text); flex: 1; min-width: 0; }
+  .acct-state { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+  .acct-state.ok { color: #16a34a; }
+  @media (prefers-color-scheme: dark) { .acct-state.ok { color: #4ade80; } }
+
+  .acct-del {
+    background: none;
+    border: 0;
+    color: var(--text-3);
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 5px;
+  }
+
+  .acct-del:hover { background: var(--hover); color: #e11d48; }
+
+  .sign-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .sign-form input {
+    height: 29px;
+    padding: 0 9px;
+    border-radius: 7px;
+    border: 1px solid var(--track);
+    background: var(--panel-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+    user-select: text;
+  }
+
+  .sign-form input:focus { border-color: var(--accent); }
+
+  .sign-form-row { display: flex; gap: 6px; }
+  .sign-form-row input { flex: 1; min-width: 0; }
+  .sign-add {
+    flex: none;
+    padding: 0 12px;
+    height: 29px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font: 600 12px/1 "Segoe UI", sans-serif;
+  }
+  .sign-add:disabled { opacity: 0.5; }
+
+  .sign-msg {
+    font-size: 11.5px;
+    color: var(--text-2);
+    margin-top: 8px;
+    line-height: 1.5;
+    white-space: pre-line;
+  }
+
+  .sign-msg.err { color: #e11d48; }
+  .sign-link {
+    background: none; border: 0; padding: 0;
+    color: var(--accent); font: inherit; font-size: 11.5px;
+    text-decoration: underline; cursor: default; margin-top: 6px;
+  }
+
   /* --------------------------------------------------------------- actions */
 
   .actions {
@@ -482,6 +669,35 @@
     <svg class="spark" id="spark" width="100" height="40" viewBox="0 0 100 40" aria-hidden="true"></svg>
   </div>
 
+  <div class="sign-card" id="sign-card">
+    <div class="sign-head">
+      <span class="sign-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
+      </span>
+      <div>
+        <div class="sign-title">科研通签到</div>
+        <div class="sign-sub" id="sign-sub">加载中…</div>
+      </div>
+      <span class="sign-badge" id="sign-badge">—</span>
+    </div>
+    <div class="sign-actions">
+      <button class="sign-btn" id="sign-now">签到</button>
+      <button class="sign-btn ghost" id="sign-manage-btn">管理</button>
+    </div>
+    <div class="sign-manage" id="sign-manage" hidden>
+      <div id="sign-acct-list"></div>
+      <div class="sign-form">
+        <input type="email" id="sign-email" placeholder="科研通邮箱" autocomplete="username" spellcheck="false">
+        <div class="sign-form-row">
+          <input type="password" id="sign-password" placeholder="密码（本机加密保存）" autocomplete="current-password">
+          <button class="sign-add" id="sign-add">添加</button>
+        </div>
+      </div>
+      <div class="sign-msg" id="sign-msg" hidden></div>
+      <button class="sign-link" id="sign-open-site">没有账号？打开科研通官网</button>
+    </div>
+  </div>
+
   <button class="disclosure" id="more" aria-expanded="false">
     <span>累计与明细</span>
     <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
@@ -525,7 +741,7 @@
 <script>
 (() => {
   const host = window.codexBar || {};
-  const state = { status: null, syncing: false, detailOpen: false };
+  const state = { status: null, syncing: false, detailOpen: false, ablesci: null };
   const $ = id => document.getElementById(id);
 
   // ------------------------------------------------------------------ utils
@@ -728,6 +944,131 @@
     renderDetail(status);
   }
 
+  // ------------------------------------------------------------ ableSci sign
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function signMsg(text, isErr) {
+    const node = $("sign-msg");
+    if (!node) return;
+    node.textContent = text || "";
+    node.hidden = !text;
+    node.className = "sign-msg" + (isErr ? " err" : "");
+  }
+
+  async function loadAbleSci() {
+    try {
+      const data = await host.ablesciList?.();
+      state.ablesci = data || { accounts: [] };
+      renderAbleSci(state.ablesci);
+    } catch {
+      $("sign-sub").textContent = "状态读取失败";
+    }
+  }
+
+  function renderAbleSci(data) {
+    state.ablesci = data;
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const signed = accounts.filter(a => a.signedToday).length;
+    const badge = $("sign-badge");
+    const sub = $("sign-sub");
+    const nowBtn = $("sign-now");
+    if (!accounts.length) {
+      badge.textContent = "未配置";
+      badge.className = "sign-badge";
+      sub.textContent = "添加账号后一键签到";
+      nowBtn.textContent = "配置账号";
+      $("sign-card").style.display = "";
+    } else if (signed === accounts.length) {
+      badge.textContent = "今日已签 ✓";
+      badge.className = "sign-badge done";
+      sub.textContent = `${accounts.length} 个账号 · 全部完成`;
+      nowBtn.textContent = "再次签到";
+    } else {
+      badge.textContent = `${signed}/${accounts.length} 已签`;
+      badge.className = "sign-badge todo";
+      sub.textContent = signed ? `${accounts.length - signed} 个账号待签到` : `${accounts.length} 个账号待签到`;
+      nowBtn.textContent = "立即签到";
+    }
+
+    const list = $("sign-acct-list");
+    if (list) {
+      if (!accounts.length) {
+        list.innerHTML = '<div class="acct-state">还没有账号，请在下方添加。</div>';
+      } else {
+        list.innerHTML = accounts.map(a => [
+          '<div class="acct-row">',
+          '  <span class="acct-mail" title="已脱敏">' + escapeHtml(a.masked) + '</span>',
+          '  <span class="acct-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? "已签" : "待签") + '</span>',
+          '  <button class="acct-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
+          '</div>'
+        ].join("")).join("");
+      }
+    }
+    syncHeight();
+  }
+
+  async function doSign() {
+    const btn = $("sign-now");
+    if (btn.disabled) return;
+    // 未配置账号时，把「签到」按钮当作展开配置
+    const current = state.ablesci;
+    if (!current || !current.accounts || !current.accounts.length) {
+      openManage();
+      $("sign-email").focus();
+      return;
+    }
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "签到中…";
+    signMsg("");
+    try {
+      const result = await host.ablesciSign?.();
+      if (!result) { signMsg("签到未返回结果", true); return; }
+      if (!result.results || !result.results.length) { signMsg(result.summary || "没有账号", true); return; }
+      const lines = result.results.map(r =>
+        (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg
+      );
+      signMsg(result.summary + "\n" + lines.join("\n"), result.results.some(r => !r.ok));
+      await loadAbleSci();
+    } catch (e) {
+      signMsg("签到失败：" + (e && e.message ? e.message : String(e)), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  function openManage() {
+    const m = $("sign-manage");
+    m.hidden = !m.hidden;
+    $("sign-manage-btn").textContent = m.hidden ? "管理" : "收起";
+    syncHeight();
+  }
+
+  async function addAccount() {
+    const email = $("sign-email").value.trim();
+    const password = $("sign-password").value;
+    if (!email || !password) { signMsg("请填写邮箱和密码", true); return; }
+    const btn = $("sign-add");
+    btn.disabled = true;
+    btn.textContent = "…";
+    signMsg("");
+    try {
+      const data = await host.ablesciAdd?.(email, password);
+      $("sign-email").value = "";
+      $("sign-password").value = "";
+      renderAbleSci(data || { accounts: [] });
+      signMsg("账号已添加，密码已加密保存在本机");
+    } catch (e) {
+      signMsg("添加失败：" + (e && e.message ? e.message : String(e)), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "添加";
+    }
+  }
+
   // ------------------------------------------------------------------ layout
   function syncHeight() {
     if (typeof host.setHeight !== "function") return;
@@ -760,6 +1101,26 @@
       try { await host.setLaunchAtLogin(next); } catch { switchEl.classList.toggle("on", !next); }
     });
 
+    // 科研通签到
+    $("sign-now").addEventListener("click", doSign);
+    $("sign-manage-btn").addEventListener("click", openManage);
+    $("sign-add").addEventListener("click", addAccount);
+    $("sign-email").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addAccount(); } });
+    $("sign-password").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addAccount(); } });
+    $("sign-open-site").addEventListener("click", () => { host.ablesciOpenSite && host.ablesciOpenSite(); });
+    $("sign-acct-list").addEventListener("click", async event => {
+      const del = event.target.closest(".acct-del");
+      if (!del) return;
+      const id = del.getAttribute("data-id");
+      try {
+        const data = await host.ablesciRemove?.(id);
+        renderAbleSci(data || { accounts: [] });
+        signMsg("账号已删除");
+      } catch (e) {
+        signMsg("删除失败：" + (e && e.message ? e.message : String(e)), true);
+      }
+    });
+
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") host.close && host.close();
       if (event.key === "F5") { event.preventDefault(); runSync(true); }
@@ -772,6 +1133,9 @@
         render(payload);
         syncHeight();
       });
+    }
+    if (typeof host.onAbleSciChanged === "function") {
+      host.onAbleSciChanged(() => { loadAbleSci(); });
     }
   }
 
@@ -800,6 +1164,7 @@
       const prefs = await host.getPrefs?.();
       if (prefs && prefs.launchAtLogin) $("launch-switch").classList.add("on");
     } catch { /* ignore */ }
+    loadAbleSci();
     runSync();
     setInterval(() => { if (state.status) render(state.status); }, 20_000);
   })();

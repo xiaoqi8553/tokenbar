@@ -35,5 +35,11 @@ contextBridge.exposeInMainWorld("dashboard", {
   /** 在资源管理器中打开日志目录 */
   openSessions: () => ipcRenderer.invoke("dashboard:open-sessions"),
   /** 打开周报/外部链接（仅 https） */
-  openExternal: url => ipcRenderer.invoke("dashboard:open-external", url)
+  openExternal: url => ipcRenderer.invoke("dashboard:open-external", url),
+  /** 科研通签到（与托盘弹窗共用同一套主进程逻辑） */
+  ablesciList: () => ipcRenderer.invoke("ablesci:list"),
+  ablesciAdd: (email, password) => ipcRenderer.invoke("ablesci:add", email, password),
+  ablesciRemove: id => ipcRenderer.invoke("ablesci:remove", id),
+  ablesciSign: () => ipcRenderer.invoke("ablesci:sign"),
+  ablesciOpenSite: () => ipcRenderer.invoke("ablesci:open-site")
 });
