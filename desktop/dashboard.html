@@ -293,6 +293,8 @@
     border-radius: 9px; margin-bottom: 7px; font-size: 13px;
   }
   .m-acct .m-mail { flex: 1; }
+  .m-acct .m-meta { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+  .m-acct .m-meta b { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
   .m-acct .m-state { font-size: 11.5px; color: var(--text-3); }
   .m-acct .m-state.ok { color: #16a34a; }
   .m-acct .m-del {
@@ -2694,13 +2696,22 @@
     if (!accounts.length) {
       list.innerHTML = '<div class="m-sub" style="margin:0 0 4px">还没有账号，在下方添加。</div>';
     } else {
-      list.innerHTML = accounts.map(a => [
-        '<div class="m-acct">',
-        '  <span class="m-mail">' + escapeHtml(a.masked) + '</span>',
-        '  <span class="m-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? '今日已签 ✓' : '待签到') + '</span>',
-        '  <button class="m-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
-        '</div>'
-      ].join("")).join("");
+      list.innerHTML = accounts.map(a => {
+        const meta = [];
+        if (a.points !== "" && a.points != null) meta.push('积分 <b>' + escapeHtml(a.points) + '</b>');
+        if (a.signDays !== "" && a.signDays != null) meta.push('连续 ' + escapeHtml(a.signDays) + ' 天');
+        if (!meta.length) meta.push('积分待更新 · 点签到获取');
+        return [
+          '<div class="m-acct">',
+          '  <span style="flex:1;min-width:0">',
+          '    <span class="m-mail">' + escapeHtml(a.masked) + '</span>',
+          '    <div class="m-meta">' + meta.join(' · ') + '</div>',
+          '  </span>',
+          '  <span class="m-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? '今日已签 ✓' : '待签到') + '</span>',
+          '  <button class="m-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
+          '</div>'
+        ].join("");
+      }).join("");
     }
   }
 
@@ -2723,7 +2734,12 @@
     try {
       const result = await d.ablesciSign();
       if (!result || !result.results) { signMsg(result && result.summary || "签到未返回结果", true); return; }
-      const lines = result.results.map(r => (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg);
+      const lines = result.results.map(r => {
+        const extra = (r.points !== "" && r.points != null)
+          ? "（积分 " + r.points + (r.signDays !== "" && r.signDays != null ? " · 连续 " + r.signDays + " 天" : "") + "）"
+          : "";
+        return (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg + extra;
+      });
       signMsg(result.summary + "\n" + lines.join("\n"), result.results.some(r => !r.ok));
       await loadAbleSci();
     } catch (e) {

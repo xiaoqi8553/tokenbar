@@ -9,6 +9,7 @@ const {
   maskEmail,
   beijingDate,
   parseCsrf,
+  parseUserInfo,
   createCookieJar
 } = require("../desktop/data/ablesci-store.cjs");
 
@@ -183,6 +184,52 @@ test("多账号串行签到，汇总分别统计", async () => {
   assert.equal(out.results.length, 2);
   assert.match(out.summary, /1 个签到成功/);
   assert.match(out.summary, /1 个今日已签/);
+});
+
+test("parseUserInfo 从首页解析积分与连续签到天数", () => {
+  const html = '<div class="u"><b id="user-point-now">2,205</b></div>'
+    + '<span id="sign-count">4</span>';
+  const info = parseUserInfo(html);
+  assert.equal(info.points, 2205, "千分位逗号要去掉");
+  assert.equal(info.signDays, 4);
+  const none = parseUserInfo("<html>anonymous</html>");
+  assert.equal(none.points, "");
+  assert.equal(none.signDays, "");
+});
+
+test("签到响应不带积分时，用登录会话抓首页补上积分/连续天数", async () => {
+  const f = tmpFiles();
+  const store = createAbleSciStore({ ...f, cipher });
+  store.addAccount("user@example.com", "p");
+  let homeCalled = false;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith("/site/login") && (!options || options.method !== "POST")) {
+      return {
+        headers: headerBag({ "set-cookie": ["advanced-frontend=xyz; Path=/"] }),
+        text: async () => '<meta name="csrf-token" content="t">'
+      };
+    }
+    if (options && options.method === "POST") {
+      return { headers: headerBag({}), text: async () => JSON.stringify({ code: 0 }) };
+    }
+    if (url.endsWith("/user/sign")) {
+      // data 里没有积分，积分只在首页 HTML 里
+      return { headers: headerBag({}), text: async () => JSON.stringify({ code: 0, msg: "签到成功" }) };
+    }
+    if (url.endsWith("ablesci.com/")) {
+      homeCalled = true;
+      assert.match(options.headers.Cookie, /advanced-frontend|_csrf/);
+      return { headers: headerBag({}), text: async () => '<b id="user-point-now">2205</b><i id="sign-count">4</i>' };
+    }
+    throw new Error("unexpected " + url);
+  };
+  const out = await store.sign({ fetchImpl });
+  assert.equal(homeCalled, true, "缺积分时应抓首页");
+  assert.equal(out.results[0].points, 2205);
+  assert.equal(out.results[0].signDays, 4);
+  const list = store.list();
+  assert.equal(list.accounts[0].points, 2205, "积分要落盘并在列表可见");
+  assert.equal(list.accounts[0].signDays, 4);
 });
 
 test("beijingDate 返回 YYYY-MM-DD", () => {

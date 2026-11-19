@@ -450,6 +450,8 @@
   }
 
   .acct-mail { color: var(--text); flex: 1; min-width: 0; }
+  .acct-meta { color: var(--text-3); font-size: 10.5px; margin-top: 1px; white-space: nowrap; }
+  .acct-meta b { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
   .acct-state { font-size: 11px; color: var(--text-3); white-space: nowrap; }
   .acct-state.ok { color: #16a34a; }
   @media (prefers-color-scheme: dark) { .acct-state.ok { color: #4ade80; } }
@@ -997,13 +999,22 @@
       if (!accounts.length) {
         list.innerHTML = '<div class="acct-state">还没有账号，请在下方添加。</div>';
       } else {
-        list.innerHTML = accounts.map(a => [
-          '<div class="acct-row">',
-          '  <span class="acct-mail" title="已脱敏">' + escapeHtml(a.masked) + '</span>',
-          '  <span class="acct-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? "已签" : "待签") + '</span>',
-          '  <button class="acct-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
-          '</div>'
-        ].join("")).join("");
+        list.innerHTML = accounts.map(a => {
+          const meta = [];
+          if (a.points !== "" && a.points != null) meta.push('积分 <b>' + escapeHtml(a.points) + '</b>');
+          if (a.signDays !== "" && a.signDays != null) meta.push('连续 ' + escapeHtml(a.signDays) + ' 天');
+          if (!meta.length) meta.push('积分待更新 · 点签到获取');
+          return [
+            '<div class="acct-row">',
+            '  <span style="flex:1;min-width:0">',
+            '    <span class="acct-mail" title="已脱敏">' + escapeHtml(a.masked) + '</span>',
+            '    <div class="acct-meta">' + meta.join(' · ') + '</div>',
+            '  </span>',
+            '  <span class="acct-state' + (a.signedToday ? ' ok' : '') + '">' + (a.signedToday ? "已签" : "待签") + '</span>',
+            '  <button class="acct-del" data-id="' + escapeHtml(a.id) + '" title="删除账号" aria-label="删除">×</button>',
+            '</div>'
+          ].join("");
+        }).join("");
       }
     }
     syncHeight();
@@ -1027,9 +1038,12 @@
       const result = await host.ablesciSign?.();
       if (!result) { signMsg("签到未返回结果", true); return; }
       if (!result.results || !result.results.length) { signMsg(result.summary || "没有账号", true); return; }
-      const lines = result.results.map(r =>
-        (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg
-      );
+      const lines = result.results.map(r => {
+        const extra = (r.points !== "" && r.points != null)
+          ? "（积分 " + r.points + (r.signDays !== "" && r.signDays != null ? " · 连续 " + r.signDays + " 天" : "") + "）"
+          : "";
+        return (r.ok ? "✓ " : "✗ ") + (r.masked || "账号") + "  " + r.msg + extra;
+      });
       signMsg(result.summary + "\n" + lines.join("\n"), result.results.some(r => !r.ok));
       await loadAbleSci();
     } catch (e) {

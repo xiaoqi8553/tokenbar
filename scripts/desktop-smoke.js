@@ -189,6 +189,7 @@ async function main() {
     assert.match(signAdded.acctText, /sm\*\*\*@example\.com/, "列表只显示脱敏邮箱");
     assert.doesNotMatch(signAdded.acctText, /smoke@example\.com/, "列表不能出现明文邮箱");
     assert.doesNotMatch(signAdded.acctText, /smoke-pass/, "列表不能出现密码");
+    assert.match(signAdded.acctText, /积分待更新/, "未签到前账号行显示积分占位");
     assert.match(signAdded.msg, /已添加/, "添加后应有成功提示");
 
     // 清理测试账号，避免污染后续断言
@@ -254,6 +255,7 @@ async function main() {
     }));
     assert.match(dashSign.acctText, /da\*\*\*@example\.com/, "看板账号列表也要脱敏");
     assert.doesNotMatch(dashSign.acctText, /dash@example\.com|dash-pass/);
+    assert.match(dashSign.acctText, /积分待更新/, "看板账号行也有积分占位");
     assert.equal(dashSign.signLabel, "立即签到", "有账号后主按钮变成签到");
     assert.match(dashSign.topLabel, /签到|已签/, "顶栏按钮同步账号状态");
     // 清理

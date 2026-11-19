@@ -112,6 +112,30 @@ function parseCsrf(html) {
 }
 
 /**
+ * 从登录后的首页 HTML 解析积分与连续签到天数。
+ * 科研通的签到接口 data 里常不带积分，积分在首页这两个元素里：
+ *   <... id="user-point-now">1234</...>   <... id="sign-count">4</...>
+ * 与开源签到脚本 daitcl/ablesciSign 的选择器一致。
+ */
+function parseUserInfo(html) {
+  const text = String(html || "");
+  const digits = s => {
+    const m = String(s == null ? "" : s).match(/-?\d[\d,]*/);
+    return m ? Number(m[0].replace(/,/g, "")) : null;
+  };
+  const byId = id => {
+    const m = text.match(new RegExp('id=["\']' + id + '["\'][^>]*>([\\s\\S]{0,120}?)<\\/', 'i'));
+    return m ? m[1].replace(/<[^>]*>/g, "").trim() : "";
+  };
+  const points = digits(byId("user-point-now"));
+  const signDays = digits(byId("sign-count"));
+  return {
+    points: Number.isFinite(points) ? points : "",
+    signDays: Number.isFinite(signDays) ? signDays : ""
+  };
+}
+
+/**
  * @param {object} options
  * @param {string} options.accountsFile 账号凭证文件路径
  * @param {string} options.stateFile 签到状态文件路径
@@ -279,7 +303,27 @@ function createAbleSciStore({ accountsFile, stateFile, cipher, fetchImpl }) {
         result = { ok: false, msg: "签到响应不是有效的 JSON" };
       }
 
-      // 4) 落盘状态
+      // 4) 签到结果里常不带总积分，用同一登录会话抓首页把积分/连续天数补齐
+      if (result.ok && (!result.points || !result.signDays)) {
+        try {
+          const homeResp = await fetchFn(HOME_URL, {
+            headers: {
+              "User-Agent": UA,
+              "Accept-Language": "zh-CN,zh;q=0.9",
+              "Referer": HOME_URL,
+              "Cookie": jar.header()
+            },
+            redirect: "manual"
+          });
+          const info = parseUserInfo(await homeResp.text());
+          if (!result.points && info.points !== "") result.points = info.points;
+          if (!result.signDays && info.signDays !== "") result.signDays = info.signDays;
+        } catch {
+          /* 抓积分失败不影响签到结论 */
+        }
+      }
+
+      // 5) 落盘状态
       if (result.ok) {
         const state = loadState();
         state.version = STATE_VERSION;
@@ -334,5 +378,6 @@ module.exports = {
   maskEmail,
   beijingDate,
   parseCsrf,
+  parseUserInfo,
   createCookieJar
 };
