@@ -49,6 +49,8 @@ All money is shown in **USD ($)**. The pricing table keeps CNY list prices inter
 - 顶栏**实时额度**按钮列出本机检测到的 Codex 账号（`~/.codex/auth.json` 与 `~/.codex/XQ_acc`）。点任意脱敏邮箱即可查询该账号的官方额度，无需密码或重新登录，token 不会离开应用。
 - **OAuth device-code sign-in**: the same panel has a **+ OAuth 授权添加账号** button. It requests a one-time pairing code from OpenAI's official device-auth endpoint, shows you the verification URL (`auth.openai.com/codex/device`) and the code to enter in your browser, then polls until you approve — exactly the flow CC Switch and Codex CLI use. Approved tokens are saved atomically to `~/.codex/XQ_acc/<email>/auth.json`; your currently active `auth.json` is never touched. No password is ever typed into TokenBar, and no token reaches the renderer or any third-party server.
 - **OAuth 设备码授权**：同一个弹窗里点**＋ OAuth 授权添加账号**，应用向 OpenAI 官方设备码接口申请一次性配对码，显示验证网址（`auth.openai.com/codex/device`）和配对码，你在浏览器里登录并输入后应用自动轮询直到授权成功——与 CC Switch / Codex CLI 的流程完全一致。token 原子写入 `~/.codex/XQ_acc/<邮箱>/auth.json`，不动当前激活的 auth.json。你不需要在 TokenBar 里输入密码，token 也不会进入界面或任何第三方服务器。
+- In the **实时额度** panel, each account row has a **隐藏** button. Hidden accounts disappear from the list and can be restored with **显示已隐藏的 N 个账号**. The hidden list is stored only in TokenBar's own config — the actual `~/.codex` auth files are never touched, so Codex CLI and other tools are unaffected.
+- **实时额度**面板里每个账号行都有**隐藏**按钮，点后从列表消失，可通过**显示已隐藏的 N 个账号**随时恢复。隐藏清单只存在 TokenBar 自己的配置里，**不动本机 `~/.codex` 授权文件**，Codex CLI 等其他工具不受影响。
 - Top bar theme tags: **月之亮面** for light and **月之暗面** for dark. The choice is remembered; the old "follow system" mode is gone.
 - 顶栏主题标签：**月之亮面**对应亮色，**月之暗面**对应暗色。选择会被记住；不再有「跟随系统」模式。
 

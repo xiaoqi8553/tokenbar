@@ -146,14 +146,34 @@ function maskEmail(email) {
 }
 
 /** 从 JWT 里取声明，失败返回 null（只是展示用，不做校验） */
-function jwtClaim(token, name) {
+function jwtClaims(token) {
   try {
     const part = String(token).split(".")[1];
     const payload = JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
-    return payload && payload[name] != null ? payload[name] : null;
+    return payload && typeof payload === "object" ? payload : null;
   } catch {
     return null;
   }
+}
+
+function jwtClaim(token, name) {
+  const payload = jwtClaims(token);
+  return payload && payload[name] != null ? payload[name] : null;
+}
+
+/**
+ * 取 ChatGPT account id：Codex 的 id_token 里它不在顶层，而是嵌在
+ * `https://api.openai.com/auth` 这个命名空间下（实测 2.6.0 授权失败的根因）。
+ * 依次兼容：嵌套 claim → 顶层 claim → access_token 里的同一嵌套 claim。
+ */
+function chatgptAccountId(idToken, accessToken) {
+  const AUTH_NS = "https://api.openai.com/auth";
+  const id = jwtClaims(idToken);
+  const access = jwtClaims(accessToken);
+  const nested = value => value && typeof value === "object" ? value[AUTH_NS] : null;
+  const pick = auth => auth && (auth.chatgpt_account_id || auth.account_id || null);
+  return pick(nested(id)) || (id && (id.chatgpt_account_id || id.account_id)) ||
+    pick(nested(access)) || null;
 }
 
 /** 从 auth.json 里推断邮箱：id_token.email → 目录名 → null */
@@ -242,11 +262,49 @@ function createCodexAuthStore(options = {}) {
     || path.join(require("node:os").homedir(), ".codex");
   const activeAuthFile = path.join(codexHome, "auth.json");
   const accountsDir = path.join(codexHome, "XQ_acc");
+  /**
+   * 隐藏账号清单：只存账号 id（auth 文件绝对路径），落在 TokenBar 自己的 userData，
+   * 绝不动 ~/.codex 下的真实授权文件。未传路径时退化为进程内内存集合（测试/无 userData 场景）。
+   */
+  const hiddenFile = options.hiddenFile || null;
 
   /** 缓存：key = auth 文件绝对路径 */
   const cache = new Map();
   /** 进行中的设备码授权会话：key = sessionId，含 device_auth_id 等敏感值，绝不过桥 */
   const deviceSessions = new Map();
+  let memoryHidden = new Set();
+
+  function readHidden() {
+    if (!hiddenFile) return memoryHidden;
+    const doc = readJson(hiddenFile);
+    const ids = doc && Array.isArray(doc.ids) ? doc.ids : [];
+    return new Set(ids.filter(x => typeof x === "string"));
+  }
+
+  function writeHidden(set) {
+    if (!hiddenFile) { memoryHidden = new Set(set); return; }
+    try {
+      if (hiddenFile.includes(path.sep)) fs.mkdirSync(path.dirname(hiddenFile), { recursive: true });
+      writeJson(hiddenFile, { version: 1, ids: [...set] });
+    } catch {
+      // 落盘失败就退回内存，不影响主流程
+      memoryHidden = new Set(set);
+    }
+  }
+
+  function hideAccount(id) {
+    const set = readHidden();
+    set.add(String(id));
+    writeHidden(set);
+    return true;
+  }
+
+  function unhideAccount(id) {
+    const set = readHidden();
+    set.delete(String(id));
+    writeHidden(set);
+    return true;
+  }
 
   function readJson(file) {
     try {
@@ -280,7 +338,10 @@ function createCodexAuthStore(options = {}) {
         isActive,
         folderName: folderName || path.basename(path.dirname(resolved)),
         email: emailOf(auth, folderName),
-        accountId: auth.tokens.account_id ? String(auth.tokens.account_id) : null
+        accountId: auth.tokens.account_id
+          ? String(auth.tokens.account_id)
+          : (chatgptAccountId(auth.tokens.id_token, auth.tokens.access_token)
+            ? String(chatgptAccountId(auth.tokens.id_token, auth.tokens.access_token)) : null)
       });
     };
     push(activeAuthFile, true, "当前账号");
@@ -295,12 +356,14 @@ function createCodexAuthStore(options = {}) {
 
   /** 对外可见的账号列表：只有脱敏信息 + 已缓存额度的概要，绝不含 token */
   function list() {
+    const hidden = readHidden();
     const accounts = discover().map(account => {
       const cached = cache.get(account.file);
       return {
         id: account.id,
         email: account.email ? maskEmail(account.email) : account.folderName,
         isActive: account.isActive,
+        isHidden: hidden.has(account.id),
         hasRefreshToken: Boolean(readJson(account.file)?.tokens?.refresh_token),
         quota: cached && cached.quota ? cached.quota : null,
         fetchedAt: cached ? cached.fetchedAt : null,
@@ -310,6 +373,7 @@ function createCodexAuthStore(options = {}) {
     return {
       codexHome,
       accounts,
+      hiddenCount: accounts.filter(item => item.isHidden).length,
       activeId: accounts.find(item => item.isActive)?.id || null
     };
   }
@@ -341,7 +405,9 @@ function createCodexAuthStore(options = {}) {
       access_token: json.access_token,
       refresh_token: json.refresh_token || refresh,
       id_token: json.id_token || auth.tokens.id_token,
-      account_id: auth.tokens.account_id || null
+      account_id: auth.tokens.account_id
+        || chatgptAccountId(json.id_token || auth.tokens.id_token, json.access_token)
+        || null
     };
   }
 
@@ -378,7 +444,9 @@ function createCodexAuthStore(options = {}) {
       "User-Agent": UA,
       Accept: "application/json"
     };
-    if (tokens.account_id) headers["ChatGPT-Account-Id"] = String(tokens.account_id);
+    // account_id 可能为空（旧版授权/2.6.0 首次修复前落盘的文件），从 token 里现算补齐
+    const chatgptAcct = tokens.account_id || chatgptAccountId(tokens.id_token, tokens.access_token);
+    if (chatgptAcct) headers["ChatGPT-Account-Id"] = String(chatgptAcct);
 
     const response = await doFetch(USAGE_URL, {
       method: "GET",
@@ -542,8 +610,7 @@ function createCodexAuthStore(options = {}) {
     // 从 id_token 里取邮箱与 account_id，用于命名账号文件与查额度
     const email = jwtClaim(tokens.id_token, "email")
       || jwtClaim(tokens.id_token, "preferred_username") || null;
-    const accountId = jwtClaim(tokens.id_token, "chatgpt_account_id")
-      || jwtClaim(tokens.id_token, "account_id") || null;
+    const accountId = chatgptAccountId(tokens.id_token, tokens.access_token);
 
     // 落盘：和 Codex 的 auth.json 完全同构，写进 XQ_acc/<email>/auth.json，
     // 不动当前激活的 auth.json（避免把用户正在用的登录挤掉）
@@ -592,6 +659,8 @@ function createCodexAuthStore(options = {}) {
     fetchQuota,
     activeQuota,
     cachedQuotaFor,
+    hideAccount,
+    unhideAccount,
     startDeviceAuth,
     pollDeviceAuth,
     deviceStatus,
@@ -599,6 +668,7 @@ function createCodexAuthStore(options = {}) {
     normalizeQuota,
     isTokenExpired,
     jwtClaim,
+    chatgptAccountId,
     _paths: { codexHome, activeAuthFile, accountsDir }
   };
 }
@@ -609,5 +679,6 @@ module.exports = {
   normalizeQuota,
   extractRateLimits,
   isTokenExpired,
-  jwtClaim
+  jwtClaim,
+  chatgptAccountId
 };

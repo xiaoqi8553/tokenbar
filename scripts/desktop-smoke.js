@@ -95,6 +95,17 @@ async function main() {
   const sessions = path.join(temporaryRoot, "sessions");
   fs.mkdirSync(sessions, { recursive: true });
   writeFixture(sessions);
+  // 造一个假的本机 Codex 授权，让实时额度弹窗有账号行可渲染（token 是测试假值）
+  const fakeJwt = payload => "h." + Buffer.from(JSON.stringify(payload)).toString("base64url") + ".s";
+  fs.writeFileSync(path.join(temporaryRoot, "auth.json"), JSON.stringify({
+    auth_mode: "chatgpt",
+    tokens: {
+      access_token: fakeJwt({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+      refresh_token: "smoke-refresh",
+      id_token: fakeJwt({ email: "smoke@example.com" }),
+      account_id: "smoke-acct"
+    }
+  }));
 
   const debugPort = await freePort();
   const packagedExecutable = process.env.CODEX_TOKEN_DESKTOP_SMOKE_EXE;
@@ -426,12 +437,19 @@ async function main() {
       api: !!(window.dashboard && typeof window.dashboard.codexAuthDeviceStart === "function"
         && typeof window.dashboard.codexAuthDevicePoll === "function"
         && typeof window.dashboard.codexAuthDeviceCancel === "function"),
-      hasAuthList: !!(window.dashboard && typeof window.dashboard.codexAuthList === "function")
+      hasAuthList: !!(window.dashboard && typeof window.dashboard.codexAuthList === "function"),
+      hideApi: !!(window.dashboard && typeof window.dashboard.codexAuthHide === "function"
+        && typeof window.dashboard.codexAuthUnhide === "function"),
+      hideButtons: document.querySelectorAll("#a-accounts .q-hide").length,
+      hideBar: !!document.querySelector("#a-hidden-bar")
     }));
     assert.ok(oauthUi.hasAdd, "授权弹窗里应有「OAuth 授权添加账号」入口");
     assert.equal(oauthUi.panelHidden, true, "设备码面板默认收起");
     assert.ok(oauthUi.api, "preload 应暴露设备码授权 API");
     assert.ok(oauthUi.hasAuthList, "preload 应暴露账号列表 API");
+    assert.ok(oauthUi.hideApi, "preload 应暴露隐藏/恢复账号 API");
+    assert.ok(oauthUi.hideBar, "应有隐藏账号恢复入口");
+    assert.ok(oauthUi.hideButtons > 0, "每个账号行都应有隐藏按钮");
     await dashboard.click("#a-close");
 
     // 4. 切一次区间，确认活跃时段跟着变

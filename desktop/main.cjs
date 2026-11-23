@@ -130,7 +130,8 @@ if (!gotLock) {
       workbuddyCache: path.join(userData, "data", "workbuddy-detail-cache.json"),
       pricing: path.join(userData, "data", "pricing.json"),
       ablesciAccounts: path.join(userData, "data", "ablesci-accounts.json"),
-      ablesciState: path.join(userData, "data", "ablesci-state.json")
+      ablesciState: path.join(userData, "data", "ablesci-state.json"),
+      codexHiddenAccounts: path.join(userData, "data", "codex-hidden-accounts.json")
     };
   }
 
@@ -568,6 +569,16 @@ if (!gotLock) {
       if (!codexAuthStore) return false;
       return codexAuthStore.cancelDeviceAuth(sessionId);
     });
+
+    // 隐藏 / 恢复账号：只改 TokenBar 自己的清单，不碰本机 auth.json
+    ipcMain.handle("codex-auth:hide", (_event, accountId) => {
+      if (!codexAuthStore) return false;
+      return codexAuthStore.hideAccount(accountId);
+    });
+    ipcMain.handle("codex-auth:unhide", (_event, accountId) => {
+      if (!codexAuthStore) return false;
+      return codexAuthStore.unhideAccount(accountId);
+    });
   }
 
   /** 把实时额度挂到 latestStatus.quota，并记录来源，供界面标注「实时」 */
@@ -770,7 +781,7 @@ if (!gotLock) {
     });
 
     // 实时额度：只读本机已有的 Codex auth.json，首次拉取后立即覆盖本地快照
-    codexAuthStore = createCodexAuthStore({});
+    codexAuthStore = createCodexAuthStore({ hiddenFile: paths.codexHiddenAccounts });
     refreshLiveQuota(true).catch(() => {});
 
     // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格

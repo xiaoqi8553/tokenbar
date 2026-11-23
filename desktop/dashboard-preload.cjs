@@ -49,5 +49,7 @@ contextBridge.exposeInMainWorld("dashboard", {
   codexAuthDeviceStart: () => ipcRenderer.invoke("codex-auth:device-start"),
   codexAuthDevicePoll: sessionId => ipcRenderer.invoke("codex-auth:device-poll", sessionId),
   codexAuthDeviceStatus: sessionId => ipcRenderer.invoke("codex-auth:device-status", sessionId),
-  codexAuthDeviceCancel: sessionId => ipcRenderer.invoke("codex-auth:device-cancel", sessionId)
+  codexAuthDeviceCancel: sessionId => ipcRenderer.invoke("codex-auth:device-cancel", sessionId),
+  codexAuthHide: accountId => ipcRenderer.invoke("codex-auth:hide", accountId),
+  codexAuthUnhide: accountId => ipcRenderer.invoke("codex-auth:unhide", accountId)
 });

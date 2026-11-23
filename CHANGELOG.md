@@ -1,5 +1,13 @@
 # 更新日志
 
+## 2.6.1 - 2026-11-23
+
+**修复 OAuth 授权后额度查询失败的根因；账号列表支持「只看自己关心的」。** 用户反馈：「这些玩意怎么清除啊，而且我 oauth 还会失败。」
+
+- **OAuth 失败根因**：授权本身成功（token 已落盘），但 `chatgpt_account_id` 在 id_token 里**不在顶层**，而是嵌在 `https://api.openai.com/auth` 命名空间下（Codex 源码的 `jwt_auth_claims` 就是取这里）。旧代码只读顶层 → account_id 为 null → 查额度时缺 `ChatGPT-Account-Id` header 而失败。新增 `chatgptAccountId()` 读嵌套 claim（兼容顶层与 access_token），并在落盘 / discover / 刷新 / 查询四处兜底补齐。**已用真实授权文件验证：无需重新授权，直接能查到 plus / 5h 19% / 每周 15%。**
+- **隐藏账号**：那些邮箱来自本机 `~/.codex/XQ_acc/`，是别的工具存的授权文件，TokenBar 只读不改。现在每个账号行有「隐藏」按钮，点后从看板列表消失；列表下方出现「显示已隐藏的 N 个账号」入口可随时恢复。隐藏清单只写 TokenBar 自己的 `codex-hidden-accounts.json`，**不碰本机 auth 文件、不影响 Codex CLI**。
+- 新增 2 个单测（嵌套 claim 读取、隐藏/恢复持久化），共 **72** 个；冒烟注入假账号验证隐藏按钮渲染。截图确认 UI。
+
 ## 2.6.0 - 2026-11-23
 
 **新增 OAuth 设备码授权添加 Codex 账号，并做了一轮安全审计与隐私清理。** 用户诉求：「你不会把我带账号的信息全部写进去了吧，github 会不会有泄密影响？……像 CC 一样做一个授权登录的请求，CC 怎么做你就怎么做。」

@@ -10,7 +10,8 @@ const {
   normalizeQuota,
   extractRateLimits,
   isTokenExpired,
-  jwtClaim
+  jwtClaim,
+  chatgptAccountId
 } = require("../desktop/data/codex-auth-store.cjs");
 
 /** 造一个假 JWT（payload 明文 base64url，测试只解析不校验） */
@@ -329,4 +330,53 @@ test("2.6.0 会话取消与过期", async () => {
   assert.equal(store.cancelDeviceAuth(sessionId), true);
   assert.equal(store.deviceStatus(sessionId), null);
   await assert.rejects(() => store.pollDeviceAuth(sessionId), /会话不存在/);
+});
+
+test("2.6.0 bugfix: chatgpt_account_id 在 id_token 的嵌套 claim 里（真实授权失败根因）", () => {
+  // 真实 id_token 把 chatgpt_account_id 放在 https://api.openai.com/auth 命名空间下
+  const idToken = fakeJwt({
+    email: "bob@example.net",
+    "https://api.openai.com/auth": {
+      chatgpt_account_id: "acct-nested-123",
+      chatgpt_user_id: "user-456"
+    }
+  });
+  assert.equal(chatgptAccountId(idToken, null), "acct-nested-123");
+  // 顶层旧格式仍兼容
+  assert.equal(chatgptAccountId(fakeJwt({ chatgpt_account_id: "acct-top" }), null), "acct-top");
+  // access_token 里也要能找到
+  assert.equal(chatgptAccountId(null, fakeJwt({
+    "https://api.openai.com/auth": { chatgpt_account_id: "acct-access" }
+  })), "acct-access");
+  assert.equal(chatgptAccountId(null, null), null);
+});
+
+test("2.6.1 隐藏账号：只写本地清单，不碰真实 auth 文件，可恢复", () => {
+  const home = fakeCodexHome();
+  const hiddenFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codex-hidden-")), "data", "hidden.json");
+  const store = createCodexAuthStore({ codexHome: home, hiddenFile });
+  const before = store.list();
+  assert.equal(before.hiddenCount, 0);
+  const victim = before.accounts.find(a => !a.isActive);
+  assert.ok(victim, "需要一个可隐藏的非激活账号");
+
+  store.hideAccount(victim.id);
+  const afterHide = store.list();
+  assert.equal(afterHide.hiddenCount, 1);
+  assert.equal(afterHide.accounts.find(a => a.id === victim.id).isHidden, true);
+
+  // 真实 auth 文件一个字节都没动
+  const stillThere = JSON.parse(fs.readFileSync(victim.id, "utf8"));
+  assert.ok(stillThere.tokens && stillThere.tokens.access_token, "本机授权文件必须原样保留");
+  // 清单落盘且不含 token
+  const doc = JSON.parse(fs.readFileSync(hiddenFile, "utf8"));
+  assert.deepEqual(doc.ids, [victim.id]);
+  assert.ok(!JSON.stringify(doc).includes("access_token"));
+
+  store.unhideAccount(victim.id);
+  assert.equal(store.list().hiddenCount, 0);
+  // 新实例也能读到（持久化生效）
+  const store2 = createCodexAuthStore({ codexHome: home, hiddenFile });
+  store2.hideAccount(victim.id);
+  assert.equal(createCodexAuthStore({ codexHome: home, hiddenFile }).list().hiddenCount, 1);
 });
