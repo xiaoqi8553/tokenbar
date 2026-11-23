@@ -894,9 +894,10 @@ if (!gotLock) {
           const shotPath = process.env.CODEX_TOKEN_DASHBOARD_SHOT;
           // 排查用：截图前点击指定按钮（如 btn-auth 打开实时额度弹窗）
           if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK) {
-            const id = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK).replace(/[^a-z0-9-]/gi, "");
+            // 先按 id 找；找不到就当 CSS 选择器用，便于点主题切换里的某个 tag
+            const target = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK);
             await mainWindow.webContents.executeJavaScript(
-              `(() => { const el = document.getElementById(${JSON.stringify(id)}); if (el) el.click(); return !!el; })()`
+              `(() => { const el = document.getElementById(${JSON.stringify(target)}) || document.querySelector(${JSON.stringify(target)}); if (el) el.click(); return !!el; })()`
             );
             await new Promise(resolve => setTimeout(resolve, 1800));
           }

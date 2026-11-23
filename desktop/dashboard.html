@@ -213,6 +213,19 @@
   /* 卡片内的小号切换器 */
   .range.mini button { font-size: 12.5px; padding: 3px 9px; border-radius: 6px; }
 
+  /* 主题切换：月之亮面 / 月之暗面 */
+  .range.theme button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+  .range.theme button svg { color: var(--text-3); }
+  .range.theme button[data-theme="light"] svg { color: #d99a2b; }
+  .range.theme button[data-theme="dark"] svg { color: #7d9dff; }
+
   .icon-btn {
     width: 30px;
     height: 30px;
@@ -967,11 +980,16 @@
       <span id="sign-top-label">科研通签到</span>
       <i class="sign-dot" id="sign-dot" hidden></i>
     </button>
-    <button class="icon-btn" id="btn-theme" title="切换深色模式" aria-label="切换深色模式">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/>
-      </svg>
-    </button>
+    <div class="range theme" id="theme-switch" role="group" aria-label="主题">
+      <button type="button" data-theme="light" aria-pressed="true" title="月之亮面 · 亮色">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
+        <span>月之亮面</span>
+      </button>
+      <button type="button" data-theme="dark" aria-pressed="false" title="月之暗面 · 暗色">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>
+        <span>月之暗面</span>
+      </button>
+    </div>
   </header>
 
   <main>
@@ -1146,7 +1164,12 @@
     meta: null,
     range: Number(localStorage.getItem("codex.range") || 14) || 14,
     hourMetric: localStorage.getItem("codex.hourMetric") || "tokens",
-    theme: localStorage.getItem("codex.theme") || "auto",
+    /** 主题：月之亮面 = light，月之暗面 = dark（旧版 auto/空值按系统偏好落到具体值） */
+    theme: (function () {
+      const saved = localStorage.getItem("codex.theme");
+      if (saved === "light" || saved === "dark") return saved;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    })(),
     /** 日志视图：sessions = 按会话汇总，requests = 按会话×模型逐行（CC Switch 式） */
     logView: localStorage.getItem("codex.logView") === "requests" ? "requests" : "sessions",
     /** 当前点开的会话 id（会话视图里的行内明细） */
@@ -1324,8 +1347,15 @@
   // 主题
   // ---------------------------------------------------------------------
   function applyTheme() {
-    const dark = state.theme === "dark" || (state.theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const dark = state.theme === "dark";
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    // 同步两个 tag 的选中态（html[data-theme] 是真正生效的开关）
+    const sw = $("theme-switch");
+    if (sw) {
+      for (const btn of sw.querySelectorAll("button[data-theme]")) {
+        btn.setAttribute("aria-pressed", String(btn.dataset.theme === state.theme));
+      }
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -2964,8 +2994,10 @@
       state.openSession = state.openSession === id ? null : id;
       renderSessionRows();
     });
-    $("btn-theme").addEventListener("click", () => {
-      state.theme = state.theme === "dark" ? "light" : state.theme === "light" ? "auto" : "dark";
+    $("theme-switch").addEventListener("click", event => {
+      const btn = event.target.closest("button[data-theme]");
+      if (!btn || !btn.dataset.theme) return;
+      state.theme = btn.dataset.theme;
       localStorage.setItem("codex.theme", state.theme);
       applyTheme();
       renderAll();

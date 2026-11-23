@@ -387,6 +387,33 @@ async function main() {
     assert.equal(projectBar.open, 1, "项目分布也能点开");
     assert.match(projectBar.text, /新增输入/);
 
+    // 3e. 主题切换：月之亮面 / 月之暗面，恰好一个选中且点击后写入 localStorage
+    const themeInitial = await dashboard.evaluate(() => ({
+      labels: [...document.querySelectorAll("#theme-switch button")].map(el => el.textContent.trim()),
+      theme: document.documentElement.dataset.theme,
+      pressed: [...document.querySelectorAll("#theme-switch button")]
+        .filter(el => el.getAttribute("aria-pressed") === "true").map(el => el.dataset.theme)
+    }));
+    assert.deepEqual(themeInitial.labels, ["月之亮面", "月之暗面"]);
+    assert.ok(["light", "dark"].includes(themeInitial.theme), "主题应为亮色或暗色（不再有 auto）");
+    assert.deepEqual(themeInitial.pressed, [themeInitial.theme], "恰好一个主题 tag 选中");
+    const otherTheme = themeInitial.theme === "light" ? "dark" : "light";
+    await dashboard.click(`#theme-switch button[data-theme="${otherTheme}"]`);
+    await dashboard.waitForFunction(
+      wanted => document.documentElement.dataset.theme === wanted,
+      otherTheme,
+      { timeout: 10_000 }
+    );
+    const themeAfter = await dashboard.evaluate(() => ({
+      theme: document.documentElement.dataset.theme,
+      pressed: [...document.querySelectorAll("#theme-switch button")]
+        .filter(el => el.getAttribute("aria-pressed") === "true").map(el => el.dataset.theme),
+      stored: localStorage.getItem("codex.theme")
+    }));
+    assert.equal(themeAfter.theme, otherTheme);
+    assert.deepEqual(themeAfter.pressed, [otherTheme], "切换后选中态跟着走");
+    assert.equal(themeAfter.stored, otherTheme, "主题选择要持久化");
+
     // 4. 切一次区间，确认活跃时段跟着变
     const before = await dashboard.evaluate(() => (document.querySelector("#hour-badge") || {}).textContent || "");
     await dashboard.click('#range button[data-key="7"]');

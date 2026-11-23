@@ -47,6 +47,8 @@ All money is shown in **USD ($)**. The pricing table keeps CNY list prices inter
 - 顶栏**科研通签到**按钮打开同一个签到面板（弹窗与看板共用账号）。
 - Top bar **实时额度** button lists the Codex accounts found on this machine (`~/.codex/auth.json` and `~/.codex/XQ_acc`). Click any masked email to query the official quota for that account; no password or new login is needed. Tokens never leave the app.
 - 顶栏**实时额度**按钮列出本机检测到的 Codex 账号（`~/.codex/auth.json` 与 `~/.codex/XQ_acc`）。点任意脱敏邮箱即可查询该账号的官方额度，无需密码或重新登录，token 不会离开应用。
+- Top bar theme tags: **月之亮面** for light and **月之暗面** for dark. The choice is remembered; the old "follow system" mode is gone.
+- 顶栏主题标签：**月之亮面**对应亮色，**月之暗面**对应暗色。选择会被记住；不再有「跟随系统」模式。
 
 ### 科研通签到 / AbleSci sign-in
 
