@@ -4,9 +4,13 @@
 
 Windows 托盘里的 token 用量看板。Codex 和 WorkBuddy 用了多少、折多少钱、跑得多快，点一下图标就能看到。
 
-Usage stats read local logs only — no network, no login, no upload. The **科研通签到 (AbleSci sign-in)** button is the one exception: it connects to ablesci.com only when you click it, using accounts you add yourself.
+Token usage (tokens, speed, model/project split) reads local logs only — no upload. Two opt-in network features: **实时额度** reuses the Codex login already on your machine to ask OpenAI for the real 5-hour / weekly quota (no new login; started automatically in the background), and **科研通签到** connects to ablesci.com only when you click it. Neither uploads your usage logs.
 
-用量统计只读本地日志——不联网、不登录、不上传。**科研通签到**按钮是唯一例外：只有你主动点击时才联网访问 ablesci.com，且只使用你自己添加的账号。
+Token 用量（tokens、速度、模型/项目分布）只读本地日志、不上传。两个联网功能都是可选的：**实时额度**复用你机器上已有的 Codex 登录，向 OpenAI 查询真实的 5 小时 / 每周额度（无需重新登录，后台自动开始）；**科研通签到**只有你点击时才访问 ablesci.com。两者都不上传用量日志。
+
+All money is shown in **USD ($)**. The pricing table keeps CNY list prices internally and converts at the configurable `usdCny` rate (default 7.2) only for display.
+
+所有金额统一用**美元（$）**显示。价格表内部仍保存人民币刊例价，只在展示时按可配置的 `usdCny` 汇率（默认 7.2）折算。
 
 ## What it shows / 看什么
 
@@ -14,8 +18,8 @@ Usage stats read local logs only — no network, no login, no upload. The **科�
 
 **托盘弹窗** — 左键点图标
 
-- 5-hour and 7-day quota windows: used %, remaining, reset time. The bar marks how much of the window has elapsed, so you can see if you're burning faster than time.
-- 5 小时 / 7 天额度窗口：已用百分比、剩余、重置时刻。进度条上标着时间走到哪了，花得比时间快还是慢一眼能看出来。
+- 5-hour and 7-day quota windows: used %, remaining, reset time. The bar marks how much of the window has elapsed, so you can see if you're burning faster than time. When the live quota is available the card is marked **实时**; otherwise it falls back to the snapshot in local logs.
+- 5 小时 / 7 天额度窗口：已用百分比、剩余、重置时刻。进度条上标着时间走到哪了，花得比时间快还是慢一眼能看出来。拿到实时额度时卡片标注 **实时**，否则退回本地日志中的快照。
 - Today's tokens, request count, cache hit rate, plus a 14-day sparkline.
 - 今日用量、请求数、缓存命中率，右边一条 14 天迷你柱图。
 - WorkBuddy today / total / credits.
@@ -41,6 +45,8 @@ Usage stats read local logs only — no network, no login, no upload. The **科�
 - 会话记录有两个视图：**会话**把每个会话用到的模型全部列出（不再折叠成 `+N`），点某行展开该会话的模型明细；**请求明细**是 CC Switch 式的逐行日志，一行一个「会话 × 模型」，含完整模型名、新增输入、缓存命中、输出、用量、请求数、花费与速度。视图选择会被记住。
 - Top bar **科研通签到** button opens the same sign-in panel (shared accounts across popover and dashboard).
 - 顶栏**科研通签到**按钮打开同一个签到面板（弹窗与看板共用账号）。
+- Top bar **实时额度** button lists the Codex accounts found on this machine (`~/.codex/auth.json` and `~/.codex/XQ_acc`). Click any masked email to query the official quota for that account; no password or new login is needed. Tokens never leave the app.
+- 顶栏**实时额度**按钮列出本机检测到的 Codex 账号（`~/.codex/auth.json` 与 `~/.codex/XQ_acc`）。点任意脱敏邮箱即可查询该账号的官方额度，无需密码或重新登录，token 不会离开应用。
 
 ### 科研通签到 / AbleSci sign-in
 
@@ -121,7 +127,7 @@ Three ways to get this wrong:
 
 - **Don't multiply `inputTokens` by the input price.** Both vendors include cached tokens in `inputTokens`, and cache hits are usually 95%+. Multiplying directly inflates cost several times over.
 - **Don't bill reasoning separately.** Every vendor already counts it in `output_tokens`.
-- **Convert USD entries.** Models priced in USD are converted at `usdCny` (default 7.2) before summing, so Codex and WorkBuddy money can be added together.
+- **One canonical currency.** CNY-priced models are summed as-is; USD-priced models are divided by `usdCny` (default 7.2) so Codex and WorkBuddy money can be added together. The result is displayed in USD ($) everywhere.
 
 Model names match by longest prefix: `glm-5.3-flashx` wins over `glm-5.3-flash`, which wins over `glm-5.3`. Unknown models fall back to a default rate and are labelled "estimated" — better an estimate than a zero.
 

@@ -23,5 +23,9 @@ contextBridge.exposeInMainWorld("codexBar", {
   onAbleSciChanged(callback) {
     if (typeof callback !== "function") return;
     ipcRenderer.on("ablesci:changed", () => callback());
-  }
+  },
+  // 实时额度（复用本机 Codex 授权）
+  codexAuthList: () => ipcRenderer.invoke("codex-auth:list"),
+  codexAuthFetch: (accountId, opts) => ipcRenderer.invoke("codex-auth:fetch", accountId, opts),
+  codexAuthActive: opts => ipcRenderer.invoke("codex-auth:active", opts)
 });

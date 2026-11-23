@@ -1,5 +1,16 @@
 # 更新日志
 
+## 2.5.0 - 2026-11-23
+
+**金额全面改为美元计价；复用本机 Codex 授权提供实时额度与多账号切换。** 用户诉求：「改成美元计价的形式吧……能不能搞个登录的授权啥的，像 CC Switch 那样，不然我只要 token 不花费，我今天的限额啥是看不了的。」
+
+- **美元计价**：看板与托盘弹窗所有金额改为 `$`（等价花费、今日/单次均摊、区间花费、模型/项目/会话明细、单价 tooltip）。数据层仍以人民币为 canonical，在展示边界统一按 `pricing.json` 的 `usdCny` 折算；界面不再出现 `¥`。
+- **实时额度**：新增 `desktop/data/codex-auth-store.cjs`，只读本机已有的 `~/.codex/auth.json` 与 `~/.codex/XQ_acc` 下各账号授权，调用官方 `https://chatgpt.com/backend-api/wham/usage` 取 5 小时 / 每周真实已用百分比与重置时刻，覆盖本地日志的过期快照。实测响应结构（`rate_limit.primary_window` / `secondary_window`、`limit_window_seconds`、`reset_at`）已按真实数据解析。
+- **不重复登录**：access_token 过期时用 `refresh_token` 走官方 `auth.openai.com/oauth/token`（client_id 从本机 id_token.aud 取得 `app_EMoamEEZ73f0CkXaXp7hrann`）换新，并原子写回原 auth.json，Codex CLI / CC Switch 下次启动即可复用。
+- **凭证安全**：token 永不进渲染进程、日志或 argv（curl 凭证经 `--config -` 从 stdin 传入）；列表/结果只回脱敏邮箱；HTTP 传输用 curl 并自动读代理环境变量与 Windows 系统代理，和 CC Switch 一致。取数失败不影响用量主链路，自动退回本地日志额度。
+- **UI**：看板顶栏新增「实时额度」按钮与账号弹窗（16 个本机账号，当前账号标记，点任意行即查询并显示额度）；额度卡与托盘在取到 API 数据时标注「实时」。主进程 30 秒后台刷新（30 秒内节流），推送 status 让卡片自动更新。
+- 新增 `tests/codex-auth.test.js`（9 个：解析/脱敏/发现/查询/刷新/异常/缓存/真实响应结构）与 `tests/usd-display.test.js`（2 个）。测试 55 → **66** 个，桌面冒烟通过。
+
 ## 2.4.1 - 2026-11-19
 
 **账号列表显示当前积分与连续签到天数。** 用户反馈「显示账号目前多少积分就更好了」。

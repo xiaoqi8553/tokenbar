@@ -8,6 +8,7 @@ const { WorkBuddyStore } = require("./data/workbuddy-store.cjs");
 const { loadTable, ensureTableFile } = require("./data/pricing.cjs");
 const { buildBaseline, baselineIsFresh, loadBaseline, saveBaseline } = require("./data/history-baseline.cjs");
 const { createAbleSciStore } = require("./data/ablesci-store.cjs");
+const { createCodexAuthStore } = require("./data/codex-auth-store.cjs");
 
 const PRODUCT_NAME = "TokenBar";
 const APP_ROOT = app.getAppPath();
@@ -89,6 +90,8 @@ if (!gotLock) {
   let wbStore = null;
   /** @type {ReturnType<createAbleSciStore>|null} 科研通签到（多账号 + 本地加密凭证） */
   let ablesciStore = null;
+  /** @type {ReturnType<createCodexAuthStore>|null} 复用本机 Codex 授权取实时额度 */
+  let codexAuthStore = null;
   /** 启动诊断日志的落盘位置，start() 阶段才确定 */
   let logFile = null;
 
@@ -469,8 +472,9 @@ if (!gotLock) {
       if (!store) throw new Error("用量数据层尚未初始化，请稍候重试");
       const detail = await store.buildDetail({ onProgress: pushDetailProgress });
       latestStatus = store.snapshot();
-      // 新快照是干净的：WorkBuddy 摘要要重新挂上，弹窗那一行才不会变回「—」
+      // 新快照是干净的：WorkBuddy 摘要与实时额度都要重新挂上
       attachWorkBuddySummary();
+      attachLiveQuota();
       updateTray();
       pushStatusToPopover();
       return detail;
@@ -482,6 +486,7 @@ if (!gotLock) {
       const detail = await store.buildDetail({ onProgress: pushDetailProgress });
       latestStatus = store.snapshot();
       attachWorkBuddySummary();
+      attachLiveQuota();
       updateTray();
       pushStatusToPopover();
       return detail;
@@ -520,6 +525,53 @@ if (!gotLock) {
       if (typeof url === "string" && /^https:\/\//i.test(url)) shell.openExternal(url);
       return true;
     });
+  }
+
+  /**
+   * 实时额度（复用本机 Codex 授权）：弹窗与完整看板共用同一组 handler。
+   * 与科研通签到不同，这里不需要用户再登录——本机 auth.json 已有 token。
+   */
+  function registerCodexAuthHandlers() {
+    ipcMain.handle("codex-auth:list", () => {
+      if (!codexAuthStore) return { accounts: [], codexHome: "", activeId: null };
+      try { return codexAuthStore.list(); }
+      catch (e) { return { accounts: [], codexHome: "", activeId: null, error: e.message }; }
+    });
+    ipcMain.handle("codex-auth:fetch", async (_event, accountId, opts) => {
+      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
+      const result = await codexAuthStore.fetchQuota(accountId, opts || {});
+      // 取到额度后立刻覆盖当前快照，让 5 小时 / 7 天卡片显示实时值
+      applyLiveQuota(result);
+      return result;
+    });
+    ipcMain.handle("codex-auth:active", async (_event, opts) => {
+      if (!codexAuthStore) return null;
+      const result = await codexAuthStore.activeQuota(opts || {});
+      if (result) applyLiveQuota(result);
+      return result;
+    });
+  }
+
+  /** 把实时额度挂到 latestStatus.quota，并记录来源，供界面标注「实时」 */
+  function applyLiveQuota(result) {
+    if (!result || !result.quota || !latestStatus) return;
+    latestStatus.quota = { ...result.quota, source: "api", account: result.email, fetchedAt: result.fetchedAt };
+    updateTray();
+    pushStatusToPopover();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("dashboard:status", latestStatus);
+    }
+  }
+
+  /** 后台静默刷新实时额度：失败不影响用量主链路 */
+  async function refreshLiveQuota(force = false) {
+    if (!codexAuthStore) return;
+    try {
+      const result = await codexAuthStore.activeQuota({ force });
+      if (result && result.quota) applyLiveQuota(result);
+    } catch (error) {
+      log(`live quota refresh failed: ${error.message}`);
+    }
   }
 
   function formatTokens(value) {
@@ -607,9 +659,11 @@ if (!gotLock) {
 
   async function refreshTrayStatus(force = false) {
     if (!store) return;
+    // 实时额度走独立节奏：store 内部有 30 秒节流，失败也只是留旧值
+    refreshLiveQuota().catch(() => {});
     // WorkBuddy 是第二个数据源：以前只在启动时 build 一次，之后新会话
     // 一直不进弹窗/托盘。build() 自带 _promise 防并发，且只重扫 size/mtime
-    // 变过的文件，放进 30 秒轮询不会重复劳动；不 await，避免拖慢托盘刷新。
+    // 变过的文件，放进 30 轮询不会重复劳动；不 await，避免拖慢托盘刷新。
     if (wbStore) {
       wbStore.build()
         .then(() => attachWorkBuddySummary())
@@ -629,8 +683,21 @@ if (!gotLock) {
         /* 摘要失败不影响主数据 */
       }
     }
+    attachLiveQuota();
     updateTray();
     pushStatusToPopover();
+  }
+
+  /** 把缓存的实时额度重新挂到最新快照（刷新会换掉整个对象） */
+  function attachLiveQuota() {
+    if (!latestStatus || !codexAuthStore) return;
+    try {
+      const active = codexAuthStore.list().activeId;
+      const live = active ? codexAuthStore.cachedQuotaFor(active) : null;
+      if (live) latestStatus.quota = { ...live, source: "api" };
+    } catch {
+      /* 覆盖失败就保留日志快照口径 */
+    }
   }
 
   async function showWindow() {
@@ -684,6 +751,10 @@ if (!gotLock) {
       cipher: makeCipher()
     });
 
+    // 实时额度：只读本机已有的 Codex auth.json，首次拉取后立即覆盖本地快照
+    codexAuthStore = createCodexAuthStore({});
+    refreshLiveQuota(true).catch(() => {});
+
     // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格
     ensureTableFile(paths.pricing);
     const pricing = loadTable(paths.pricing);
@@ -717,18 +788,21 @@ if (!gotLock) {
 
     const snapshot = await store.init({ full: false });
     latestStatus = snapshot;
+    attachLiveQuota();
     updateTray();
     pushStatusToPopover();
     // 后台补齐历史：先让弹窗秒开，再静默把全量索引跑完并推一次更新
     store.buildFull()
       .then(fullSnapshot => {
         latestStatus = fullSnapshot;
+        attachLiveQuota();
         updateTray();
         pushStatusToPopover();
         // 再补一次明细：拿到「线程累计」口径（含被清理的早期历史），
         // 弹窗与看板才能显示同一个总量
         return store.buildDetail().then(() => {
           latestStatus = store.snapshot();
+          attachLiveQuota();
           updateTray();
           pushStatusToPopover();
         });
@@ -748,6 +822,7 @@ if (!gotLock) {
     loadPreferences(paths);
     registerPopoverHandlers();
     registerDashboardHandlers();
+    registerCodexAuthHandlers();
     log("creating popover");
     createPopover();
     log("creating tray");
@@ -817,6 +892,14 @@ if (!gotLock) {
             await new Promise(resolve => setTimeout(resolve, 2200));
           }
           const shotPath = process.env.CODEX_TOKEN_DASHBOARD_SHOT;
+          // 排查用：截图前点击指定按钮（如 btn-auth 打开实时额度弹窗）
+          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK) {
+            const id = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK).replace(/[^a-z0-9-]/gi, "");
+            await mainWindow.webContents.executeJavaScript(
+              `(() => { const el = document.getElementById(${JSON.stringify(id)}); if (el) el.click(); return !!el; })()`
+            );
+            await new Promise(resolve => setTimeout(resolve, 1800));
+          }
           // 明确先回到顶部，避免捕获到上一次滚动位置
           await mainWindow.webContents.executeJavaScript('(() => { const el = document.querySelector("main"); if (el) el.scrollTop = 0; return true; })()');
           await new Promise(resolve => setTimeout(resolve, 350));

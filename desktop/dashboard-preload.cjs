@@ -41,5 +41,9 @@ contextBridge.exposeInMainWorld("dashboard", {
   ablesciAdd: (email, password) => ipcRenderer.invoke("ablesci:add", email, password),
   ablesciRemove: id => ipcRenderer.invoke("ablesci:remove", id),
   ablesciSign: () => ipcRenderer.invoke("ablesci:sign"),
-  ablesciOpenSite: () => ipcRenderer.invoke("ablesci:open-site")
+  ablesciOpenSite: () => ipcRenderer.invoke("ablesci:open-site"),
+  /** 实时额度：复用本机 Codex 授权（只读本地 auth.json + 官方用量接口） */
+  codexAuthList: () => ipcRenderer.invoke("codex-auth:list"),
+  codexAuthFetch: (accountId, opts) => ipcRenderer.invoke("codex-auth:fetch", accountId, opts),
+  codexAuthActive: opts => ipcRenderer.invoke("codex-auth:active", opts)
 });

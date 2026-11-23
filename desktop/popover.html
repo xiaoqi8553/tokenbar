@@ -747,14 +747,19 @@
   const $ = id => document.getElementById(id);
 
   // ------------------------------------------------------------------ utils
+  // 金额统一用美元（USD）计价：数据层仍是人民币 canonical，展示时按汇率折算
+  function costRate() {
+    const c = state.status && state.status.cost;
+    return (c && Number(c.rate)) || 7.2;
+  }
   function formatMoney(cny) {
-    const n = Number(cny);
-    if (!Number.isFinite(n) || n <= 0) return "¥0";
-    if (n < 1) return "¥" + n.toFixed(2);
-    if (n < 10) return "¥" + n.toFixed(2).replace(/0$/, "");
-    if (n < 1000) return "¥" + n.toFixed(0);
-    if (n < 100000) return "¥" + Math.round(n).toLocaleString("zh-CN");
-    return "¥" + (n / 10000).toFixed(n >= 1000000 ? 0 : 1) + "万";
+    const n = Number(cny) / costRate();
+    if (!Number.isFinite(n) || n <= 0) return "$0";
+    if (n < 1) return "$" + n.toFixed(2);
+    if (n < 10) return "$" + n.toFixed(2).replace(/0$/, "");
+    if (n < 1000) return "$" + n.toFixed(0);
+    if (n < 1000000) return "$" + Math.round(n).toLocaleString("en-US");
+    return "$" + (n / 1000000).toFixed(2) + "M";
   }
 
   function formatTokens(value) {
@@ -919,7 +924,9 @@
 
     const building = status.phase === "fast" || status.phase === "full";
     $("updated").textContent = building ? "正在建立完整索引…" : relativeTime(status.updatedAt || status.lastEventAt);
-    $("plan").textContent = quota.planType ? String(quota.planType).replace(/^\w/, c => c.toUpperCase()) : "";
+    const live = quota.source === "api";
+    const planName = quota.planType ? String(quota.planType).replace(/^\w/, c => c.toUpperCase()) : "";
+    $("plan").textContent = live ? (planName ? "实时 · " + planName : "实时额度") : planName;
     document.body.classList.toggle("booting", building);
 
     const dot = $("status-dot");

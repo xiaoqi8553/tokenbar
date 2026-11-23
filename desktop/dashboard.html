@@ -302,6 +302,18 @@
     font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 5px;
   }
   .m-acct .m-del:hover { color: #e11d48; background: var(--line-soft); }
+  /* 实时额度账号行：整行可点，hover 高亮 */
+  .m-acct.q-acct { cursor: pointer; transition: border-color .15s, background .15s; }
+  .m-acct.q-acct:hover { border-color: var(--accent); background: var(--line-soft); }
+  .m-acct.q-acct.is-active { border-color: var(--accent); }
+  .m-acct .q-quota { font-size: 11px; color: var(--text-3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .m-acct .q-quota b { color: var(--text-2); font-weight: 600; }
+  .m-acct .q-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px;
+    background: var(--line-soft); color: var(--text-3); white-space: nowrap;
+  }
+  .m-acct .q-tag.live { background: rgba(34,197,94,.16); color: #16a34a; }
+  .m-acct .q-tag.err { background: rgba(225,29,72,.14); color: #e11d48; }
   .m-form { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
   .m-form input {
     height: 34px; padding: 0 11px; border-radius: 8px;
@@ -522,7 +534,7 @@
   }
   .ver:hover { color: var(--accent); background: var(--accent-3); }
 
-  /* 金额：数字用等宽表格数字，避免「¥」和数字抖动 */
+  /* 金额：数字用等宽表格数字，避免「$」和数字抖动 */
   .stat-num.money, .bar-money {
     font-variant-numeric: tabular-nums;
   }
@@ -945,6 +957,11 @@
         <path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>
       </svg>
     </button>
+    <button class="sign-top" id="btn-auth" title="实时额度 · 切换账号" aria-label="实时额度">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span id="auth-top-label">实时额度</span>
+      <i class="sign-dot" id="auth-dot" hidden></i>
+    </button>
     <button class="sign-top" id="btn-sign" title="科研通签到" aria-label="科研通签到">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
       <span id="sign-top-label">科研通签到</span>
@@ -1062,6 +1079,23 @@
     <button class="link" id="btn-sessions">日志目录</button>
   </footer>
 
+  <div class="modal-mask" id="auth-modal" hidden>
+    <div class="sign-modal" role="dialog" aria-modal="true" aria-label="实时额度与账号">
+      <h3>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        实时额度
+        <span class="m-badge" id="a-badge">本地日志</span>
+      </h3>
+      <div class="m-sub" id="a-sub">复用本机 Codex 授权，点任意账号即可向官方查询 5 小时 / 每周额度（不上传凭证）</div>
+      <div id="a-accounts"></div>
+      <div class="m-msg" id="a-msg" hidden></div>
+      <div class="m-foot">
+        <button class="m-link" id="a-refresh">刷新列表</button>
+        <button class="m-close" id="a-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-mask" id="sign-modal" hidden>
     <div class="sign-modal" role="dialog" aria-modal="true" aria-label="科研通签到">
       <h3>
@@ -1140,22 +1174,20 @@
     return (Number(value) || 0).toLocaleString("zh-CN");
   }
 
-  /**
-   * 金额：人民币为主。
-   * 小额给两位小数（单次调用几毛钱时四舍五入会变 0），上万用「万」，
-   * 中间用千分位整数，读起来比 6 位数字快。
-   */
-  function fmtMoney(cny) {
-    const n = Number(cny);
-    if (!Number.isFinite(n) || n <= 0) return "¥0";
-    if (n < 1) return "¥" + n.toFixed(2);
-    if (n < 10) return "¥" + n.toFixed(2).replace(/0$/, "");
-    if (n < 1000) return "¥" + n.toFixed(0);
-    if (n < 100000) return "¥" + Math.round(n).toLocaleString("zh-CN");
-    return "¥" + (n / 10000).toFixed(n >= 1000000 ? 0 : 1) + "万";
+  /** 当前汇率：数据层仍以人民币为 canonical，界面按这个汇率折成美元展示 */
+  function moneyRate() {
+    return (state.detail && state.detail.cost && Number(state.detail.cost.rate)) || 7.2;
   }
 
-  /** 美元：和人民币的口径是同一个数按汇率折算 */
+  /**
+   * 金额统一用美元（USD）计价：所有业务值（cost.cny、桶单价、区间花费）内部仍是人民币，
+   * 在展示边界统一除以汇率折成美元。小额给两位小数，百万以上用 M，中间用千分位。
+   */
+  function fmtMoney(cny) {
+    return fmtUsd(Number(cny) / moneyRate());
+  }
+
+  /** 美元主计价 */
   function fmtUsd(usd) {
     const n = Number(usd);
     if (!Number.isFinite(n) || n <= 0) return "$0";
@@ -1231,12 +1263,13 @@
     return total;
   }
 
-  /** 单价说明：鼠标停在模型行上能看到「输入 / 命中 / 输出」三档 */
+  /** 单价说明：鼠标停在模型行上能看到「输入 / 命中 / 输出」三档（美元 / 百万 tokens） */
   function unitText(model) {
     const unit = unitFor(model);
     if (!unit) return "";
-    return "输入 ¥" + unit.input.toFixed(2) + " · 命中 ¥" + unit.cached.toFixed(2) +
-      " · 输出 ¥" + unit.output.toFixed(2) + " / 百万 tokens";
+    const rate = moneyRate();
+    return "输入 $" + (unit.input / rate).toFixed(2) + " · 命中 $" + (unit.cached / rate).toFixed(2) +
+      " · 输出 $" + (unit.output / rate).toFixed(2) + " / 百万 tokens";
   }
 
   function fmtPercent(value, digits) {
@@ -1718,7 +1751,6 @@
         hints: []
       };
     }
-    const rate = Number(cost.rate) || 7.2;
     const days = detail.baseline && detail.baseline.days ? detail.baseline.days : detail.series.length;
     const totalTokens = detail.totals ? detail.totals.totalTokens : 0;
     const estimatedShare = totalTokens ? (cost.estimatedTokens || 0) / totalTokens : 0;
@@ -1731,7 +1763,7 @@
       unit: "",
       hideMeter: true,
       // 详情都收进 tooltip：卡片上只留「多少钱 + 今日多少」
-      title: fmtUsd(cost.usd) + " · 按 1 美元 ≈ " + rate.toFixed(2) + " 元折算" +
+      title: "美元计价 · 按官方 API 刊例价折算" +
         (estimatedShare >= 0.005 ? " · 含 " + fmtPercent(estimatedShare * 100, 1) + " 估算用量" : ""),
       foot: "今日 <b>" + fmtMoney(cost.todayCny) + "</b> · " + fmtTokens(totalTokens) + " tokens",
       hints: detail.totals && detail.totals.records
@@ -1783,8 +1815,7 @@
         money: true,
         unit: "",
         hideMeter: true,
-        title: fmtUsd(detail.cost ? detail.cost.usd : 0) + " · 按 1 美元 ≈ " +
-          ((detail.cost && detail.cost.rate) || 7.2).toFixed(2) + " 元折算",
+        title: "美元计价 · 按官方 API 刊例价折算",
         foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
         hints: []
       },
@@ -1821,9 +1852,10 @@
       cards = workbuddyCards();
     } else {
       const quota = (state.status && state.status.quota) || null;
+      const liveTag = quota && quota.source === "api" ? " · 实时" : "";
       cards = [
-        quotaCard("5 小时额度", "5 小时窗口", quota && quota.session),
-        quotaCard("7 天额度", "7 天窗口", quota && quota.weekly),
+        quotaCard("5 小时额度", "5 小时窗口" + liveTag, quota && quota.session),
+        quotaCard("7 天额度", "7 天窗口" + liveTag, quota && quota.weekly),
         todayCard(),
         totalCard(),
         costCard(),
@@ -2057,11 +2089,10 @@
 
     // 区间花费：按区间内每天、每个模型各自的单价现算
     const costRange = rangeCost();
-    const costRate = (detail && detail.cost && detail.cost.rate) || 7.2;
 
     const cells = [
       ["区间用量", fmtTokens(sumRange), series.length + " 天"],
-      ["区间花费", fmtMoney(costRange), fmtUsd(costRange / costRate) + " · 刊例价"],
+      ["区间花费", fmtMoney(costRange), "美元 · 刊例价"],
       ["日均", fmtTokens(avg), activeDays + " 天 · " + fmtCount(sumRecords) + " 次请求"],
       ["单日峰值", peak ? fmtTokens(peak.totalTokens) : "—", peak ? dayLabel(peak.day) : ""],
       ["环比", compareValue, compareNote]
@@ -2647,6 +2678,115 @@
     setTimeout(() => { boot.style.display = "none"; }, 320);
   }
 
+  // --------------------------------------------------------------- 实时额度（本机 Codex 授权）
+  function authMsg(text, isErr) {
+    const node = $("a-msg");
+    if (!node) return;
+    node.textContent = text || "";
+    node.hidden = !text;
+    node.className = "m-msg" + (isErr ? " err" : "");
+  }
+
+  function fmtReset(resetsAt) {
+    if (!resetsAt) return "";
+    const d = new Date(Number(resetsAt) * 1000);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function loadAuthAccounts() {
+    const d = window.dashboard;
+    if (!d || !d.codexAuthList) return;
+    try {
+      const data = await d.codexAuthList();
+      renderAuthAccounts(data || { accounts: [] });
+    } catch (e) {
+      $("a-badge").textContent = "读取失败";
+      authMsg(String(e && e.message ? e.message : e), true);
+    }
+  }
+
+  function renderAuthAccounts(data) {
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const activeId = data.activeId;
+    const badge = $("a-badge");
+    const dot = $("auth-dot");
+    // 顶部标签：显示当前激活账号的实时额度来源
+    const active = accounts.find(a => a.id === activeId && a.quota);
+    if (active && active.quota && active.quota.session) {
+      $("auth-top-label").textContent = "额度 " + Math.round(active.quota.session.usedPercent) + "%";
+      dot.hidden = false;
+      badge.textContent = "实时 · " + active.email;
+      badge.className = "m-badge done";
+    } else {
+      $("auth-top-label").textContent = "实时额度";
+      dot.hidden = true;
+      badge.textContent = accounts.length ? accounts.length + " 个账号" : "未检测到账号";
+      badge.className = "m-badge";
+    }
+
+    const list = $("a-accounts");
+    if (!accounts.length) {
+      list.innerHTML = '<div class="m-sub" style="margin:0 0 4px">没有检测到本机 Codex 授权。请先用 CC Switch 或 Codex CLI 登录。</div>';
+      return;
+    }
+    list.innerHTML = accounts.map(a => {
+      const q = a.quota;
+      const live = Boolean(q && q.session);
+      const tag = a.error
+        ? '<span class="q-tag err">失败</span>'
+        : live ? '<span class="q-tag live">实时</span>' : '<span class="q-tag">未查询</span>';
+      const detail = live
+        ? '<div class="q-quota">5 小时 <b>' + Math.round(q.session.usedPercent) + '%</b>' +
+          (q.session.resetsAt ? ' · 重置 ' + fmtReset(q.session.resetsAt) : '') +
+          (q.weekly ? ' ｜ 每周 <b>' + Math.round(q.weekly.usedPercent) + '%</b>' : '') +
+          '</div>'
+        : (a.error ? '<div class="q-quota">' + escapeHtml(a.error) + '</div>' : '<div class="q-quota">点击查询官方实时额度</div>');
+      return '<div class="m-acct q-acct' + (a.id === activeId ? ' is-active' : '') + '" data-id="' + escapeHtml(a.id) + '">' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="m-mail">' + escapeHtml(a.email) + (a.id === activeId ? ' <span class="q-tag">当前</span>' : '') + '</div>' +
+        detail + '</div>' + tag + '</div>';
+    }).join("");
+  }
+
+  function openAuthModal() { $("auth-modal").hidden = false; loadAuthAccounts(); }
+  function closeAuthModal() { $("auth-modal").hidden = true; }
+
+  async function doFetchQuota(accountId) {
+    const d = window.dashboard;
+    if (!d || !d.codexAuthFetch) return;
+    authMsg("正在向官方查询额度…");
+    try {
+      const result = await d.codexAuthFetch(accountId, { force: true });
+      authMsg("已更新 " + result.email + " 的实时额度，看板额度卡已同步。");
+      // 用实时额度刷新看板顶部的状态与额度卡
+      if (window.dashboard.getStatus) {
+        window.dashboard.getStatus().then(status => {
+          if (status) { state.status = status; renderStats(); renderStatus(); }
+        }).catch(() => {});
+      }
+      loadAuthAccounts();
+    } catch (e) {
+      authMsg("查询失败：" + (e && e.message ? e.message : String(e)), true);
+      loadAuthAccounts();
+    }
+  }
+
+  function bindAuth() {
+    $("btn-auth").addEventListener("click", openAuthModal);
+    $("a-close").addEventListener("click", closeAuthModal);
+    $("auth-modal").addEventListener("click", event => { if (event.target === $("auth-modal")) closeAuthModal(); });
+    $("a-refresh").addEventListener("click", () => loadAuthAccounts());
+    $("a-accounts").addEventListener("click", event => {
+      const row = event.target.closest(".q-acct");
+      if (!row) return;
+      doFetchQuota(row.getAttribute("data-id"));
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !$("auth-modal").hidden) closeAuthModal();
+    });
+  }
+
   // --------------------------------------------------------------- 科研通签到
   function signMsg(text, isErr) {
     const node = $("m-msg");
@@ -2858,6 +2998,7 @@
   buildSourceTabs();
   bindButtons();
   bindSign();
+  bindAuth();
   loadAbleSci();
   bindChartHover();
 
@@ -2876,6 +3017,14 @@
       state.status = status;
       if (status) renderStats();
     }).catch(() => {});
+    // 主进程后台取到实时额度后会推 status；订阅进来让额度卡自动变「实时」
+    if (window.dashboard.onStatus) {
+      window.dashboard.onStatus(status => {
+        if (!status) return;
+        state.status = status;
+        renderStats();
+      });
+    }
     load().catch(() => {});
   } else {
     $("boot-text").textContent = "桥接未加载：请通过桌面应用启动";
