@@ -36,7 +36,7 @@ function headerBag(entries = {}) {
 }
 
 test("maskEmail 脱敏", () => {
-  assert.equal(maskEmail("xiaoqi8553@gmail.com"), "xi***@gmail.com");
+  assert.equal(maskEmail("alice@example.com"), "al***@example.com");
   assert.equal(maskEmail("ab@x.io"), "ab***@x.io");
   assert.equal(maskEmail(""), "***");
 });
@@ -58,9 +58,9 @@ test("cookie jar 保存并拼接 cookie", () => {
 test("多账号增删：密码加密落盘，列表返回脱敏邮箱", () => {
   const f = tmpFiles();
   const store = createAbleSciStore({ ...f, cipher });
-  store.addAccount("xiaoqi8553@gmail.com", "pass123");
-  store.addAccount("trevor.williams@mail.com", "pass456");
-  assert.throws(() => store.addAccount("xiaoqi8553@gmail.com", "x"), /已存在/);
+  store.addAccount("alice@example.com", "pass123");
+  store.addAccount("bob@example.net", "pass456");
+  assert.throws(() => store.addAccount("alice@example.com", "x"), /已存在/);
   assert.throws(() => store.addAccount("not-an-email", "x"), /邮箱格式/);
 
   const raw = JSON.parse(fs.readFileSync(f.accountsFile, "utf8"));
@@ -70,9 +70,9 @@ test("多账号增删：密码加密落盘，列表返回脱敏邮箱", () => {
 
   const list = store.list();
   assert.equal(list.accounts.length, 2);
-  assert.equal(list.accounts[0].masked, "xi***@gmail.com");
+  assert.equal(list.accounts[0].masked, "al***@example.com");
   assert.ok(!JSON.stringify(list).includes("pass123"), "列表不能泄露明文密码");
-  assert.ok(!JSON.stringify(list).includes("trevor.williams"));
+  assert.ok(!JSON.stringify(list).includes("bob@example.net"));
 
   const id = list.accounts[0].id;
   store.removeAccount(id);

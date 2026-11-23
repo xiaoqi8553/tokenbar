@@ -27,5 +27,9 @@ contextBridge.exposeInMainWorld("codexBar", {
   // 实时额度（复用本机 Codex 授权）
   codexAuthList: () => ipcRenderer.invoke("codex-auth:list"),
   codexAuthFetch: (accountId, opts) => ipcRenderer.invoke("codex-auth:fetch", accountId, opts),
-  codexAuthActive: opts => ipcRenderer.invoke("codex-auth:active", opts)
+  codexAuthActive: opts => ipcRenderer.invoke("codex-auth:active", opts),
+  codexAuthDeviceStart: () => ipcRenderer.invoke("codex-auth:device-start"),
+  codexAuthDevicePoll: sessionId => ipcRenderer.invoke("codex-auth:device-poll", sessionId),
+  codexAuthDeviceStatus: sessionId => ipcRenderer.invoke("codex-auth:device-status", sessionId),
+  codexAuthDeviceCancel: sessionId => ipcRenderer.invoke("codex-auth:device-cancel", sessionId)
 });

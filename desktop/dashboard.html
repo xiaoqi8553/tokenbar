@@ -349,6 +349,30 @@
   .m-link { background: none; border: 0; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
   .m-close { background: none; border: 0; color: var(--text-3); font-size: 13px; cursor: pointer; }
 
+  /* 账号列表单独滚动，底部「OAuth 授权 / 刷新 / 关闭」始终可见 */
+  #a-accounts { max-height: 330px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  #auth-modal .m-foot { position: sticky; bottom: -20px; background: var(--panel); padding: 10px 0 2px; margin-top: 8px; z-index: 1; }
+  #a-oauth-add { font-weight: 600; }
+
+  /* OAuth 设备码授权面板 */
+  .dev-panel {
+    margin-top: 12px; padding: 12px 14px; border: 1px solid var(--accent-3);
+    border-radius: 10px; background: var(--panel-soft);
+  }
+  .dev-panel[hidden] { display: none; }
+  .dev-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dev-code {
+    font: 700 20px/1.2 "Consolas", "SF Mono", monospace; letter-spacing: 2px;
+    color: var(--accent); background: var(--panel); border: 1px dashed var(--accent-2);
+    padding: 8px 12px; border-radius: 8px; user-select: all;
+  }
+  .dev-hint { font-size: 12px; color: var(--text-2); line-height: 1.7; }
+  .dev-link { color: var(--accent); word-break: break-all; }
+  .dev-status { font-size: 12px; color: var(--text-3); margin-top: 8px; }
+  .dev-status.busy { color: var(--warn); }
+  .dev-status.done { color: var(--ok); }
+  .dev-btns { display: flex; gap: 8px; margin-top: 10px; }
+
   main {
     overflow-y: auto;
     overflow-x: hidden;
@@ -1106,8 +1130,25 @@
       </h3>
       <div class="m-sub" id="a-sub">复用本机 Codex 授权，点任意账号即可向官方查询 5 小时 / 每周额度（不上传凭证）</div>
       <div id="a-accounts"></div>
+      <div class="dev-panel" id="a-dev-panel" hidden>
+        <div class="dev-hint">
+          1. 打开官方验证网址（会新开浏览器）：
+          <a class="dev-link" id="a-dev-url" href="https://auth.openai.com/codex/device" target="_blank" rel="noreferrer">https://auth.openai.com/codex/device</a><br>
+          2. 登录你的 ChatGPT 账号，输入下面的一次性配对码（15 分钟内有效）：
+        </div>
+        <div class="dev-row" style="margin-top:8px">
+          <span class="dev-code" id="a-dev-code">————</span>
+          <button class="m-btn ghost" id="a-dev-copy" style="height:32px">复制</button>
+        </div>
+        <div class="dev-status" id="a-dev-status">等待你在浏览器完成授权…</div>
+        <div class="dev-btns">
+          <button class="m-link" id="a-dev-open">重新打开验证网址</button>
+          <button class="m-link" id="a-dev-cancel">取消授权</button>
+        </div>
+      </div>
       <div class="m-msg" id="a-msg" hidden></div>
       <div class="m-foot">
+        <button class="m-link" id="a-oauth-add">＋ OAuth 授权添加账号</button>
         <button class="m-link" id="a-refresh">刷新列表</button>
         <button class="m-close" id="a-close">关闭</button>
       </div>
@@ -2802,18 +2843,107 @@
     }
   }
 
+  // ---- OAuth 设备码授权（配对码只在主进程内存，界面只显示码与网址） ----
+  let devSession = null;
+  let devTimer = null;
+
+  function devStatus(text, kind) {
+    const node = $("a-dev-status");
+    node.textContent = text;
+    node.className = "dev-status" + (kind ? " " + kind : "");
+  }
+
+  function stopDevicePolling() {
+    if (devTimer) { clearInterval(devTimer); devTimer = null; }
+  }
+
+  async function closeDevicePanel(notifyMain) {
+    stopDevicePolling();
+    if (devSession && notifyMain && window.dashboard.codexAuthDeviceCancel) {
+      try { await window.dashboard.codexAuthDeviceCancel(devSession); } catch { /* 忽略 */ }
+    }
+    devSession = null;
+    $("a-dev-panel").hidden = true;
+  }
+
+  async function startDeviceAuth() {
+    const d = window.dashboard;
+    if (!d || !d.codexAuthDeviceStart) return;
+    authMsg("正在申请一次性配对码…");
+    try {
+      const session = await d.codexAuthDeviceStart();
+      devSession = session.sessionId;
+      $("a-dev-code").textContent = session.userCode;
+      $("a-dev-url").href = session.verifyUrl;
+      $("a-dev-url").textContent = session.verifyUrl;
+      $("a-dev-panel").hidden = false;
+      authMsg("");
+      devStatus("等待你在浏览器完成授权（每 " + session.intervalSec + " 秒自动检查一次）…", "busy");
+      // 打开官方验证页（新浏览器窗口；token 不会经过本应用）
+      if (d.openExternal) d.openExternal(session.verifyUrl);
+      const intervalMs = Math.max(3, Number(session.intervalSec) || 5) * 1000;
+      stopDevicePolling();
+      devTimer = setInterval(() => pollDeviceAuth(), intervalMs);
+    } catch (e) {
+      authMsg("申请配对码失败：" + (e && e.message ? e.message : String(e)), true);
+    }
+  }
+
+  async function pollDeviceAuth() {
+    const d = window.dashboard;
+    if (!devSession || !d || !d.codexAuthDevicePoll) return;
+    try {
+      const result = await d.codexAuthDevicePoll(devSession);
+      if (result.status === "pending") {
+        devStatus("尚未授权，等待中…", "busy");
+        return;
+      }
+      if (result.status === "expired") {
+        devStatus("配对码已过期，请重新点「OAuth 授权添加账号」。", "");
+        await closeDevicePanel(false);
+        return;
+      }
+      if (result.status === "success") {
+        devStatus("授权成功，已保存到本机。", "done");
+        authMsg("已授权 " + (result.email || "新账号") +
+          (result.quota && result.quota.session ? "，5 小时已用 " + Math.round(result.quota.session.usedPercent) + "%" : (result.quotaError ? "（额度查询：" + result.quotaError + "）" : "")) + "。", false);
+        await closeDevicePanel(false);
+        loadAuthAccounts();
+        // 若授权的是当前激活账号，顺手刷新看板实时额度
+        if (window.dashboard.getStatus) {
+          window.dashboard.getStatus().then(status => {
+            if (status) { state.status = status; renderStats(); renderStatus(); }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      devStatus("检查失败：" + (e && e.message ? e.message : String(e)), "");
+    }
+  }
+
   function bindAuth() {
     $("btn-auth").addEventListener("click", openAuthModal);
-    $("a-close").addEventListener("click", closeAuthModal);
-    $("auth-modal").addEventListener("click", event => { if (event.target === $("auth-modal")) closeAuthModal(); });
+    $("a-close").addEventListener("click", () => { closeDevicePanel(true); closeAuthModal(); });
+    $("auth-modal").addEventListener("click", event => { if (event.target === $("auth-modal")) { closeDevicePanel(true); closeAuthModal(); } });
     $("a-refresh").addEventListener("click", () => loadAuthAccounts());
+    $("a-oauth-add").addEventListener("click", startDeviceAuth);
+    $("a-dev-cancel").addEventListener("click", () => { closeDevicePanel(true); authMsg("已取消授权。"); });
+    $("a-dev-open").addEventListener("click", () => {
+      const url = $("a-dev-url").href;
+      if (window.dashboard.openExternal) window.dashboard.openExternal(url);
+    });
+    $("a-dev-copy").addEventListener("click", async () => {
+      const code = $("a-dev-code").textContent;
+      try { await navigator.clipboard.writeText(code); authMsg("配对码已复制。"); }
+      catch { authMsg("复制失败，请手动选中配对码复制。", true); }
+    });
     $("a-accounts").addEventListener("click", event => {
       const row = event.target.closest(".q-acct");
       if (!row) return;
       doFetchQuota(row.getAttribute("data-id"));
     });
     document.addEventListener("keydown", event => {
-      if (event.key === "Escape" && !$("auth-modal").hidden) closeAuthModal();
+      if (event.key === "Escape" && !$("auth-modal").hidden) { closeDevicePanel(true); closeAuthModal(); }
     });
   }
 

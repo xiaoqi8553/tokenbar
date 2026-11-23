@@ -17,8 +17,14 @@
  * plan_type），因此可直接复用 codex-store 的 normalizeRateLimits 口径。
  *
  * 设计要点：
- *  - 只读本机已有的 auth.json（~/.codex/auth.json 与 ~/.codex/XQ_acc 下各账号目录），
- *    不实现 OAuth 登录页；用户要新增账号请照旧用 CC Switch / codex login。
+ *  - 两种取得授权的方式：
+ *    1) 复用本机已有 auth.json（~/.codex/auth.json 与 ~/.codex/XQ_acc 下各账号目录）；
+ *    2) OAuth Device Code 授权：和 CC Switch / Codex CLI 同款流程——给用户一个一次性
+ *       配对码和官方验证网址，在浏览器里授权后，token 只落到本机，不经过本应用服务器。
+ *       端点（从 CC Switch 安装包与 openai/codex 源码核对，2026-11 实测）：
+ *         POST https://auth.openai.com/api/accounts/deviceauth/usercode   {client_id}
+ *         POST https://auth.openai.com/api/accounts/deviceauth/token      {device_auth_id,user_code} 轮询
+ *         POST https://auth.openai.com/oauth/token   form: grant_type=authorization_code + PKCE
  *  - token 永不出进程：list()/status() 只回脱敏邮箱、有效期、额度，不回 token。
  *  - access_token 过期时用 refresh_token 走官方 oauth/token 换新，并把新 token
  *    原子写回原 auth.json（Codex CLI、CC Switch 下次启动即可复用）。
@@ -27,8 +33,13 @@
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
-const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"; // 从本机 id_token.aud 确认
+const USERCODE_URL = "https://auth.openai.com/api/accounts/deviceauth/usercode";
+const DEVICE_TOKEN_URL = "https://auth.openai.com/api/accounts/deviceauth/token";
+const VERIFY_URL = "https://auth.openai.com/codex/device";
+const DEVICE_REDIRECT_URI = "https://auth.openai.com/deviceauth/callback";
+const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"; // 从本机 id_token.aud 确认（与 Codex CLI 一致）
 const UA = "codex_cli_rs/0.1.0";
+const DEVICE_POLL_MAX_MS = 15 * 60 * 1000; // 官方配对码 15 分钟有效
 const TOKEN_EXPIRY_SKEW_MS = 60_000; // 提前 1 分钟视为过期
 
 /**
@@ -109,7 +120,23 @@ function curlRequest(url, opts) {
 
 function nowIso() { return new Date().toISOString(); }
 
-/** 邮箱脱敏：xiao***@gmail.com */
+/** 生成随机 session id（只用来在主进程内索引一次授权会话，不是凭证） */
+function newSessionId() {
+  try {
+    const crypto = require("node:crypto");
+    return crypto.randomUUID();
+  } catch {
+    return "dev-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  }
+}
+
+/** 目录名安全化：邮箱里的 @ / . / + 等不能出现在文件夹名里 */
+function safeFolderName(value) {
+  const s = String(value || "").trim().replace(/[^\w.@-]+/g, "_").replace(/^\.+|\.+$/g, "");
+  return s || "oauth-account";
+}
+
+/** 邮箱脱敏：保留前两位，其余星号（例 alice@example.com → al***@example.com） */
 function maskEmail(email) {
   const s = String(email || "");
   const at = s.indexOf("@");
@@ -218,6 +245,8 @@ function createCodexAuthStore(options = {}) {
 
   /** 缓存：key = auth 文件绝对路径 */
   const cache = new Map();
+  /** 进行中的设备码授权会话：key = sessionId，含 device_auth_id 等敏感值，绝不过桥 */
+  const deviceSessions = new Map();
 
   function readJson(file) {
     try {
@@ -406,12 +435,167 @@ function createCodexAuthStore(options = {}) {
     return cached && cached.quota ? cached.quota : null;
   }
 
+  // ------------------------------------------------------------------
+  // OAuth Device Code 授权（与 CC Switch / Codex CLI 同款，只落本机）
+  // ------------------------------------------------------------------
+
+  /**
+   * 第一步：向官方申请一个一次性配对码。返回的 user_code 与验证网址给用户在浏览器里授权；
+   * device_auth_id 只留在主进程的 deviceSessions 里，绝不过桥到渲染进程。
+   */
+  async function startDeviceAuth(opts = {}) {
+    const doFetch = opts.fetch || fetchFn;
+    const response = await doFetch(USERCODE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": UA },
+      body: JSON.stringify({ client_id: CLIENT_ID }),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) throw new Error(`申请配对码失败 HTTP ${response.status}`);
+    const json = await response.json();
+    if (!json.device_auth_id || !json.user_code) throw new Error("配对码响应缺少 device_auth_id / user_code");
+
+    const id = newSessionId();
+    const intervalSec = Math.max(1, Number(json.interval) || 5);
+    const expiresAtMs = json.expires_at
+      ? (Date.parse(json.expires_at) || Date.now() + DEVICE_POLL_MAX_MS)
+      : Date.now() + DEVICE_POLL_MAX_MS;
+    deviceSessions.set(id, {
+      deviceAuthId: String(json.device_auth_id),
+      userCode: String(json.user_code),
+      intervalSec,
+      expiresAtMs,
+      startedAt: Date.now(),
+      pkce: null
+    });
+    // 只回可展示的字段：配对码本身不是密钥，device_auth_id 永远不出去
+    return {
+      sessionId: id,
+      userCode: String(json.user_code),
+      verifyUrl: VERIFY_URL,
+      intervalSec,
+      expiresAt: new Date(expiresAtMs).toISOString()
+    };
+  }
+
+  /** 查会话状态（渲染进程刷新/重开弹窗时用），只回可展示字段 */
+  function deviceStatus(sessionId) {
+    const s = deviceSessions.get(sessionId);
+    if (!s) return null;
+    return {
+      sessionId,
+      userCode: s.userCode,
+      verifyUrl: VERIFY_URL,
+      expiresAt: new Date(s.expiresAtMs).toISOString(),
+      expired: Date.now() >= s.expiresAtMs
+    };
+  }
+
+  /**
+   * 第二步：轮询用户是否已在浏览器完成授权。
+   * 403/404 = 用户还没点授权（pending）；200 = 拿到 authorization_code + PKCE。
+   * 成功后立刻换 token、写成本机 auth.json，并清掉会话。
+   */
+  async function pollDeviceAuth(sessionId, opts = {}) {
+    const session = deviceSessions.get(sessionId);
+    if (!session) throw new Error("授权会话不存在或已结束");
+    if (Date.now() >= session.expiresAtMs) {
+      deviceSessions.delete(sessionId);
+      return { status: "expired" };
+    }
+    const doFetch = opts.fetch || fetchFn;
+    const response = await doFetch(DEVICE_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": UA },
+      body: JSON.stringify({ device_auth_id: session.deviceAuthId, user_code: session.userCode }),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (response.status === 403 || response.status === 404) return { status: "pending" };
+    if (!response.ok) throw new Error(`查询授权结果失败 HTTP ${response.status}`);
+
+    const grant = await response.json();
+    if (!grant.authorization_code) throw new Error("授权响应缺少 authorization_code");
+
+    // 第三步：authorization_code + PKCE 换 access/refresh/id token（form 编码）
+    const form = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: CLIENT_ID,
+      code: String(grant.authorization_code),
+      redirect_uri: String(grant.redirect_uri || DEVICE_REDIRECT_URI),
+      scope: "openid profile email offline_access"
+    });
+    if (grant.code_verifier) form.set("code_verifier", String(grant.code_verifier));
+    if (grant.code_challenge) form.set("code_challenge", String(grant.code_challenge));
+
+    const tokenResponse = await doFetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
+      body: form.toString(),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!tokenResponse.ok) throw new Error(`换取令牌失败 HTTP ${tokenResponse.status}`);
+    const tokens = await tokenResponse.json();
+    if (!tokens.access_token || !tokens.refresh_token || !tokens.id_token) {
+      throw new Error("令牌响应缺少 access_token / refresh_token / id_token");
+    }
+
+    // 从 id_token 里取邮箱与 account_id，用于命名账号文件与查额度
+    const email = jwtClaim(tokens.id_token, "email")
+      || jwtClaim(tokens.id_token, "preferred_username") || null;
+    const accountId = jwtClaim(tokens.id_token, "chatgpt_account_id")
+      || jwtClaim(tokens.id_token, "account_id") || null;
+
+    // 落盘：和 Codex 的 auth.json 完全同构，写进 XQ_acc/<email>/auth.json，
+    // 不动当前激活的 auth.json（避免把用户正在用的登录挤掉）
+    const folder = safeFolderName(email || ("oauth-" + Date.now()));
+    const targetDir = path.join(accountsDir, folder);
+    fs.mkdirSync(targetDir, { recursive: true });
+    const authFile = path.join(targetDir, "auth.json");
+    const authDoc = {
+      auth_mode: "chatgpt",
+      last_refresh: nowIso(),
+      tokens: {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        id_token: tokens.id_token,
+        account_id: accountId
+      }
+    };
+    writeJson(authFile, authDoc);
+    deviceSessions.delete(sessionId);
+
+    // 立刻查一次额度，让 UI 一次拿到完整结果（失败也不影响授权本身）
+    let quota = null;
+    let quotaError = null;
+    try {
+      const result = await fetchQuota(path.resolve(authFile), { ...opts, skipRefresh: true });
+      quota = result.quota;
+    } catch (error) {
+      quotaError = error.message;
+    }
+    return {
+      status: "success",
+      email: email ? maskEmail(email) : folder,
+      accountId: accountId,
+      quota,
+      quotaError
+    };
+  }
+
+  function cancelDeviceAuth(sessionId) {
+    return deviceSessions.delete(sessionId);
+  }
+
   return {
     discover,
     list,
     fetchQuota,
     activeQuota,
     cachedQuotaFor,
+    startDeviceAuth,
+    pollDeviceAuth,
+    deviceStatus,
+    cancelDeviceAuth,
     normalizeQuota,
     isTokenExpired,
     jwtClaim,

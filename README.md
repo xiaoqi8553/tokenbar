@@ -4,9 +4,9 @@
 
 Windows 托盘里的 token 用量看板。Codex 和 WorkBuddy 用了多少、折多少钱、跑得多快，点一下图标就能看到。
 
-Token usage (tokens, speed, model/project split) reads local logs only — no upload. Two opt-in network features: **实时额度** reuses the Codex login already on your machine to ask OpenAI for the real 5-hour / weekly quota (no new login; started automatically in the background), and **科研通签到** connects to ablesci.com only when you click it. Neither uploads your usage logs.
+Token usage (tokens, speed, model/project split) reads local logs only — no upload. Three opt-in network features, all going straight to their official endpoints with your own credentials held only in this machine's memory: **实时额度** reuses the Codex login already on your machine to ask OpenAI for the real 5-hour / weekly quota (no new login; started automatically in the background); **OAuth 授权添加账号** runs Codex's official device-code flow in-app; **科研通签到** connects to ablesci.com only when you click it. None of them uploads your usage logs, and no credential is ever stored in this repository.
 
-Token 用量（tokens、速度、模型/项目分布）只读本地日志、不上传。两个联网功能都是可选的：**实时额度**复用你机器上已有的 Codex 登录，向 OpenAI 查询真实的 5 小时 / 每周额度（无需重新登录，后台自动开始）；**科研通签到**只有你点击时才访问 ablesci.com。两者都不上传用量日志。
+Token 用量（tokens、速度、模型/项目分布）只读本地日志、不上传。三个联网功能都是可选的，且都直连官方接口、凭证只在本机内存中过一下：**实时额度**复用你机器上已有的 Codex 登录，向 OpenAI 查询真实的 5 小时 / 每周额度（无需重新登录，后台自动开始）；**OAuth 授权添加账号**在应用内走 Codex 官方设备码流程；**科研通签到**只有你点击时才访问 ablesci.com。三者都不上传用量日志，仓库里也不会存任何凭证。
 
 All money is shown in **USD ($)**. The pricing table keeps CNY list prices internally and converts at the configurable `usdCny` rate (default 7.2) only for display.
 
@@ -47,6 +47,8 @@ All money is shown in **USD ($)**. The pricing table keeps CNY list prices inter
 - 顶栏**科研通签到**按钮打开同一个签到面板（弹窗与看板共用账号）。
 - Top bar **实时额度** button lists the Codex accounts found on this machine (`~/.codex/auth.json` and `~/.codex/XQ_acc`). Click any masked email to query the official quota for that account; no password or new login is needed. Tokens never leave the app.
 - 顶栏**实时额度**按钮列出本机检测到的 Codex 账号（`~/.codex/auth.json` 与 `~/.codex/XQ_acc`）。点任意脱敏邮箱即可查询该账号的官方额度，无需密码或重新登录，token 不会离开应用。
+- **OAuth device-code sign-in**: the same panel has a **+ OAuth 授权添加账号** button. It requests a one-time pairing code from OpenAI's official device-auth endpoint, shows you the verification URL (`auth.openai.com/codex/device`) and the code to enter in your browser, then polls until you approve — exactly the flow CC Switch and Codex CLI use. Approved tokens are saved atomically to `~/.codex/XQ_acc/<email>/auth.json`; your currently active `auth.json` is never touched. No password is ever typed into TokenBar, and no token reaches the renderer or any third-party server.
+- **OAuth 设备码授权**：同一个弹窗里点**＋ OAuth 授权添加账号**，应用向 OpenAI 官方设备码接口申请一次性配对码，显示验证网址（`auth.openai.com/codex/device`）和配对码，你在浏览器里登录并输入后应用自动轮询直到授权成功——与 CC Switch / Codex CLI 的流程完全一致。token 原子写入 `~/.codex/XQ_acc/<邮箱>/auth.json`，不动当前激活的 auth.json。你不需要在 TokenBar 里输入密码，token 也不会进入界面或任何第三方服务器。
 - Top bar theme tags: **月之亮面** for light and **月之暗面** for dark. The choice is remembered; the old "follow system" mode is gone.
 - 顶栏主题标签：**月之亮面**对应亮色，**月之暗面**对应暗色。选择会被记住；不再有「跟随系统」模式。
 

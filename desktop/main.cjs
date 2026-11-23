@@ -550,6 +550,24 @@ if (!gotLock) {
       if (result) applyLiveQuota(result);
       return result;
     });
+
+    // OAuth Device Code 授权：配对码只在主进程内存里，token 只落本机
+    ipcMain.handle("codex-auth:device-start", async () => {
+      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
+      return codexAuthStore.startDeviceAuth();
+    });
+    ipcMain.handle("codex-auth:device-poll", async (_event, sessionId) => {
+      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
+      return codexAuthStore.pollDeviceAuth(sessionId);
+    });
+    ipcMain.handle("codex-auth:device-status", (_event, sessionId) => {
+      if (!codexAuthStore) return null;
+      return codexAuthStore.deviceStatus(sessionId);
+    });
+    ipcMain.handle("codex-auth:device-cancel", (_event, sessionId) => {
+      if (!codexAuthStore) return false;
+      return codexAuthStore.cancelDeviceAuth(sessionId);
+    });
   }
 
   /** 把实时额度挂到 latestStatus.quota，并记录来源，供界面标注「实时」 */
@@ -893,9 +911,13 @@ if (!gotLock) {
           }
           const shotPath = process.env.CODEX_TOKEN_DASHBOARD_SHOT;
           // 排查用：截图前点击指定按钮（如 btn-auth 打开实时额度弹窗）
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK) {
-            // 先按 id 找；找不到就当 CSS 选择器用，便于点主题切换里的某个 tag
-            const target = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK);
+          const shotClicks = [
+            process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK,
+            process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK2
+          ].filter(Boolean);
+          for (const clickTarget of shotClicks) {
+            // 先按 id 找；找不到就当 CSS 选择器用，便于连点打开弹窗里的子面板
+            const target = String(clickTarget);
             await mainWindow.webContents.executeJavaScript(
               `(() => { const el = document.getElementById(${JSON.stringify(target)}) || document.querySelector(${JSON.stringify(target)}); if (el) el.click(); return !!el; })()`
             );

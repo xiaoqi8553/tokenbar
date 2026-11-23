@@ -414,6 +414,26 @@ async function main() {
     assert.deepEqual(themeAfter.pressed, [otherTheme], "切换后选中态跟着走");
     assert.equal(themeAfter.stored, otherTheme, "主题选择要持久化");
 
+    // 3f. OAuth 设备码授权入口：按钮、面板、preload API 齐备
+    await dashboard.click("#btn-auth");
+    await dashboard.waitForFunction(
+      () => document.querySelector("#auth-modal") && !document.querySelector("#auth-modal").hidden,
+      { timeout: 10_000 }
+    );
+    const oauthUi = await dashboard.evaluate(() => ({
+      hasAdd: !!document.querySelector("#a-oauth-add"),
+      panelHidden: document.querySelector("#a-dev-panel").hidden,
+      api: !!(window.dashboard && typeof window.dashboard.codexAuthDeviceStart === "function"
+        && typeof window.dashboard.codexAuthDevicePoll === "function"
+        && typeof window.dashboard.codexAuthDeviceCancel === "function"),
+      hasAuthList: !!(window.dashboard && typeof window.dashboard.codexAuthList === "function")
+    }));
+    assert.ok(oauthUi.hasAdd, "授权弹窗里应有「OAuth 授权添加账号」入口");
+    assert.equal(oauthUi.panelHidden, true, "设备码面板默认收起");
+    assert.ok(oauthUi.api, "preload 应暴露设备码授权 API");
+    assert.ok(oauthUi.hasAuthList, "preload 应暴露账号列表 API");
+    await dashboard.click("#a-close");
+
     // 4. 切一次区间，确认活跃时段跟着变
     const before = await dashboard.evaluate(() => (document.querySelector("#hour-badge") || {}).textContent || "");
     await dashboard.click('#range button[data-key="7"]');

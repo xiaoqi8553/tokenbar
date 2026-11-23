@@ -1,5 +1,16 @@
 # 更新日志
 
+## 2.6.0 - 2026-11-23
+
+**新增 OAuth 设备码授权添加 Codex 账号，并做了一轮安全审计与隐私清理。** 用户诉求：「你不会把我带账号的信息全部写进去了吧，github 会不会有泄密影响？……像 CC 一样做一个授权登录的请求，CC 怎么做你就怎么做。」
+
+- **安全审计结论**：全 git 历史与工作区源码扫描，`sk-` API Key / access_token / refresh_token / 真实邮箱都**未进入仓库**。用量索引 `data/usage-index.json` 里那条 `sk-0c14...` 来自用户某条会话标题，文件被 `.gitignore` 排除、从未提交。测试文件里曾拿真实邮箱当假数据，已全部替换为 `alice@example.com` 等纯假邮箱。
+- **OAuth Device Code 授权**：`codex-auth-store.cjs` 新增 `startDeviceAuth/pollDeviceAuth/deviceStatus/cancelDeviceAuth`，流程与 CC Switch / Codex CLI 完全一致（端点从 CC Switch 安装包 + openai/codex 源码核对并实测）：
+  POST `/api/accounts/deviceauth/usercode` 取一次性配对码 → 浏览器打开 `https://auth.openai.com/codex/device` 输入配对码 → 轮询 `/api/accounts/deviceauth/token` → `/oauth/token` 用 authorization_code + PKCE 换 token → 原子写入 `~/.codex/XQ_acc/<email>/auth.json`（不动当前激活的 auth.json）。
+- **UI**：实时额度弹窗底部新增「＋ OAuth 授权添加账号」，展开后显示官方验证网址、大号配对码、复制 / 重新打开 / 取消按钮、轮询状态；账号列表限高滚动、底部操作栏 sticky 固定。token 与 `device_auth_id` 都只留在主进程内存，界面只有脱敏邮箱和配对码。
+- 新增 4 个设备码单测（申请 / pending / 成功落盘与脱敏 / 取消过期），共 **70** 个测试；桌面冒烟新增 OAuth 入口断言，并用真实端点截图确认设备码面板。
+- 保留原有「复用本机 Codex 授权」为默认入口，两条路径并存。
+
 ## 2.5.1 - 2026-11-23
 
 **主题切换改为「月之亮面 / 月之暗面」双标签。** 用户诉求：「这个界面的切换也改一下，tag1 叫月之亮面对应亮色，tag2 叫月之暗面对应暗色。」
@@ -34,7 +45,7 @@
 - 弹窗（托盘左键）新增签到卡片：状态徽标（未配置 / `N/N 已签` / 今日已签 ✓）、签到主按钮、可展开的账号管理（脱敏列表、添加、删除）。看板顶栏也加了签到按钮与同款模态面板，右键托盘菜单加「科研通签到」并用系统通知反馈结果。
 - 支持**多账号**：点一次串行签到全部账号（避免同站并发触发风控），逐个显示成功 / 今日已签 / 失败与站点原文；汇总分别统计。签到结果按北京时间记「今日已签」，刷新后徽标同步。
 - 站点流程对齐现成开源脚本：`GET /site/login` 取 `<meta name="csrf-token">` + 收 cookie → `POST /site/login`（`_csrf/email/password/remember=off`，`X-Requested-With: XMLHttpRequest`）→ `GET /user/sign`，复用同一 cookie jar（Node fetch 不自动管 cookie，手动实现）。已签判断 `msg` 含「您今天已于」；登录触发验证码时提示去浏览器手动签一次。2026-11-19 用真实站点验证：CSRF/cookie 提取成功、空凭证 POST 返回结构化错误，证明参数名与格式正确。
-- **凭证安全**：邮箱明文不落盘/不出数据层，只有脱敏邮箱（`xi***@gmail.com`）出现在 UI 与日志；密码优先 Electron `safeStorage`（Windows DPAPI）加密，不可用时退回本机派生 AES-256-GCM，密文存 `%APPDATA%/TokenBar/data/ablesci-accounts.json`。账号增删/签到走白名单 IPC。
+- **凭证安全**：邮箱明文不落盘/不出数据层，只有脱敏邮箱（如 `al***@example.com`）出现在 UI 与日志；密码优先 Electron `safeStorage`（Windows DPAPI）加密，不可用时退回本机派生 AES-256-GCM，密文存 `%APPDATA%/TokenBar/data/ablesci-accounts.json`。账号增删/签到走白名单 IPC。
 - 新增 `tests/ablesci-sign.test.js`（8 个：脱敏、CSRF 两种结构、cookie jar、多账号增删加密、登录→签到全流程、已签/失败/验证码分支、多账号汇总、北京日期），冒烟脚本加弹窗与看板两条真实 Electron 交互链（加号→脱敏→删除、模态开关）。测试 45 → **53** 个。
 - 口径更新：README 首页「不联网」改为「用量统计仍只读本地；签到功能会联网访问 ablesci.com」。
 

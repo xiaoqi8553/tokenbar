@@ -19,7 +19,7 @@ function fakeJwt(payload) {
 }
 
 /** 搭一个假的 CODEX_HOME：一个当前账号 + 一个多账号目录 */
-function fakeCodexHome({ activeEmail = "xiaoqi8553@gmail.com", expired = false } = {}) {
+function fakeCodexHome({ activeEmail = "alice@example.com", expired = false } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "codex-auth-"));
   const exp = Math.floor(Date.now() / 1000) + (expired ? -100 : 3600);
   const active = {
@@ -91,7 +91,7 @@ test("2.5.0 真实 wham/usage 响应：rate_limit.primary_window / reset_at / li
   const REAL = {
     user_id: "user-xxx",
     account_id: "acct-active",
-    email: "xiaoqi8553@gmail.com",
+    email: "alice@example.com",
     plan_type: "plus",
     rate_limit: {
       allowed: true,
@@ -104,7 +104,7 @@ test("2.5.0 真实 wham/usage 响应：rate_limit.primary_window / reset_at / li
   };
   const q = normalizeQuota(extractRateLimits(REAL), "2026-11-23T03:00:00.000Z");
   assert.equal(q.planType, "plus");
-  assert.equal(q.email, "xi***@gmail.com");
+  assert.equal(q.email, "al***@example.com");
   assert.equal(q.session.usedPercent, 56);
   assert.equal(q.session.windowMinutes, 300); // 18000 秒 → 300 分钟
   assert.equal(q.session.resetsAt, 1795415840); // reset_at 单数也要认
@@ -118,7 +118,7 @@ test("isTokenExpired / jwtClaim / maskEmail", () => {
   assert.equal(isTokenExpired({ tokens: { access_token: fakeJwt({ exp: now + 3600 }) } }), false);
   assert.equal(isTokenExpired({ tokens: { access_token: fakeJwt({ exp: now - 10 }) } }), true);
   assert.equal(jwtClaim(fakeJwt({ email: "a@b.com" }), "email"), "a@b.com");
-  assert.equal(maskEmail("xiaoqi8553@gmail.com"), "xi***@gmail.com");
+  assert.equal(maskEmail("alice@example.com"), "al***@example.com");
 });
 
 test("discover/list 找到全部 chatgpt 账号并脱敏，token 不外泄", () => {
@@ -127,7 +127,7 @@ test("discover/list 找到全部 chatgpt 账号并脱敏，token 不外泄", () 
   const list = store.list();
   assert.equal(list.accounts.length, 2); // 当前 + XQ_acc 里的 trevor，不含 apikey
   assert.equal(list.accounts[0].isActive, true);
-  assert.equal(list.accounts[0].email, "xi***@gmail.com");
+  assert.equal(list.accounts[0].email, "al***@example.com");
   assert.equal(list.activeId, path.join(home, "auth.json"));
   const serialized = JSON.stringify(list);
   assert.ok(!serialized.includes("refresh-active"), "不能包含 refresh_token");
@@ -152,7 +152,7 @@ test("fetchQuota 用 access_token 查官方接口，并把实时额度写进缓�
   assert.equal(calls[0].acct, "acct-active");
   assert.equal(result.quota.session.usedPercent, 41);
   assert.equal(result.quota.weekly.usedPercent, 9);
-  assert.equal(result.email, "xi***@gmail.com");
+  assert.equal(result.email, "al***@example.com");
   assert.ok(!JSON.stringify(result).includes("access_token"));
 
   // cachedQuotaFor 给主进程覆盖 status.quota 用
@@ -163,7 +163,7 @@ test("fetchQuota 用 access_token 查官方接口，并把实时额度写进缓�
 test("access_token 过期时用 refresh_token 换新并写回 auth.json", async () => {
   const home = fakeCodexHome({ expired: true });
   const authFile = path.join(home, "auth.json");
-  const newToken = fakeJwt({ email: "xiaoqi8553@gmail.com", exp: Math.floor(Date.now() / 1000) + 7200 });
+  const newToken = fakeJwt({ email: "alice@example.com", exp: Math.floor(Date.now() / 1000) + 7200 });
   const calls = [];
   const store = createCodexAuthStore({
     codexHome: home,
@@ -209,4 +209,124 @@ test("activeQuota 30 秒内复用缓存，不重复打接口", async () => {
   assert.equal(count, 1);
   await store.activeQuota({ force: true });
   assert.equal(count, 2);
+});
+
+// ---------------------------------------------------------------------------
+// 2.6.0 OAuth Device Code 授权（CC Switch / Codex CLI 同款）
+// ---------------------------------------------------------------------------
+
+/** 按 URL 分派的假 fetch，记录每次请求便于断言端点与字段 */
+function fakeDeviceFetch() {
+  const calls = [];
+  const idToken = fakeJwt({
+    email: "bob@example.net",
+    chatgpt_account_id: "acct-oauth",
+    exp: Math.floor(Date.now() / 1000) + 3600
+  });
+  const fetch = async (url, opts) => {
+    calls.push({ url, opts });
+    if (url.includes("/deviceauth/usercode")) {
+      return okResponse({
+        device_auth_id: "deviceauth_abc",
+        user_code: "ABCD-EFGH",
+        interval: "5",
+        expires_at: new Date(Date.now() + 15 * 60_000).toISOString()
+      });
+    }
+    if (url.includes("/deviceauth/token")) {
+      return okResponse({
+        authorization_code: "auth-code-1",
+        code_verifier: "verifier-1",
+        code_challenge: "challenge-1"
+      });
+    }
+    if (url.includes("/oauth/token")) {
+      return okResponse({
+        access_token: fakeJwt({ email: "bob@example.net", exp: Math.floor(Date.now() / 1000) + 3600 }),
+        refresh_token: "refresh-oauth",
+        id_token: idToken
+      });
+    }
+    if (url.includes("wham/usage")) return okResponse(USAGE_BODY);
+    return { ok: false, status: 599, json: async () => ({}) };
+  };
+  return { fetch, calls };
+}
+
+test("2.6.0 设备码授权：申请配对码只回可展示字段，device_auth_id 不外泄", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "codex-device-"));
+  const { fetch, calls } = fakeDeviceFetch();
+  const store = createCodexAuthStore({ codexHome: home, fetch });
+  const started = await store.startDeviceAuth();
+
+  assert.equal(calls[0].url, "https://auth.openai.com/api/accounts/deviceauth/usercode");
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { client_id: "app_EMoamEEZ73f0CkXaXp7hrann" });
+  assert.equal(started.userCode, "ABCD-EFGH");
+  assert.equal(started.verifyUrl, "https://auth.openai.com/codex/device");
+  const serialized = JSON.stringify(started);
+  assert.ok(!serialized.includes("deviceauth_abc"), "device_auth_id 绝不能出数据层");
+  assert.ok(!serialized.includes("access_token"));
+});
+
+test("2.6.0 pending 状态：用户还没在浏览器授权时返回 pending，不落盘", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "codex-device-"));
+  const startedFetch = fakeDeviceFetch();
+  const store = createCodexAuthStore({ codexHome: home, fetch: startedFetch.fetch });
+  const { sessionId } = await store.startDeviceAuth();
+  const result = await store.pollDeviceAuth(sessionId, {
+    fetch: async () => ({ ok: false, status: 403, json: async () => ({}) })
+  });
+  assert.equal(result.status, "pending");
+  assert.ok(!fs.existsSync(path.join(home, "XQ_acc", "bob@example.net", "auth.json")));
+});
+
+test("2.6.0 授权成功：换 token → 本机落盘 → 脱敏邮箱与额度，token 不出结果", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "codex-device-"));
+  const { fetch, calls } = fakeDeviceFetch();
+  const store = createCodexAuthStore({ codexHome: home, fetch });
+  const { sessionId } = await store.startDeviceAuth();
+  const result = await store.pollDeviceAuth(sessionId);
+
+  assert.equal(result.status, "success");
+  assert.equal(result.email, "bo***@example.net");
+  assert.equal(result.accountId, "acct-oauth");
+  assert.equal(result.quota.session.usedPercent, 41);
+
+  // 端点与表单字段
+  const pollCall = calls.find(c => c.url.includes("/deviceauth/token"));
+  assert.deepEqual(JSON.parse(pollCall.opts.body), {
+    device_auth_id: "deviceauth_abc",
+    user_code: "ABCD-EFGH"
+  });
+  const exchange = calls.find(c => c.url.includes("/oauth/token"));
+  const form = new URLSearchParams(exchange.opts.body);
+  assert.equal(form.get("grant_type"), "authorization_code");
+  assert.equal(form.get("code"), "auth-code-1");
+  assert.equal(form.get("code_verifier"), "verifier-1");
+  assert.equal(form.get("redirect_uri"), "https://auth.openai.com/deviceauth/callback");
+
+  // 落盘文件：与 Codex auth.json 同构，且不动当前激活文件
+  const saved = JSON.parse(fs.readFileSync(path.join(home, "XQ_acc", "bob@example.net", "auth.json"), "utf8"));
+  assert.equal(saved.auth_mode, "chatgpt");
+  assert.equal(saved.tokens.refresh_token, "refresh-oauth");
+  assert.equal(saved.tokens.account_id, "acct-oauth");
+  assert.ok(!fs.existsSync(path.join(home, "auth.json")), "不能覆盖当前激活的 auth.json");
+
+  const serialized = JSON.stringify(result);
+  assert.ok(!serialized.includes("refresh-oauth"), "refresh_token 不能出现在返回值");
+  assert.ok(!serialized.includes("access_token"));
+
+  // 新账号能被 discover() 找到
+  assert.ok(store.discover().some(a => a.email === "bob@example.net"));
+});
+
+test("2.6.0 会话取消与过期", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "codex-device-"));
+  const { fetch } = fakeDeviceFetch();
+  const store = createCodexAuthStore({ codexHome: home, fetch });
+  const { sessionId } = await store.startDeviceAuth();
+  assert.ok(store.deviceStatus(sessionId));
+  assert.equal(store.cancelDeviceAuth(sessionId), true);
+  assert.equal(store.deviceStatus(sessionId), null);
+  await assert.rejects(() => store.pollDeviceAuth(sessionId), /会话不存在/);
 });
