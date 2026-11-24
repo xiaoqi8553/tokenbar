@@ -1,3 +1,13 @@
+'use strict';
+
+/**
+ * TokenBar Desktop 主进程门面（W3 3.0 深度重构）。
+ * 职责：装配 ctx（可变状态 + 函数引用）、启动编排、app 事件。
+ * 业务逻辑全部在 desktop/core/** 模块，模块内部通过 ctx.xxx(ctx, ...) 互相调用
+ * （闭包 late-binding，无循环依赖问题）。所有 IPC channel / 窗口安全配置 /
+ * userData 路径与数据格式 / 截图诊断环境变量钩子均保持零行为变化。
+ */
+
 const { app, BrowserWindow, Menu, Tray, shell, ipcMain, screen, nativeImage, safeStorage, Notification } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -10,54 +20,85 @@ const { buildBaseline, baselineIsFresh, loadBaseline, saveBaseline } = require("
 const { createAbleSciStore } = require("./data/ablesci-store.cjs");
 const { createCodexAuthStore } = require("./data/codex-auth-store.cjs");
 
+const C = require("./core/constants.cjs");
+const { logger: baseLogger, createLogger } = require("./core/logger.cjs");
+const { installErrorBoundary } = require("./core/error-boundary.cjs");
+const { installPaths } = require("./core/paths.cjs");
+const { installPrefs } = require("./core/prefs.cjs");
+const { installWindows } = require("./core/windows.cjs");
+const { installTray } = require("./core/tray.cjs");
+const { installPopoverIpc } = require("./core/ipc/popover.cjs");
+const { installDashboardIpc } = require("./core/ipc/dashboard.cjs");
+const { installAuthIpc } = require("./core/ipc/auth.cjs");
+const { installStores } = require("./core/stores.cjs");
+const { installShotDiagnostics } = require("./core/diagnostics.cjs");
+
 const PRODUCT_NAME = "TokenBar";
 const APP_ROOT = app.getAppPath();
 const SMOKE = process.env.CODEX_TOKEN_DASHBOARD_SMOKE === "1";
 const gotLock = SMOKE || app.requestSingleInstanceLock();
 
+/** ctx：普通对象，既放全部可变状态，也放所有函数引用。 */
+const ctx = {
+  // 依赖注入
+  app, BrowserWindow, Menu, Tray, shell, ipcMain, screen, nativeImage, safeStorage, Notification,
+  fs, os, path, crypto,
+  CodexStore, WorkBuddyStore,
+  // 计价数据入口已移除，但单价数据仍由 loadTable(paths.pricing) 装载（见 core/stores.cjs）。
+  loadTable: p => loadTable(p),
+  ensureTableFile,
+  buildBaseline, baselineIsFresh, loadBaseline, saveBaseline,
+  createAbleSciStore, createCodexAuthStore,
+  PRODUCT_NAME, APP_ROOT, SMOKE,
+  DESKTOP_DIR: path.join(APP_ROOT, "desktop"),
+
+  // 可变状态
+  mainWindow: null,
+  popover: null,
+  popoverReady: false,
+  trayMenu: null,
+  tray: null,
+  /** 关窗口默认只是隐藏，退出时才允许真关 */
+  allowWindowClose: false,
+  quitting: false,
+  latestStatus: null,
+  startupError: "",
+  statusTimer: null,
+  smokeExitTimer: null,
+  preferences: { launchAtLogin: false, startMode: "popover", popoverOnly: true },
+  store: null,
+  wbStore: null,
+  ablesciStore: null,
+  codexAuthStore: null,
+  /** 启动诊断日志的落盘位置，start() 阶段才确定 */
+  logFile: null,
+  logger: baseLogger
+};
+// 手写 log() 改为委托 logger：启动早期只走 stdout，目录就绪后切换为文件日志（自动脱敏）。
+ctx.log = (c, message) => c.logger.info(message);
+
+// 尽早安装全局错误边界（幂等；模块设计不主动退出进程，Electron 保持存活）。
+installErrorBoundary({ onFatal: payload => ctx.log(ctx, `[fatal:${payload.type}]`) });
+
+// 按依赖顺序装配；函数体通过 ctx 引用，安装顺序不影响相互调用。
+// WorkBuddy 国际版 ~/.workbuddy-ai 与国内版 ~/.workbuddy 的双根探测见 core/paths.cjs 的 workBuddyRoots。
+installPaths(ctx);
+installPrefs(ctx);
+installWindows(ctx);
+installTray(ctx);
+installPopoverIpc(ctx);
+installDashboardIpc(ctx);
+installAuthIpc(ctx);
+installStores(ctx);
+
 /**
  * 改名 TokenBar 后，userData 会从 %APPDATA%/Codex Token 变成 %APPDATA%/TokenBar。
  * 历史索引（usage-index.json，5.7B 的基线）还在旧目录，直接换名会让累计掉回磁盘日志的 2.4B，
  * 所以首次启动把旧目录整份搬过来。搬不动（占用/权限）就继续用旧目录，宁可名字不对也不能丢账。
+ * 搬迁逻辑逐字保留在 core/paths.cjs。
  */
-function adoptLegacyUserData() {
-  // 开发模式取 package.json 的 name（tokenbar），打包后取 productName（TokenBar），
-  // 大小写两套目录会让缓存各存一份，这里统一钉死。
-  try {
-    // 外部显式指定 --user-data-dir（冒烟、排查）时不覆盖，别把测试数据写进真账本
-    if (!process.argv.some(arg => arg.startsWith("--user-data-dir"))) {
-      app.setPath("userData", path.join(app.getPath("appData"), "TokenBar"));
-    }
-  } catch {
-    /* 极早期调用失败就沿用默认路径 */
-  }
-  const appData = app.getPath("appData");
-  let current;
-  try {
-    current = app.getPath("userData");
-  } catch {
-    return;
-  }
-  // 注意不能只看「目录是否为空」：requestSingleInstanceLock() 已经在 userData 下写了
-  // SingletonLock，目录永远非空。只认真正的账本文件。
-  const hasPayload = dir => fs.existsSync(path.join(dir, "data", "usage-index.json"))
-    || fs.existsSync(path.join(dir, "data", "history-baseline.json"));
-  if (hasPayload(current)) return;
-  for (const name of ["Codex Token", "codex-token-dashboard"]) {
-    const legacy = path.join(appData, name);
-    if (legacy === current || !fs.existsSync(legacy)) continue;
-    try {
-      fs.mkdirSync(current, { recursive: true });
-      fs.cpSync(legacy, current, { recursive: true, force: false, errorOnExist: false });
-      return;
-    } catch {
-      /* 复制失败就往下走，后续扫描会重建缓存（慢一点，但不影响正确性） */
-    }
-  }
-}
-
 // 只有拿到单实例锁才搬数据，避免两个实例同时读同一个索引；冒烟测试不碰真实账本
-if (gotLock && !SMOKE) adoptLegacyUserData();
+if (gotLock && !SMOKE) ctx.adoptLegacyUserData(ctx);
 
 // 启动诊断：设置 CODEX_TOKEN_BOOT_MARK 可确认主进程脚本是否真的被执行
 if (process.env.CODEX_TOKEN_BOOT_MARK) {
@@ -68,972 +109,112 @@ if (process.env.CODEX_TOKEN_BOOT_MARK) {
   }
 }
 
+// 托盘状态刷新入口：实现保留在门面（源码守门测试直接读取函数体），
+// 其余托盘 / push 逻辑在 core/tray.cjs，通过 ctx 互相调用。
+function attachWorkBuddySummary() {
+  return ctx.attachWorkBuddySummary(ctx);
+}
+async function refreshTrayStatus(force = false) {
+  if (!ctx.store) return;
+  // 实时额度走独立节奏：store 内部有 30 秒节流，失败也只是留旧值
+  ctx.refreshLiveQuota(ctx).catch(() => {});
+  // WorkBuddy 是第二个数据源：build() 自带 _promise 防并发，只重扫 size/mtime
+  // 变过的文件；放进 30 秒轮询不会重复劳动，且不阻塞托盘/弹窗的 Codex 刷新。
+  const wbStore = ctx.wbStore;
+  if (wbStore) {
+    wbStore.build()
+      .then(() => attachWorkBuddySummary())
+      .catch(error => ctx.log(ctx, `workbuddy refresh failed: ${error.message}`));
+  }
+  try {
+    ctx.latestStatus = await ctx.store.refresh({ full: false });
+    ctx.startupError = "";
+  } catch (error) {
+    ctx.startupError = `读取用量失败：${error.message}`;
+  }
+  // 快照是全新的对象，WorkBuddy 摘要要重新挂上
+  if (ctx.latestStatus && wbStore) {
+    try {
+      ctx.latestStatus.workbuddy = wbStore.summary();
+    } catch {
+      /* 摘要失败不影响主数据 */
+    }
+  }
+  ctx.attachLiveQuota(ctx);
+  ctx.updateTray(ctx);
+  ctx.pushStatusToPopover(ctx);
+  }
+// 模块内统一通过 ctx.refreshTrayStatus(ctx, force) 调用；上面的门面函数适配成 (c, force)。
+ctx.refreshTrayStatus = (c, force) => refreshTrayStatus(force);
+
+async function start(ctx) {
+  const paths = ctx.userDataPaths(ctx);
+  ctx.migrateUserData(ctx, paths);
+  // 目录就绪后再挂日志，否则首次启动会写不进去
+  ctx.logFile = path.join(paths.logs, C.LOG_FILE_NAME);
+  ctx.logger = createLogger({ file: ctx.logFile, console: false });
+  ctx.log(ctx, `start v${ctx.app.getVersion()} | smoke=${ctx.SMOKE} | packaged=${ctx.app.isPackaged} | execPath=${process.execPath}`);
+  ctx.loadPreferences(ctx, paths);
+  ctx.registerPopoverHandlers(ctx);
+  ctx.registerDashboardHandlers(ctx);
+  ctx.registerCodexAuthHandlers(ctx);
+  ctx.log(ctx, "creating popover");
+  ctx.createPopover(ctx);
+  ctx.log(ctx, "creating tray");
+  ctx.createTray(ctx);
+  // 完整看板窗口延后创建：弹窗是主入口，不需要先起一个大窗口
+  if (ctx.preferences.startMode === "dashboard" && !ctx.SMOKE) ctx.createWindow(ctx);
+
+  ctx.initStore(ctx, paths, ctx.resolveBaseline(ctx, paths)).catch(error => {
+    ctx.log(ctx, `initStore failed: ${error.stack || error.message}`);
+    ctx.startupError = `用量数据初始化失败：${error.message}`;
+    ctx.updateTray(ctx);
+    ctx.pushStatusToPopover(ctx);
+  });
+
+  if (ctx.preferences.startMode === "dashboard" && !ctx.SMOKE) {
+    ctx.showWindow(ctx).catch(() => {});
+  } else {
+    ctx.showPopover(ctx);
+  }
+
+  ctx.statusTimer = setInterval(() => { refreshTrayStatus().catch(() => {}); }, C.POLL_INTERVAL_MS);
+
+  // Dev 截图诊断：环境变量钩子逐字搬迁到 core/diagnostics.cjs
+  installShotDiagnostics(ctx);
+
+  if (ctx.SMOKE) {
+    // 冒烟脚本自己控制节奏，超时可从外面传
+    const smokeTimeout = Number(process.env.CODEX_TOKEN_DASHBOARD_SMOKE_TIMEOUT)
+      || (process.env.CODEX_TOKEN_DASHBOARD_SHOT ? C.SMOKE_TIMEOUT_WITH_SHOT_MS : C.SMOKE_TIMEOUT_DEFAULT_MS);
+    ctx.smokeExitTimer = setTimeout(() => {
+      process.stdout.write("Desktop smoke lifecycle check complete; quitting.\n");
+      ctx.app.quit();
+    }, smokeTimeout);
+  }
+}
+
 if (!gotLock) {
   app.quit();
 } else {
-  let mainWindow;
-  let popover;
-  let popoverReady = false;
-  let trayMenu;
-  let tray;
-  /** 关窗口默认只是隐藏，退出时才允许真关 */
-  let allowWindowClose = false;
-  let quitting = false;
-  let latestStatus = null;
-  let startupError = "";
-  let statusTimer;
-  let smokeExitTimer;
-  let preferences = { launchAtLogin: false, startMode: "popover", popoverOnly: true };
-  /** @type {CodexStore|null} 独立数据层：直接读 ~/.codex/sessions，不经过本地 HTTP 服务 */
-  let store = null;
-  /** @type {WorkBuddyStore|null} WorkBuddy 用量：国际版 ~/.workbuddy-ai、国内版 ~/.workbuddy */
-  let wbStore = null;
-  /** @type {ReturnType<createAbleSciStore>|null} 科研通签到（多账号 + 本地加密凭证） */
-  let ablesciStore = null;
-  /** @type {ReturnType<createCodexAuthStore>|null} 复用本机 Codex 授权取实时额度 */
-  let codexAuthStore = null;
-  /** 启动诊断日志的落盘位置，start() 阶段才确定 */
-  let logFile = null;
-
-  function log(message) {
-    const line = `[${new Date().toISOString()}] ${message}\n`;
-    try {
-      if (logFile) {
-        fs.appendFileSync(logFile, line);
-        return;
-      }
-    } catch {
-      /* 落盘失败时退回到标准输出 */
-    }
-    try {
-      process.stdout.write(line);
-    } catch {
-      /* 忽略 */
-    }
-  }
-
   app.setName(PRODUCT_NAME);
   if (process.platform === "win32") app.setAppUserModelId("com.xiaoqi.tokenbar");
 
-  function userDataPaths() {
-    const userData = app.getPath("userData");
-    return {
-      userData,
-      data: path.join(userData, "data"),
-      logs: path.join(userData, "logs"),
-      config: path.join(userData, "config.json"),
-      preferences: path.join(userData, "preferences.json"),
-      usageCache: path.join(userData, "data", "codex-usage-cache.json"),
-      detailCache: path.join(userData, "data", "codex-detail-cache.json"),
-      usageIndex: path.join(userData, "data", "usage-index.json"),
-      baseline: path.join(userData, "data", "history-baseline.json"),
-      workbuddyCache: path.join(userData, "data", "workbuddy-detail-cache.json"),
-      pricing: path.join(userData, "data", "pricing.json"),
-      ablesciAccounts: path.join(userData, "data", "ablesci-accounts.json"),
-      ablesciState: path.join(userData, "data", "ablesci-state.json"),
-      codexHiddenAccounts: path.join(userData, "data", "codex-hidden-accounts.json")
-    };
-  }
-
-  /**
-   * 科研通账号密码的加密器：优先 Electron safeStorage（Windows DPAPI / macOS Keychain），
-   * 不可用时退回本机派生的 AES-256-GCM（至少不明文落盘）。加密结果统一 base64 字符串存储。
-   */
-  function makeCipher() {
-    let backend = "safeStorage";
-    let available = false;
-    try { available = Boolean(safeStorage && safeStorage.isEncryptionAvailable()); } catch { available = false; }
-    if (available) {
-      return {
-        backend,
-        encrypt(text) { return safeStorage.encryptString(String(text)).toString("base64"); },
-        decrypt(stored) { return safeStorage.decryptString(Buffer.from(String(stored), "base64")); }
-      };
-    }
-    backend = "local-aes-gcm";
-    log(`safeStorage 不可用，科研通凭证使用本机派生密钥加密 (${backend})`);
-    const key = crypto.createHash("sha256")
-      .update("tokenbar.ablesci.v1|" + app.getPath("userData") + "|" + os.hostname())
-      .digest();
-    return {
-      backend,
-      encrypt(text) {
-        const iv = crypto.randomBytes(12);
-        const c = crypto.createCipheriv("aes-256-gcm", key, iv);
-        const enc = Buffer.concat([c.update(String(text), "utf8"), c.final()]);
-        return "gcm:" + Buffer.concat([iv, c.getAuthTag(), enc]).toString("base64");
-      },
-      decrypt(stored) {
-        const raw = Buffer.from(String(stored).replace(/^gcm:/, ""), "base64");
-        const iv = raw.subarray(0, 12);
-        const tag = raw.subarray(12, 28);
-        const enc = raw.subarray(28);
-        const d = crypto.createDecipheriv("aes-256-gcm", key, iv);
-        d.setAuthTag(tag);
-        return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
-      }
-    };
-  }
-
-  function sessionsDir() {
-    return process.env.CODEX_HOME
-      ? path.join(process.env.CODEX_HOME, "sessions")
-      : path.join(os.homedir(), ".codex", "sessions");
-  }
-
-  /**
-   * WorkBuddy 有两套安装，日志目录不同：
-   *   国际版 ~/.workbuddy-ai/projects，国内版 ~/.workbuddy/projects。
-   * 两个都读，同名会话按体积取大者（见 WorkBuddyStore.listFiles）。
-   */
-  function workBuddyRoots() {
-    const home = os.homedir();
-    const candidates = [
-      process.env.WORKBUDDY_HOME,
-      path.join(home, ".workbuddy-ai"),
-      path.join(home, ".workbuddy")
-    ].filter(Boolean);
-    const existing = candidates.filter(root => fs.existsSync(path.join(root, "projects")));
-    return existing.length ? existing : [path.join(home, ".workbuddy")];
-  }
-
-  function migrateUserData(paths) {
-    fs.mkdirSync(paths.data, { recursive: true });
-    fs.mkdirSync(paths.logs, { recursive: true });
-  }
-
-  function loadPreferences(paths) {
-    try {
-      preferences = { ...preferences, ...JSON.parse(fs.readFileSync(paths.preferences, "utf8")) };
-    } catch {
-      // First launch or an older preferences file.
-    }
-    if (process.platform === "win32") {
-      app.setLoginItemSettings({ openAtLogin: Boolean(preferences.launchAtLogin), path: process.execPath });
-    }
-  }
-
-  function savePreferences(paths) {
-    fs.writeFileSync(paths.preferences, JSON.stringify(preferences, null, 2), "utf8");
-  }
-
-  // ---------------------------------------------------------------------
-  // 完整看板窗口
-  // ---------------------------------------------------------------------
-
-  function loadingPage(message = "正在载入完整看板…") {
-    const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${PRODUCT_NAME}</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f5f9;color:#172235;font:14px/1.6 "Segoe UI",sans-serif}.card{width:min(460px,calc(100vw - 40px));padding:32px;border:1px solid #d9e1eb;border-radius:18px;background:#fff;box-shadow:0 20px 70px #20395a18}.mark{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;background:#172235;color:#fff;font-weight:700;font-size:19px}.title{margin:22px 0 4px;font-size:24px}.muted{color:#64748b}.bar{height:5px;margin-top:22px;border-radius:8px;background:linear-gradient(90deg,#2a61dd 0 38%,#e8edf5 38%);animation:move 1.4s ease-in-out infinite alternate}@keyframes move{to{background:linear-gradient(90deg,#e8edf5 0 40%,#2a61dd 40% 76%,#e8edf5 76%)}}</style><section class="card"><div class="mark">&gt;_</div><h1 class="title">${PRODUCT_NAME}</h1><div class="muted">${message}</div><div class="bar"></div></section>`;
-    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-  }
-
-  /**
-   * 完整看板窗口：直接加载本地 dashboard.html，由 preload 从 CodexStore 取数，
-   * 不经过 server.js / index.html。
-   */
-  function createWindow() {
-    if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
-
-    mainWindow = new BrowserWindow({
-      width: 1180,
-      height: 860,
-      minWidth: 820,
-      minHeight: 620,
-      show: false,
-      title: `${PRODUCT_NAME} · 用量看板`,
-      backgroundColor: "#f3f4f7",
-      autoHideMenuBar: true,
-      webPreferences: {
-        preload: path.join(__dirname, "dashboard-preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        webSecurity: true
-      }
-    });
-
-    mainWindow.loadFile(path.join(__dirname, "dashboard.html"));
-    mainWindow.once("ready-to-show", () => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
-    });
-    mainWindow.on("close", event => {
-      if (allowWindowClose || quitting) return;
-      event.preventDefault();
-      mainWindow.hide();
-    });
-    mainWindow.on("closed", () => {
-      mainWindow = null;
-    });
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https:\/\//i.test(url)) shell.openExternal(url);
-      return { action: "deny" };
-    });
-    return mainWindow;
-  }
-
-  // ---------------------------------------------------------------------
-  // 托盘弹窗：不依赖本地服务，数据直接来自 CodexStore
-  // ---------------------------------------------------------------------
-  const POPOVER_WIDTH = 396;
-  const POPOVER_HEIGHT = 640;
-
-  function createPopover() {
-    popover = new BrowserWindow({
-      width: POPOVER_WIDTH,
-      height: POPOVER_HEIGHT,
-      show: false,
-      frame: false,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      skipTaskbar: true,
-      alwaysOnTop: true,
-      transparent: true,
-      hasShadow: true,
-      backgroundColor: "#00000000",
-      roundedCorners: true,
-      title: PRODUCT_NAME,
-      webPreferences: {
-        preload: path.join(__dirname, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        webSecurity: true
-      }
-    });
-
-    popover.loadFile(path.join(__dirname, "popover.html"));
-    popover.webContents.once("did-finish-load", () => {
-      popoverReady = true;
-      pushStatusToPopover();
-    });
-    popover.on("blur", () => {
-      if (popover && !popover.isDestroyed() && popover.isVisible()) hidePopover();
-    });
-    popover.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https:\/\//i.test(url)) shell.openExternal(url);
-      return { action: "deny" };
-    });
-  }
-
-  function popoverPosition(height = POPOVER_HEIGHT) {
-    const trayBounds = tray && typeof tray.getBounds === "function" ? tray.getBounds() : { x: 0, y: 0, width: 0, height: 0 };
-    const anchor = trayBounds.width || trayBounds.height
-      ? { x: Math.round(trayBounds.x + trayBounds.width / 2), y: Math.round(trayBounds.y + trayBounds.height / 2) }
-      : { x: screen.getPrimaryDisplay().workArea.x + screen.getPrimaryDisplay().workArea.width, y: screen.getPrimaryDisplay().workArea.y + screen.getPrimaryDisplay().workArea.height };
-    const area = screen.getDisplayNearestPoint(anchor).workArea;
-
-    let x = Math.round(anchor.x - POPOVER_WIDTH / 2);
-    let y;
-    if (trayBounds.width && trayBounds.y > area.y + area.height / 2) {
-      y = Math.round(trayBounds.y - height - 6);
-    } else if (trayBounds.width) {
-      y = Math.round(trayBounds.y + trayBounds.height + 6);
-    } else {
-      y = area.y + area.height - height - 10;
-      x = area.x + area.width - POPOVER_WIDTH - 10;
-    }
-
-    x = Math.min(Math.max(x, area.x + 8), area.x + area.width - POPOVER_WIDTH - 8);
-    y = Math.min(Math.max(y, area.y + 8), area.y + area.height - height - 8);
-    return { x, y, width: POPOVER_WIDTH, height };
-  }
-
-  function showPopover() {
-    if (!popover || popover.isDestroyed()) return;
-    const bounds = popover.getBounds();
-    popover.setBounds(popoverPosition(bounds.height));
-    popover.showInactive();
-    popover.focus();
-    pushStatusToPopover();
-    refreshTrayStatus().catch(() => {});
-  }
-
-  function hidePopover() {
-    if (!popover || popover.isDestroyed()) return;
-    if (popover.isVisible()) popover.hide();
-  }
-
-  function togglePopover() {
-    if (!popover || popover.isDestroyed()) return;
-    if (popover.isVisible()) hidePopover();
-    else showPopover();
-  }
-
-  function pushStatusToPopover() {
-    if (!popover || popover.isDestroyed() || !popoverReady) return;
-    popover.webContents.send("popover:status", latestStatus || { ok: false, phase: store ? store.phase : "idle" });
-  }
-
-  /** 科研通状态变了，让打开的弹窗重新拉一次签到状态 */
-  function pushAbleSciChanged() {
-    if (!popover || popover.isDestroyed() || !popoverReady) return;
-    popover.webContents.send("ablesci:changed");
-  }
-
-  function registerPopoverHandlers() {
-    ipcMain.handle("popover:refresh", async () => {
-      await refreshTrayStatus(true);
-      return latestStatus;
-    });
-    ipcMain.handle("popover:open-dashboard", async () => {
-      hidePopover();
-      await showWindow();
-      return true;
-    });
-    ipcMain.handle("popover:close", () => {
-      hidePopover();
-      return true;
-    });
-    ipcMain.handle("popover:quit", () => {
-      app.quit();
-      return true;
-    });
-    ipcMain.handle("popover:open-status-page", () => {
-      shell.openExternal("https://status.openai.com/");
-      return true;
-    });
-    ipcMain.handle("popover:prefs", () => ({
-      launchAtLogin: Boolean(preferences.launchAtLogin),
-      startMode: preferences.startMode
-    }));
-    ipcMain.on("popover:set-height", (_event, requested) => {
-      if (!popover || popover.isDestroyed()) return;
-      const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-      const maxHeight = Math.max(320, area.height - 32);
-      const nextHeight = Math.min(Math.max(Math.round(requested), 320), maxHeight);
-      const bounds = popover.getBounds();
-      if (!nextHeight || Math.abs(bounds.height - nextHeight) < 2) return;
-      // Keep the panel bottom-anchored above the tray icon while it grows.
-      const nextY = Math.min(
-        Math.max(bounds.y + bounds.height - nextHeight, area.y + 8),
-        area.y + area.height - nextHeight - 8
-      );
-      popover.setBounds({ x: bounds.x, y: nextY, width: bounds.width, height: nextHeight });
-    });
-    ipcMain.handle("popover:set-launch-at-login", (_event, enabled) => {
-      preferences.launchAtLogin = Boolean(enabled);
-      savePreferences(userDataPaths());
-      if (process.platform === "win32") app.setLoginItemSettings({ openAtLogin: Boolean(enabled), path: process.execPath });
-      updateTray();
-      return { launchAtLogin: preferences.launchAtLogin };
-    });
-
-    // ---- 科研通签到（弹窗与完整看板共用） ----
-    ipcMain.handle("ablesci:list", () => {
-      if (!ablesciStore) return { accounts: [], today: "" };
-      try { return ablesciStore.list(); } catch (e) { return { accounts: [], today: "", error: e.message }; }
-    });
-    ipcMain.handle("ablesci:add", (_event, email, password) => {
-      if (!ablesciStore) throw new Error("签到模块尚未就绪");
-      return ablesciStore.addAccount(email, password);
-    });
-    ipcMain.handle("ablesci:remove", (_event, id) => {
-      if (!ablesciStore) throw new Error("签到模块尚未就绪");
-      return ablesciStore.removeAccount(id);
-    });
-    ipcMain.handle("ablesci:sign", async () => {
-      if (!ablesciStore) throw new Error("签到模块尚未就绪");
-      const result = await ablesciStore.sign();
-      log(`ablesci sign: ${result.summary}`);
-      return result;
-    });
-    ipcMain.handle("ablesci:open-site", () => {
-      shell.openExternal("https://www.ablesci.com/");
-      return true;
-    });
-  }
-
-  // ---------------------------------------------------------------------
-  // 完整看板（本地数据，无 HTTP 服务）
-  // ---------------------------------------------------------------------
-
-  function pushDetailProgress(progress) {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.webContents.send("dashboard:progress", progress);
-  }
-
-  /** 把 WorkBuddy 的当日/累计摘要挂到最新快照上，弹窗与托盘共用 */
-  function attachWorkBuddySummary() {
-    if (!wbStore || !latestStatus) return;
-    try {
-      latestStatus.workbuddy = wbStore.summary();
-    } catch {
-      return;
-    }
-    updateTray();
-    pushStatusToPopover();
-  }
-
-  function registerDashboardHandlers() {
-    ipcMain.handle("dashboard:status", () => latestStatus || (store ? store.snapshot() : null));
-
-    ipcMain.handle("dashboard:get-detail", async () => {
-      if (!store) throw new Error("用量数据层尚未初始化，请稍候重试");
-      const detail = await store.buildDetail({ onProgress: pushDetailProgress });
-      latestStatus = store.snapshot();
-      // 新快照是干净的：WorkBuddy 摘要与实时额度都要重新挂上
-      attachWorkBuddySummary();
-      attachLiveQuota();
-      updateTray();
-      pushStatusToPopover();
-      return detail;
-    });
-
-    ipcMain.handle("dashboard:refresh", async () => {
-      if (!store) throw new Error("用量数据层尚未初始化，请稍候重试");
-      await store.refresh({ full: true });
-      const detail = await store.buildDetail({ onProgress: pushDetailProgress });
-      latestStatus = store.snapshot();
-      attachWorkBuddySummary();
-      attachLiveQuota();
-      updateTray();
-      pushStatusToPopover();
-      return detail;
-    });
-
-    // WorkBuddy 用量：与 Codex 完全独立的第二个数据源，切到该标签时按需构建
-    ipcMain.handle("dashboard:workbuddy-detail", async () => {
-      if (!wbStore) return null;
-      const detail = await wbStore.build({ onProgress: pushDetailProgress });
-      attachWorkBuddySummary();
-      return detail;
-    });
-
-    ipcMain.handle("dashboard:workbuddy-refresh", async () => {
-      if (!wbStore) return null;
-      const detail = await wbStore.build({ onProgress: pushDetailProgress, force: true });
-      attachWorkBuddySummary();
-      return detail;
-    });
-
-    ipcMain.handle("dashboard:meta", () => ({
-      name: PRODUCT_NAME,
-      version: app.getVersion(),
-      repo: "https://github.com/xiaoqi8553/tokenbar",
-      packaged: app.isPackaged
-    }));
-
-    ipcMain.handle("dashboard:open-sessions", () => shell.openPath(sessionsDir()));
-    ipcMain.handle("dashboard:open-workbuddy", () => {
-      const roots = workBuddyRoots();
-      // 优先打开有数据的那套（国际版在前）
-      const target = roots.find(root => fs.existsSync(path.join(root, "projects"))) || roots[0];
-      return shell.openPath(path.join(target, "projects"));
-    });
-    ipcMain.handle("dashboard:open-external", (_event, url) => {
-      if (typeof url === "string" && /^https:\/\//i.test(url)) shell.openExternal(url);
-      return true;
-    });
-  }
-
-  /**
-   * 实时额度（复用本机 Codex 授权）：弹窗与完整看板共用同一组 handler。
-   * 与科研通签到不同，这里不需要用户再登录——本机 auth.json 已有 token。
-   */
-  function registerCodexAuthHandlers() {
-    ipcMain.handle("codex-auth:list", () => {
-      if (!codexAuthStore) return { accounts: [], codexHome: "", activeId: null };
-      try { return codexAuthStore.list(); }
-      catch (e) { return { accounts: [], codexHome: "", activeId: null, error: e.message }; }
-    });
-    ipcMain.handle("codex-auth:fetch", async (_event, accountId, opts) => {
-      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
-      const result = await codexAuthStore.fetchQuota(accountId, opts || {});
-      // 取到额度后立刻覆盖当前快照，让 5 小时 / 7 天卡片显示实时值
-      applyLiveQuota(result);
-      return result;
-    });
-    ipcMain.handle("codex-auth:active", async (_event, opts) => {
-      if (!codexAuthStore) return null;
-      const result = await codexAuthStore.activeQuota(opts || {});
-      if (result) applyLiveQuota(result);
-      return result;
-    });
-
-    // OAuth Device Code 授权：配对码只在主进程内存里，token 只落本机
-    ipcMain.handle("codex-auth:device-start", async () => {
-      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
-      return codexAuthStore.startDeviceAuth();
-    });
-    ipcMain.handle("codex-auth:device-poll", async (_event, sessionId) => {
-      if (!codexAuthStore) throw new Error("授权模块尚未就绪");
-      return codexAuthStore.pollDeviceAuth(sessionId);
-    });
-    ipcMain.handle("codex-auth:device-status", (_event, sessionId) => {
-      if (!codexAuthStore) return null;
-      return codexAuthStore.deviceStatus(sessionId);
-    });
-    ipcMain.handle("codex-auth:device-cancel", (_event, sessionId) => {
-      if (!codexAuthStore) return false;
-      return codexAuthStore.cancelDeviceAuth(sessionId);
-    });
-
-    // 隐藏 / 恢复账号：只改 TokenBar 自己的清单，不碰本机 auth.json
-    ipcMain.handle("codex-auth:hide", (_event, accountId) => {
-      if (!codexAuthStore) return false;
-      return codexAuthStore.hideAccount(accountId);
-    });
-    ipcMain.handle("codex-auth:unhide", (_event, accountId) => {
-      if (!codexAuthStore) return false;
-      return codexAuthStore.unhideAccount(accountId);
-    });
-  }
-
-  /** 把实时额度挂到 latestStatus.quota，并记录来源，供界面标注「实时」 */
-  function applyLiveQuota(result) {
-    if (!result || !result.quota || !latestStatus) return;
-    latestStatus.quota = { ...result.quota, source: "api", account: result.email, fetchedAt: result.fetchedAt };
-    updateTray();
-    pushStatusToPopover();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("dashboard:status", latestStatus);
-    }
-  }
-
-  /** 后台静默刷新实时额度：失败不影响用量主链路 */
-  async function refreshLiveQuota(force = false) {
-    if (!codexAuthStore) return;
-    try {
-      const result = await codexAuthStore.activeQuota({ force });
-      if (result && result.quota) applyLiveQuota(result);
-    } catch (error) {
-      log(`live quota refresh failed: ${error.message}`);
-    }
-  }
-
-  function formatTokens(value) {
-    const number = Number(value) || 0;
-    if (number >= 1e9) return `${(number / 1e9).toFixed(number >= 1e10 ? 1 : 2).replace(/0+$/, "").replace(/\.$/, "")}B`;
-    if (number >= 1e6) return `${(number / 1e6).toFixed(number >= 1e8 ? 0 : 1).replace(/\.0$/, "")}M`;
-    if (number >= 1e3) return `${(number / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
-    return String(number);
-  }
-
-  /** 托盘右键「科研通签到」：签到后用系统通知反馈结果，不依赖弹窗是否打开 */
-  async function runTraySign() {
-    if (!ablesciStore) return;
-    if (ablesciStore.list().accounts.length === 0) {
-      showPopover();
-      return;
-    }
-    try {
-      const result = await ablesciStore.sign();
-      const detail = (result.results || []).map(r => `${r.masked}：${r.msg}`).join("\n");
-      if (typeof Notification === "function" && Notification.isSupported()) {
-        new Notification({
-          title: result.results && result.results.some(r => !r.ok) ? "科研通签到（部分失败）" : "科研通签到完成",
-          body: (result.summary + "\n" + detail).slice(0, 400),
-          silent: true
-        }).show();
-      }
-      // 同步弹窗里的状态徽标
-      pushAbleSciChanged();
-      log(`tray ablesci sign: ${result.summary}`);
-    } catch (e) {
-      log(`tray ablesci sign failed: ${e.message}`);
-    }
-  }
-
-  function updateTray() {
-    if (!tray) return;
-    const data = latestStatus;
-    const quota = data && data.quota;
-    const tooltip = data
-      ? `TokenBar · 会话 ${quota && quota.session ? Math.round(quota.session.usedPercent) + "%" : "—"} · 今日 ${formatTokens(data.today?.totalTokens)}`
-      : startupError || "TokenBar · 正在读取用量";
-    tray.setToolTip(tooltip.slice(0, 127));
-    trayMenu = Menu.buildFromTemplate([
-      { label: "打开用量速览", click: showPopover },
-      { label: "打开完整看板", click: () => { showWindow(); } },
-      { type: "separator" },
-      { label: quota && quota.session ? `会话额度：${Math.round(quota.session.usedPercent)}% 已用` : "会话额度：暂无数据", enabled: false },
-      { label: quota && quota.weekly ? `每周额度：${Math.round(quota.weekly.usedPercent)}% 已用` : "每周额度：暂无数据", enabled: false },
-      { label: `今日用量：${formatTokens(data?.today?.totalTokens)} tokens`, enabled: false },
-      { label: `累计用量：${formatTokens(data?.totals?.totalTokens)} tokens`, enabled: false },
-      { label: `WorkBuddy 今日：${formatTokens(data?.workbuddy?.today?.totalTokens)} tokens`, enabled: false },
-      { type: "separator" },
-      { label: "立即同步数据", click: () => { refreshTrayStatus(true); } },
-      {
-        label: "科研通签到",
-        click: () => { runTraySign(); }
-      },
-      {
-        label: "登录 Windows 时启动",
-        type: "checkbox",
-        checked: Boolean(preferences.launchAtLogin),
-        click: item => {
-          preferences.launchAtLogin = item.checked;
-          savePreferences(userDataPaths());
-          if (process.platform === "win32") app.setLoginItemSettings({ openAtLogin: item.checked, path: process.execPath });
-          updateTray();
-        }
-      },
-      {
-        label: "启动时打开完整看板",
-        type: "checkbox",
-        checked: preferences.startMode === "dashboard",
-        click: item => {
-          preferences.startMode = item.checked ? "dashboard" : "popover";
-          savePreferences(userDataPaths());
-          updateTray();
-        }
-      },
-      { type: "separator" },
-      { label: "退出 TokenBar", click: () => app.quit() }
-    ]);
-    tray.setContextMenu(null);
-  }
-
-  async function refreshTrayStatus(force = false) {
-    if (!store) return;
-    // 实时额度走独立节奏：store 内部有 30 秒节流，失败也只是留旧值
-    refreshLiveQuota().catch(() => {});
-    // WorkBuddy 是第二个数据源：以前只在启动时 build 一次，之后新会话
-    // 一直不进弹窗/托盘。build() 自带 _promise 防并发，且只重扫 size/mtime
-    // 变过的文件，放进 30 轮询不会重复劳动；不 await，避免拖慢托盘刷新。
-    if (wbStore) {
-      wbStore.build()
-        .then(() => attachWorkBuddySummary())
-        .catch(error => log(`workbuddy refresh failed: ${error.message}`));
-    }
-    try {
-      latestStatus = await store.refresh({ full: false });
-      startupError = "";
-    } catch (error) {
-      startupError = `读取用量失败：${error.message}`;
-    }
-    // 快照是全新的对象，WorkBuddy 摘要要重新挂上
-    if (latestStatus && wbStore) {
-      try {
-        latestStatus.workbuddy = wbStore.summary();
-      } catch {
-        /* 摘要失败不影响主数据 */
-      }
-    }
-    attachLiveQuota();
-    updateTray();
-    pushStatusToPopover();
-  }
-
-  /** 把缓存的实时额度重新挂到最新快照（刷新会换掉整个对象） */
-  function attachLiveQuota() {
-    if (!latestStatus || !codexAuthStore) return;
-    try {
-      const active = codexAuthStore.list().activeId;
-      const live = active ? codexAuthStore.cachedQuotaFor(active) : null;
-      if (live) latestStatus.quota = { ...live, source: "api" };
-    } catch {
-      /* 覆盖失败就保留日志快照口径 */
-    }
-  }
-
-  async function showWindow() {
-    // 窗口是惰性创建的：默认启动模式不建看板窗口，
-    // 早先这里直接 return，导致「打开完整看板」看起来毫无反应。
-    const win = createWindow();
-    if (!win || win.isDestroyed()) return;
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-  }
-
-  function createTray() {
-    const image = nativeImage.createFromPath(path.join(APP_ROOT, "desktop", "icon.png")).resize({ width: 32, height: 32 });
-    tray = new Tray(image);
-    tray.setToolTip(`${PRODUCT_NAME} · 点击查看用量速览`);
-    tray.on("click", togglePopover);
-    tray.on("double-click", () => { showWindow(); });
-    tray.on("right-click", () => {
-      if (trayMenu) tray.popUpContextMenu(trayMenu);
-    });
-    updateTray();
-  }
-
-  /**
-   * 历史基线：usage-index.json 里存着本机历史上扫到的每条请求，包含 Codex
-   * 已经清理掉的早期日志。没有它，累计会少算一大半。
-   */
-  function resolveBaseline(paths) {
-    const indexPath = paths.usageIndex;
-    if (!fs.existsSync(indexPath)) return null;
-    const cached = loadBaseline(paths.baseline);
-    if (cached && baselineIsFresh(cached, indexPath)) return cached;
-    try {
-      const started = Date.now();
-      const baseline = buildBaseline(indexPath);
-      saveBaseline(paths.baseline, baseline);
-      log(`history baseline: ${baseline.records} records, ${(baseline.totalTokens / 1e9).toFixed(2)}B, ${Object.keys(baseline.days).length} days, ${Date.now() - started}ms`);
-      return baseline;
-    } catch (error) {
-      log(`history baseline failed: ${error.message}`);
-      return cached || null;
-    }
-  }
-
-  async function initStore(paths, baseline) {
-    // 科研通签到：凭证用 safeStorage 加密，账号/状态落在 userData/data 下
-    ablesciStore = createAbleSciStore({
-      accountsFile: paths.ablesciAccounts,
-      stateFile: paths.ablesciState,
-      cipher: makeCipher()
-    });
-
-    // 实时额度：只读本机已有的 Codex auth.json，首次拉取后立即覆盖本地快照
-    codexAuthStore = createCodexAuthStore({ hiddenFile: paths.codexHiddenAccounts });
-    refreshLiveQuota(true).catch(() => {});
-
-    // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格
-    ensureTableFile(paths.pricing);
-    const pricing = loadTable(paths.pricing);
-    log(`pricing: ${pricing.entries.length} models, USD→CNY ${pricing.usdCny}`);
-
-    store = new CodexStore({
-      sessionsDir: sessionsDir(),
-      cacheFile: paths.usageCache,
-      detailCacheFile: paths.detailCache,
-      baseline,
-      pricing
-    });
-    // 明细缓存先读盘：看板第二次打开可以秒出
-    store.loadDetailCache();
-
-    wbStore = new WorkBuddyStore({
-      roots: workBuddyRoots(),
-      cacheFile: paths.workbuddyCache,
-      pricing
-    });
-    wbStore.loadCache();
-    // WorkBuddy 日志量小（本机 38MB / 千条请求），并行构建，几十毫秒
-    wbStore.build()
-      .then(() => {
-        const summary = wbStore.summary();
-        const sources = (summary.roots || []).filter(item => item.files > 0).map(item => `${path.basename(item.root)}:${item.files}`).join(" + ");
-        log(`workbuddy: ${wbStore.files.size} files (${sources}), ${(summary.totals.totalTokens / 1e6).toFixed(1)}M tokens`);
-        attachWorkBuddySummary();
-      })
-      .catch(error => log(`workbuddy scan failed: ${error.message}`));
-
-    const snapshot = await store.init({ full: false });
-    latestStatus = snapshot;
-    attachLiveQuota();
-    updateTray();
-    pushStatusToPopover();
-    // 后台补齐历史：先让弹窗秒开，再静默把全量索引跑完并推一次更新
-    store.buildFull()
-      .then(fullSnapshot => {
-        latestStatus = fullSnapshot;
-        attachLiveQuota();
-        updateTray();
-        pushStatusToPopover();
-        // 再补一次明细：拿到「线程累计」口径（含被清理的早期历史），
-        // 弹窗与看板才能显示同一个总量
-        return store.buildDetail().then(() => {
-          latestStatus = store.snapshot();
-          attachLiveQuota();
-          updateTray();
-          pushStatusToPopover();
-        });
-      })
-      .catch(error => {
-        startupError = `历史索引构建失败：${error.message}`;
-        updateTray();
-      });
-  }
-
-  async function start() {
-    const paths = userDataPaths();
-    migrateUserData(paths);
-    // 目录就绪后再挂日志，否则首次启动会写不进去
-    logFile = path.join(paths.logs, "desktop.log");
-    log(`start v${app.getVersion()} | smoke=${SMOKE} | packaged=${app.isPackaged} | execPath=${process.execPath}`);
-    loadPreferences(paths);
-    registerPopoverHandlers();
-    registerDashboardHandlers();
-    registerCodexAuthHandlers();
-    log("creating popover");
-    createPopover();
-    log("creating tray");
-    createTray();
-    // 完整看板窗口延后创建：弹窗是主入口，不需要先起一个大窗口
-    if (preferences.startMode === "dashboard" && !SMOKE) createWindow();
-
-    initStore(paths, resolveBaseline(paths)).catch(error => {
-      log(`initStore failed: ${error.stack || error.message}`);
-      startupError = `用量数据初始化失败：${error.message}`;
-      updateTray();
-      pushStatusToPopover();
-    });
-
-    if (preferences.startMode === "dashboard" && !SMOKE) {
-      showWindow().catch(() => {});
-    } else {
-      showPopover();
-    }
-
-    statusTimer = setInterval(() => { refreshTrayStatus().catch(() => {}); }, 30_000);
-
-    // Dev 诊断：把真实弹窗内容截成 PNG，用于验证 preload 与真实数据链路
-    if (process.env.CODEX_TOKEN_POPOVER_SHOT) {
-      setTimeout(async () => {
-        try {
-          if (!popover || popover.isDestroyed()) return;
-          const image = await popover.webContents.capturePage();
-          fs.writeFileSync(process.env.CODEX_TOKEN_POPOVER_SHOT, image.toPNG());
-          process.stdout.write(`popover shot saved: ${process.env.CODEX_TOKEN_POPOVER_SHOT}\n`);
-        } catch (error) {
-          process.stdout.write(`popover shot failed: ${error.message}\n`);
-        }
-      }, 3000);
-    }
-
-    // Dev 诊断：把真实看板内容截成 PNG，用于验证 preload 与真实数据链路
-    if (process.env.CODEX_TOKEN_DASHBOARD_SHOT) {
-      setTimeout(async () => {
-        try {
-          await showWindow();
-          // 等首次明细扫描 + 渲染完成
-          await new Promise(resolve => setTimeout(resolve, Number(process.env.CODEX_TOKEN_DASHBOARD_SHOT_DELAY) || 14000));
-          if (!mainWindow || mainWindow.isDestroyed()) return;
-          // 排查用：截图前把窗口固定成指定尺寸（如 1180x860），保证截图和真实窗口一致
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_SIZE) {
-            const [width, height] = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_SIZE)
-              .split("x")
-              .map(value => Number(value) || 0);
-            if (width >= 820 && height >= 620) {
-              // Windows 上 unmaximize 是异步的，紧接着 setSize 会被还原尺寸覆盖，必须等一帧
-              if (mainWindow.isMaximized()) {
-                mainWindow.unmaximize();
-                await new Promise(resolve => setTimeout(resolve, 350));
-              }
-              mainWindow.setSize(width, height);
-              mainWindow.center();
-              await new Promise(resolve => setTimeout(resolve, 900));
-            }
-          }
-          // 排查用：先切到指定数据源（codex / workbuddy）再截图
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_SOURCE) {
-            const source = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_SOURCE).replace(/[^a-z]/gi, "");
-            await mainWindow.webContents.executeJavaScript(
-              `(() => { const el = document.querySelector('#source button[data-source="${source}"]'); if (el) el.click(); return !!el; })()`
-            );
-            await new Promise(resolve => setTimeout(resolve, 2200));
-          }
-          const shotPath = process.env.CODEX_TOKEN_DASHBOARD_SHOT;
-          // 排查用：截图前点击指定按钮（如 btn-auth 打开实时额度弹窗）
-          const shotClicks = [
-            process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK,
-            process.env.CODEX_TOKEN_DASHBOARD_SHOT_CLICK2
-          ].filter(Boolean);
-          for (const clickTarget of shotClicks) {
-            // 先按 id 找；找不到就当 CSS 选择器用，便于连点打开弹窗里的子面板
-            const target = String(clickTarget);
-            await mainWindow.webContents.executeJavaScript(
-              `(() => { const el = document.getElementById(${JSON.stringify(target)}) || document.querySelector(${JSON.stringify(target)}); if (el) el.click(); return !!el; })()`
-            );
-            await new Promise(resolve => setTimeout(resolve, 1800));
-          }
-          // 明确先回到顶部，避免捕获到上一次滚动位置
-          await mainWindow.webContents.executeJavaScript('(() => { const el = document.querySelector("main"); if (el) el.scrollTop = 0; return true; })()');
-          await new Promise(resolve => setTimeout(resolve, 350));
-          const info = await mainWindow.webContents.executeJavaScript(
-            '({scrollTop: (document.querySelector("main")||{}).scrollTop, innerHeight: window.innerHeight, dpr: window.devicePixelRatio, scrollHeight: (document.querySelector("main")||{}).scrollHeight})'
-          );
-          process.stdout.write(`dashboard layout: ${JSON.stringify(info)}\n`);
-          const shoot = async () => {
-            let lastError;
-            for (let attempt = 0; attempt < 4; attempt += 1) {
-              try {
-                if (mainWindow.isMinimized()) mainWindow.restore();
-                mainWindow.show();
-                mainWindow.focus();
-                await new Promise(resolve => setTimeout(resolve, 400));
-                return await mainWindow.webContents.capturePage();
-              } catch (error) {
-                lastError = error;
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-            }
-            throw lastError;
-          };
-          const image = await shoot();
-          fs.writeFileSync(shotPath, image.toPNG());
-          process.stdout.write(`dashboard shot saved: ${shotPath}\n`);
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_SCROLL) {
-            await mainWindow.webContents.executeJavaScript('(() => { const el = document.querySelector("main"); if (el) el.scrollTop = el.scrollHeight; return el ? el.scrollTop : -1; })()');
-            await new Promise(resolve => setTimeout(resolve, 700));
-            const bottom = await shoot();
-            const bottomPath = shotPath.replace(/\.png$/i, "-bottom.png");
-            fs.writeFileSync(bottomPath, bottom.toPNG());
-            process.stdout.write(`dashboard shot saved: ${bottomPath}\n`);
-          }
-          // 排查用：按区间逐张截图，验证活跃时段等图表确实跟着 7/14/30/全部 变化
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_RANGE) {
-            const keys = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_RANGE).split(",");
-            for (const raw of keys) {
-              const rangeKey = Number(raw) || 0;
-              await mainWindow.webContents.executeJavaScript(
-                `(() => {
-                   const btn = document.querySelector('#range button[data-key="${rangeKey}"]');
-                   if (btn) btn.click();
-                   const hours = document.querySelector('#hours');
-                   if (hours) hours.scrollIntoView({ block: 'center' });
-                   return !!btn;
-                 })()`
-              );
-              await new Promise(resolve => setTimeout(resolve, 900));
-              const rangeShot = await shoot();
-              const rangePath = shotPath.replace(/\.png$/i, "-range" + (rangeKey || "all") + ".png");
-              fs.writeFileSync(rangePath, rangeShot.toPNG());
-              process.stdout.write(`dashboard shot saved: ${rangePath}\n`);
-            }
-          }
-          // 排查用：切到指定时段指标后再截一张（tokens / speed）
-          if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_HOUR) {
-            const metric = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_HOUR).replace(/[^a-z]/gi, "");
-            await mainWindow.webContents.executeJavaScript(
-              `(() => { const el = document.querySelector('#hour-tabs button[data-metric="${metric}"]'); if (el) el.click(); return !!el; })()`
-            );
-            await mainWindow.webContents.executeJavaScript('(() => { const el = document.querySelector("main"); if (el) el.scrollTop = el.scrollHeight; return el ? el.scrollTop : -1; })()');
-            await new Promise(resolve => setTimeout(resolve, 700));
-            const hourShot = await shoot();
-            const hourPath = shotPath.replace(/\.png$/i, "-" + metric + ".png");
-            fs.writeFileSync(hourPath, hourShot.toPNG());
-            process.stdout.write(`dashboard shot saved: ${hourPath}\n`);
-          }
-        } catch (error) {
-          process.stdout.write(`dashboard shot failed: ${error.message}\n`);
-        }
-      }, 1500);
-    }
-
-    if (SMOKE) {
-      // 冒烟脚本自己控制节奏，超时可从外面传
-      const smokeTimeout = Number(process.env.CODEX_TOKEN_DASHBOARD_SMOKE_TIMEOUT)
-        || (process.env.CODEX_TOKEN_DASHBOARD_SHOT ? 40_000 : 8_000);
-      smokeExitTimer = setTimeout(() => {
-        process.stdout.write("Desktop smoke lifecycle check complete; quitting.\n");
-        app.quit();
-      }, smokeTimeout);
-    }
-  }
-
-  app.on("second-instance", () => { showWindow(); });
+  app.on("second-instance", () => { ctx.showWindow(ctx); });
   app.on("window-all-closed", event => {
     // 托盘常驻，不因窗口全部关闭而退出
     if (event && typeof event.preventDefault === "function") event.preventDefault();
   });
   app.on("before-quit", () => {
-    quitting = true;
-    allowWindowClose = true;
-    if (statusTimer) clearInterval(statusTimer);
-    if (smokeExitTimer) clearTimeout(smokeExitTimer);
-    if (store) store.saveCache();
+    ctx.quitting = true;
+    ctx.allowWindowClose = true;
+    if (ctx.statusTimer) clearInterval(ctx.statusTimer);
+    if (ctx.smokeExitTimer) clearTimeout(ctx.smokeExitTimer);
+    if (ctx.store) ctx.store.saveCache();
   });
-  app.whenReady().then(start).catch(error => {
-    log(`fatal: ${error.stack || error.message}`);
-    startupError = error.message;
-    updateTray();
+  app.whenReady().then(() => start(ctx)).catch(error => {
+    ctx.log(ctx, `fatal: ${error.stack || error.message}`);
+    ctx.startupError = error.message;
+    ctx.updateTray(ctx);
   });
 }

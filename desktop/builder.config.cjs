@@ -11,6 +11,7 @@ module.exports = {
   electronDist: path.resolve(__dirname, "../node_modules/electron/dist"),
   files: [
     "desktop/main.cjs",
+    "desktop/core/**",
     "desktop/preload.cjs",
     "desktop/popover.html",
     "desktop/dashboard.html",

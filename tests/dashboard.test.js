@@ -20,7 +20,7 @@ const { WorkBuddyStore } = require(path.join(root, "desktop", "data", "workbuddy
 
 test("2.0 项目名与版本已经换到 TokenBar", () => {
   assert.equal(packageJson.name, "tokenbar");
-  assert.match(packageJson.version, /^2\.\d+\.\d+$/);
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+$/);
   assert.match(builder, /productName: "TokenBar"/);
   assert.match(builder, /appId: "com\.xiaoqi\.tokenbar"/);
   assert.match(main, /const PRODUCT_NAME = "TokenBar"/);
