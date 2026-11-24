@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. Format base
 
 ## [3.0.0] - 2026-11-24
 
-品质升级波次：数据层、UI 构建、授权流程、去重口径、可观测性与发布工程一起收口。测试 **86** 个，生产依赖 **0** 个。
+品质升级波次：数据层、UI 构建、授权流程、去重口径、可观测性与发布工程一起收口。测试 **108** 个，生产依赖 **0** 个。
 
 ### Added
 

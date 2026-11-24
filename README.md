@@ -85,7 +85,7 @@ npm run desktop:shortcut   # 桌面快捷方式
 ```bash
 npm install
 npm start                  # Electron 开发模式
-npm test                   # 数据层 + UI 断言，86 个测试
+npm test                   # 数据层 + UI 断言，108 个测试
 npm run desktop:smoke      # 启动、托盘、窗口生命周期
 ```
 
@@ -177,7 +177,7 @@ Codex Desktop 的云端线程在 `~/.codex/sqlite/codex.db` 里 `source_kind = '
 
 ## Contributing
 
-欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（86 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
+欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（108 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
 
 ## License
 
