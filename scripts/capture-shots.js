@@ -196,6 +196,10 @@ async function main() {
     await popover.waitForFunction(() => document.body.innerText.trim().length > 20, { timeout: 20_000 });
     await fixViewport(popover);
 
+    console.log("capture-shots:");
+    // 弹窗截图必须趁它还可见时做：点开看板后 popover 会 hide，隐藏窗口无法截。
+    await shoot(popover, "popover.png");
+
     // 从弹窗点开完整看板（lucid 的启动链就是这么走的）
     await popover.click("#dashboard");
     const dashboard = await findPage(browser, "dashboard.html", 25_000);
@@ -210,7 +214,6 @@ async function main() {
       { timeout: 15_000 }
     );
 
-    console.log("capture-shots:");
     await setTheme(dashboard, "light");
     await shoot(dashboard, "dashboard-light.png");
 
@@ -244,9 +247,6 @@ async function main() {
     await shoot(dashboard, "auth-panel.png");
     const closeAuth = dashboard.locator("#a-close");
     if (await closeAuth.count()) await closeAuth.click().catch(() => {});
-
-    // 托盘弹窗：保持应用的默认主题即可。
-    await shoot(popover, "popover.png");
 
     console.log(`done: ${fs.readdirSync(shotsDir).filter(f => f.endsWith(".png")).length} png in docs/shots/`);
   } finally {
