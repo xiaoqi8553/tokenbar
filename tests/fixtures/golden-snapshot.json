@@ -1,0 +1,1065 @@
+{
+  "detail": {
+    "ok": true,
+    "builtAt": null,
+    "sessions": 3,
+    "scannedFiles": 3,
+    "baseline": null,
+    "throughput": null,
+    "totals": {
+      "inputTokens": 1750,
+      "cachedInputTokens": 160,
+      "outputTokens": 500,
+      "totalTokens": 2250,
+      "records": 5,
+      "sessions": 3,
+      "cost": 0.0964352
+    },
+    "cost": {
+      "cny": 0.0964352,
+      "usd": 0.013393777777777777,
+      "todayCny": 0,
+      "estimatedTokens": 650,
+      "rate": 7.2,
+      "updatedAt": "2026-10-28",
+      "note": "官方 API 刊例价，单位：每 100 万 tokens；缓存价指命中缓存的输入",
+      "sources": [
+        "https://openai.com/api/pricing",
+        "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        "https://docs.bigmodel.cn/cn/guide/start/pricing",
+        "https://hy.tencent.com/research/hy4-preview",
+        "https://platform.kimi.ai/docs/pricing/chat-k3"
+      ]
+    },
+    "pricing": {
+      "rate": 7.2,
+      "updatedAt": "2026-10-28",
+      "note": "官方 API 刊例价，单位：每 100 万 tokens；缓存价指命中缓存的输入",
+      "sources": [
+        "https://openai.com/api/pricing",
+        "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+        "https://docs.bigmodel.cn/cn/guide/start/pricing",
+        "https://hy.tencent.com/research/hy4-preview",
+        "https://platform.kimi.ai/docs/pricing/chat-k3"
+      ],
+      "models": {
+        "gpt-5.5": {
+          "label": "GPT-5.5",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "unit": {
+            "input": 36,
+            "cached": 3.6,
+            "output": 216
+          },
+          "estimated": false,
+          "note": ""
+        },
+        "o3": {
+          "label": "o3",
+          "vendor": "—",
+          "currency": "CNY",
+          "unit": {
+            "input": 4,
+            "cached": 0.4,
+            "output": 12
+          },
+          "estimated": true,
+          "note": ""
+        },
+        "gpt-6.1-sol": {
+          "label": "GPT-6.1 Sol",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "unit": {
+            "input": 14.4,
+            "cached": 0.7200000000000001,
+            "output": 72
+          },
+          "estimated": false,
+          "note": ""
+        }
+      },
+      "fallback": {
+        "label": "未知模型",
+        "unit": {
+          "input": 4,
+          "cached": 0.4,
+          "output": 12
+        },
+        "estimated": true
+      },
+      "entries": [
+        {
+          "match": "gpt-6.1-sol",
+          "label": "GPT-6.1 Sol",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.1,
+          "output": 10,
+          "cny": {
+            "input": 14.4,
+            "cached": 0.7200000000000001,
+            "output": 72
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-6-sol",
+          "label": "GPT-6 Sol",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.2,
+          "output": 10,
+          "cny": {
+            "input": 14.4,
+            "cached": 1.4400000000000002,
+            "output": 72
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-6.1-terra",
+          "label": "GPT-6.1 Terra",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 1,
+          "cached": 0.05,
+          "output": 5,
+          "cny": {
+            "input": 7.2,
+            "cached": 0.36000000000000004,
+            "output": 36
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-6-luna",
+          "label": "GPT-6 Luna",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 0.1,
+          "cached": 0.01,
+          "output": 0.5,
+          "cny": {
+            "input": 0.7200000000000001,
+            "cached": 0.07200000000000001,
+            "output": 3.6
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-6-astra",
+          "label": "GPT-6 Astra",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 10,
+          "cached": 1,
+          "output": 50,
+          "cny": {
+            "input": 72,
+            "cached": 7.2,
+            "output": 360
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.6-sol",
+          "label": "GPT-5.6 Sol",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 4,
+          "cached": 0.4,
+          "output": 20,
+          "cny": {
+            "input": 28.8,
+            "cached": 2.8800000000000003,
+            "output": 144
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.6-luna",
+          "label": "GPT-5.6 Luna",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 0.2,
+          "cached": 0.02,
+          "output": 1.2,
+          "cny": {
+            "input": 1.4400000000000002,
+            "cached": 0.14400000000000002,
+            "output": 8.64
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.5",
+          "label": "GPT-5.5",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 5,
+          "cached": 0.5,
+          "output": 30,
+          "cny": {
+            "input": 36,
+            "cached": 3.6,
+            "output": 216
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.4-mini",
+          "label": "GPT-5.4 mini",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 0.75,
+          "cached": 0.075,
+          "output": 4.5,
+          "cny": {
+            "input": 5.4,
+            "cached": 0.54,
+            "output": 32.4
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.4",
+          "label": "GPT-5.4",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 2.5,
+          "cached": 0.25,
+          "output": 15,
+          "cny": {
+            "input": 18,
+            "cached": 1.8,
+            "output": 108
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.6-terra",
+          "label": "GPT-5.6 Terra",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.2,
+          "output": 12,
+          "cny": {
+            "input": 14.4,
+            "cached": 1.4400000000000002,
+            "output": 86.4
+          },
+          "note": ""
+        },
+        {
+          "match": "gpt-5.3-codex",
+          "label": "GPT-5.3 Codex",
+          "vendor": "OpenAI",
+          "currency": "USD",
+          "input": 1.75,
+          "cached": 0.175,
+          "output": 14,
+          "cny": {
+            "input": 12.6,
+            "cached": 1.26,
+            "output": 100.8
+          },
+          "note": ""
+        },
+        {
+          "match": "deepseek-v4.1-flash",
+          "label": "DeepSeek V4.1 Flash",
+          "vendor": "DeepSeek",
+          "currency": "CNY",
+          "input": 1,
+          "cached": 0.02,
+          "output": 4,
+          "cny": {
+            "input": 1,
+            "cached": 0.02,
+            "output": 4
+          },
+          "note": "按空闲时段价；工作日 9–12 / 14–18 点为高峰，价格翻倍"
+        },
+        {
+          "match": "deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro",
+          "vendor": "DeepSeek",
+          "currency": "CNY",
+          "input": 4.5,
+          "cached": 0.15,
+          "output": 13.5,
+          "cny": {
+            "input": 4.5,
+            "cached": 0.15,
+            "output": 13.5
+          },
+          "note": "按空闲时段价；高峰翻倍"
+        },
+        {
+          "match": "deepseek",
+          "label": "DeepSeek V4.1 Flash",
+          "vendor": "DeepSeek",
+          "currency": "CNY",
+          "input": 1,
+          "cached": 0.02,
+          "output": 4,
+          "cny": {
+            "input": 1,
+            "cached": 0.02,
+            "output": 4
+          },
+          "note": "未知版本，按 V4.1 Flash 空闲价估算"
+        },
+        {
+          "match": "glm-5.3-flashx",
+          "label": "GLM-5.3-FlashX",
+          "vendor": "智谱",
+          "currency": "CNY",
+          "input": 2,
+          "cached": 0.57,
+          "output": 7,
+          "cny": {
+            "input": 2,
+            "cached": 0.57,
+            "output": 7
+          },
+          "note": ""
+        },
+        {
+          "match": "glm-5.3-flash",
+          "label": "GLM-5.3-Flash",
+          "vendor": "智谱",
+          "currency": "CNY",
+          "input": 0.8,
+          "cached": 0.23,
+          "output": 2.8,
+          "cny": {
+            "input": 0.8,
+            "cached": 0.23,
+            "output": 2.8
+          },
+          "note": ""
+        },
+        {
+          "match": "glm-5.3",
+          "label": "GLM-5.3",
+          "vendor": "智谱",
+          "currency": "CNY",
+          "input": 8,
+          "cached": 2,
+          "output": 28,
+          "cny": {
+            "input": 8,
+            "cached": 2,
+            "output": 28
+          },
+          "note": ""
+        },
+        {
+          "match": "hy4-preview",
+          "label": "Hunyuan Hy4 preview",
+          "vendor": "腾讯混元",
+          "currency": "CNY",
+          "input": 6,
+          "cached": 0.3,
+          "output": 18,
+          "cny": {
+            "input": 6,
+            "cached": 0.3,
+            "output": 18
+          },
+          "note": ""
+        },
+        {
+          "match": "hy3",
+          "label": "Hunyuan Hy3",
+          "vendor": "腾讯混元",
+          "currency": "CNY",
+          "input": 1,
+          "cached": 0.25,
+          "output": 4,
+          "cny": {
+            "input": 1,
+            "cached": 0.25,
+            "output": 4
+          },
+          "note": ""
+        },
+        {
+          "match": "kimi-k3",
+          "label": "Kimi K3",
+          "vendor": "月之暗面",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.3,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 2.16,
+            "output": 108
+          },
+          "note": ""
+        },
+        {
+          "match": "kimi-k2.7-code",
+          "label": "Kimi K2.7 Code",
+          "vendor": "月之暗面",
+          "currency": "USD",
+          "input": 0.95,
+          "cached": 0.19,
+          "output": 4,
+          "cny": {
+            "input": 6.84,
+            "cached": 1.368,
+            "output": 28.8
+          },
+          "note": ""
+        },
+        {
+          "match": "kimi-k2.6",
+          "label": "Kimi K2.6",
+          "vendor": "月之暗面",
+          "currency": "USD",
+          "input": 0.95,
+          "cached": 0.16,
+          "output": 4,
+          "cny": {
+            "input": 6.84,
+            "cached": 1.1520000000000001,
+            "output": 28.8
+          },
+          "note": ""
+        },
+        {
+          "match": "minimax-m3",
+          "label": "MiniMax M3",
+          "vendor": "MiniMax",
+          "currency": "CNY",
+          "input": 2.1,
+          "cached": 0.42,
+          "output": 8.4,
+          "cny": {
+            "input": 2.1,
+            "cached": 0.42,
+            "output": 8.4
+          },
+          "note": ""
+        }
+      ]
+    },
+    "series": [
+      {
+        "day": "2026-07-23",
+        "totalTokens": 1000,
+        "inputTokens": 800,
+        "cachedInputTokens": 0,
+        "outputTokens": 200,
+        "records": 1,
+        "cost": 0.072
+      },
+      {
+        "day": "2026-07-24",
+        "totalTokens": 1050,
+        "inputTokens": 800,
+        "cachedInputTokens": 150,
+        "outputTokens": 250,
+        "records": 2,
+        "cost": 0.013772
+      },
+      {
+        "day": "2026-07-25",
+        "totalTokens": 200,
+        "inputTokens": 150,
+        "cachedInputTokens": 10,
+        "outputTokens": 50,
+        "records": 2,
+        "cost": 0.0106632
+      }
+    ],
+    "models": [
+      {
+        "model": "gpt-5.5",
+        "inputTokens": 900,
+        "cachedInputTokens": 0,
+        "outputTokens": 220,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 1120,
+        "records": 2,
+        "share": 0.49777777777777776,
+        "cost": 0.07992,
+        "unit": {
+          "input": 36,
+          "cached": 3.6,
+          "output": 216
+        },
+        "estimated": false
+      },
+      {
+        "model": "o3",
+        "inputTokens": 500,
+        "cachedInputTokens": 50,
+        "outputTokens": 150,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 650,
+        "records": 1,
+        "share": 0.28888888888888886,
+        "cost": 0.00362,
+        "unit": {
+          "input": 4,
+          "cached": 0.4,
+          "output": 12
+        },
+        "estimated": true
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "inputTokens": 350,
+        "cachedInputTokens": 110,
+        "outputTokens": 130,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 480,
+        "records": 2,
+        "share": 0.21333333333333335,
+        "cost": 0.0128952,
+        "unit": {
+          "input": 14.4,
+          "cached": 0.7200000000000001,
+          "output": 72
+        },
+        "estimated": false
+      }
+    ],
+    "projects": [
+      {
+        "project": "thesis",
+        "inputTokens": 1200,
+        "cachedInputTokens": 100,
+        "outputTokens": 320,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 1520,
+        "records": 3,
+        "sessions": 0,
+        "share": 0.6755555555555556
+      },
+      {
+        "project": "codex",
+        "inputTokens": 500,
+        "cachedInputTokens": 50,
+        "outputTokens": 150,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 650,
+        "records": 1,
+        "sessions": 0,
+        "share": 0.28888888888888886
+      },
+      {
+        "project": "demo",
+        "inputTokens": 50,
+        "cachedInputTokens": 10,
+        "outputTokens": 30,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 80,
+        "records": 1,
+        "sessions": 0,
+        "share": 0.035555555555555556
+      }
+    ],
+    "modelDays": {
+      "2026-07-23": {
+        "gpt-5.5": {
+          "inputTokens": 800,
+          "cachedInputTokens": 0,
+          "outputTokens": 200,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 1000,
+          "records": 1
+        }
+      },
+      "2026-07-24": {
+        "gpt-6.1-sol": {
+          "inputTokens": 300,
+          "cachedInputTokens": 100,
+          "outputTokens": 100,
+          "reasoningOutputTokens": 20,
+          "totalTokens": 400,
+          "records": 1
+        },
+        "o3": {
+          "inputTokens": 500,
+          "cachedInputTokens": 50,
+          "outputTokens": 150,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 650,
+          "records": 1
+        }
+      },
+      "2026-07-25": {
+        "gpt-5.5": {
+          "inputTokens": 100,
+          "cachedInputTokens": 0,
+          "outputTokens": 20,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 120,
+          "records": 1
+        },
+        "gpt-6.1-sol": {
+          "inputTokens": 50,
+          "cachedInputTokens": 10,
+          "outputTokens": 30,
+          "reasoningOutputTokens": 5,
+          "totalTokens": 80,
+          "records": 1
+        }
+      }
+    },
+    "projectDays": {
+      "2026-07-23": {
+        "thesis": {
+          "inputTokens": 800,
+          "cachedInputTokens": 0,
+          "outputTokens": 200,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 1000,
+          "records": 1
+        }
+      },
+      "2026-07-24": {
+        "thesis": {
+          "inputTokens": 300,
+          "cachedInputTokens": 100,
+          "outputTokens": 100,
+          "reasoningOutputTokens": 20,
+          "totalTokens": 400,
+          "records": 1
+        },
+        "codex": {
+          "inputTokens": 500,
+          "cachedInputTokens": 50,
+          "outputTokens": 150,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 650,
+          "records": 1
+        }
+      },
+      "2026-07-25": {
+        "thesis": {
+          "inputTokens": 100,
+          "cachedInputTokens": 0,
+          "outputTokens": 20,
+          "reasoningOutputTokens": 0,
+          "totalTokens": 120,
+          "records": 1
+        },
+        "demo": {
+          "inputTokens": 50,
+          "cachedInputTokens": 10,
+          "outputTokens": 30,
+          "reasoningOutputTokens": 5,
+          "totalTokens": 80,
+          "records": 1
+        }
+      }
+    },
+    "hourly": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "dailyHours": {
+      "2026-07-23": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "2026-07-24": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        400,
+        0,
+        0,
+        0,
+        650,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "2026-07-25": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        120,
+        0,
+        0,
+        0,
+        0,
+        80,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "sessionList": [
+      {
+        "id": "s1",
+        "sessionId": "s1",
+        "project": "thesis",
+        "cwd": "E:/proj/thesis",
+        "source": null,
+        "firstAt": "2026-07-23T08:00:00.000Z",
+        "lastAt": "2026-07-25T18:00:00.000Z",
+        "totalTokens": 1520,
+        "inputTokens": 1200,
+        "cachedInputTokens": 100,
+        "outputTokens": 320,
+        "records": 3,
+        "files": 1,
+        "sessionTotal": 0,
+        "quota": null,
+        "models": [
+          "gpt-5.5",
+          "gpt-6.1-sol"
+        ],
+        "modelDetails": [
+          {
+            "model": "gpt-5.5",
+            "inputTokens": 900,
+            "cachedInputTokens": 0,
+            "outputTokens": 220,
+            "totalTokens": 1120,
+            "records": 2,
+            "cost": 0.07992,
+            "estimated": false
+          },
+          {
+            "model": "gpt-6.1-sol",
+            "inputTokens": 300,
+            "cachedInputTokens": 100,
+            "outputTokens": 100,
+            "totalTokens": 400,
+            "records": 1,
+            "cost": 0.010152,
+            "estimated": false
+          }
+        ],
+        "turns": 0,
+        "cost": 0.090072,
+        "tps": null
+      },
+      {
+        "id": "s2",
+        "sessionId": "s2",
+        "project": "codex",
+        "cwd": "E:/proj/codex",
+        "source": null,
+        "firstAt": "2026-07-23T08:00:00.000Z",
+        "lastAt": "2026-07-25T18:00:00.000Z",
+        "totalTokens": 650,
+        "inputTokens": 500,
+        "cachedInputTokens": 50,
+        "outputTokens": 150,
+        "records": 1,
+        "files": 1,
+        "sessionTotal": 0,
+        "quota": null,
+        "models": [
+          "o3"
+        ],
+        "modelDetails": [
+          {
+            "model": "o3",
+            "inputTokens": 500,
+            "cachedInputTokens": 50,
+            "outputTokens": 150,
+            "totalTokens": 650,
+            "records": 1,
+            "cost": 0.00362,
+            "estimated": true
+          }
+        ],
+        "turns": 0,
+        "cost": 0.00362,
+        "tps": null
+      },
+      {
+        "id": "s3",
+        "sessionId": "s3",
+        "project": "demo",
+        "cwd": "E:/proj/demo",
+        "source": null,
+        "firstAt": "2026-07-23T08:00:00.000Z",
+        "lastAt": "2026-07-25T18:00:00.000Z",
+        "totalTokens": 80,
+        "inputTokens": 50,
+        "cachedInputTokens": 10,
+        "outputTokens": 30,
+        "records": 1,
+        "files": 1,
+        "sessionTotal": 0,
+        "quota": null,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "modelDetails": [
+          {
+            "model": "gpt-6.1-sol",
+            "inputTokens": 50,
+            "cachedInputTokens": 10,
+            "outputTokens": 30,
+            "totalTokens": 80,
+            "records": 1,
+            "cost": 0.0027432,
+            "estimated": false
+          }
+        ],
+        "turns": 0,
+        "cost": 0.0027432,
+        "tps": null
+      }
+    ],
+    "today": null
+  },
+  "fast": {
+    "ok": true,
+    "source": "codex-store",
+    "phase": "idle",
+    "updatedAt": null,
+    "lastEventAt": null,
+    "sessions": 0,
+    "totals": {
+      "inputTokens": 1750,
+      "cachedInputTokens": 160,
+      "outputTokens": 500,
+      "totalTokens": 2250,
+      "records": 5
+    },
+    "baseline": null,
+    "today": {
+      "day": "2026-11-24",
+      "totalTokens": 0,
+      "inputTokens": 0,
+      "cachedInputTokens": 0,
+      "outputTokens": 0,
+      "reasoningOutputTokens": 0,
+      "records": 0
+    },
+    "yesterday": {
+      "day": "2026-11-23",
+      "totalTokens": 0,
+      "inputTokens": 0,
+      "cachedInputTokens": 0,
+      "outputTokens": 0,
+      "reasoningOutputTokens": 0,
+      "records": 0
+    },
+    "series": [
+      {
+        "day": "2026-11-11",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-12",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-13",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-14",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-15",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-16",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-17",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-18",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-19",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-20",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-21",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-22",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-23",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-24",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      }
+    ],
+    "quota": null,
+    "cost": {
+      "cny": 0.0964352,
+      "usd": 0.013393777777777777,
+      "todayCny": 0,
+      "rate": 7.2
+    },
+    "providers": [],
+    "scannedFiles": 0
+  }
+}

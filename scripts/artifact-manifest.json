@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "target": "source",
+  "files": {
+    "package.json": "a2e92289f91d5c22099467c7c621be40273ecc0cb5b6be87bf8c3c2d8ba56737",
+    "desktop/main.cjs": "bb80fa495c4f7f882c7332b001a3308b2fc31c8979c655cb4a4cbd641a0d9754",
+    "desktop/preload.cjs": "1d7b580ef664f45345dd347a2f3f09bd54e55591681d8955eed32d30d414c34d",
+    "desktop/popover.html": "d058a699bac84c2a09c94fd475d6a2802d261eaa1394a661e0340c07a1a0505c",
+    "desktop/dashboard.html": "2723c1259386d98b29f3ac5a79c61deb314d5071a2933925d1ecadaa90728c86",
+    "desktop/dashboard-preload.cjs": "5ebfa643e7057debc7ca5be1af9ca884fa55d8e2936fcc05ad98e9b730a94f58",
+    "desktop/icon.png": "96383a786495439e534d2f1e049d2d7ee5ae178ee07698ac29af57b28483e845",
+    "desktop/data/ablesci-store.cjs": "e7e233faabece4e69367ed368df6fb2d8088ff1881c721a119a6da48221f79e1",
+    "desktop/data/codex-auth-store.cjs": "487c5ce26820260d767999fb636de58639971ae875fb82d925fa664dd603dd17",
+    "desktop/data/codex-store.cjs": "55368bb0800cdecb00e8658e33099bfbbb5ec4c9b979e36706d3f5e52d452d30",
+    "desktop/data/event-dedupe.cjs": "bb34e52a23e2debfe5dd02828af3899774f59f6b4bc9c36ac5917e8bef426740",
+    "desktop/data/history-baseline.cjs": "87de98ffdc6815e21db4483947e4d5dc62d91cab8a6eea1fec0403a74c76a738",
+    "desktop/data/pricing.cjs": "d3780a2a912b3ab38c8ef794ce5e190fb1c491ef2d59dbb17a625a4c2c5a88e5",
+    "desktop/data/workbuddy-store.cjs": "c1ca3fe4cc46ff575c7557a05ea9c5da24f8ddc09e82f51ab99eedb80d00b61c",
+    "README.md": "dafa206b608d65e1e5729fb6d0e7e16c952960d07868cc0f082cc857bfc49bb0",
+    "CHANGELOG.md": "635cbe2e102173f674579a8b3dd890475f6fb562df9622ff9873476c1d216fb9"
+  }
+}
