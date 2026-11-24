@@ -8,7 +8,7 @@
   "scripts": {
     "start": "npm run desktop:icon && electron .",
     "desktop:icon": "node desktop/create-icon.cjs",
-    "test": "node --test tests/*.test.js",
+    "test": "node scripts/run-tests.cjs",
     "desktop:smoke": "node scripts/desktop-smoke.js",
     "dashboard:build": "node scripts/build-dashboard.js",
     "docs:shots": "node scripts/capture-shots.js",
