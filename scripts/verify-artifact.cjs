@@ -70,7 +70,13 @@ const SECRET_PATTERNS = [
 ];
 
 function sha256(file) {
-  return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+  let buf = fs.readFileSync(file);
+  // Windows checkout 会把 LF 转成 CRLF；哈希前统一归一化为 LF，
+  // 让本地与 CI 对同一份源码得到相同摘要（.gitattributes 已强制 LF，这是第二道防线）。
+  if (TEXT_EXT.has(path.extname(file))) {
+    buf = Buffer.from(buf.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
+  }
+  return crypto.createHash("sha256").update(buf).digest("hex");
 }
 
 function walk(dir, base = "") {

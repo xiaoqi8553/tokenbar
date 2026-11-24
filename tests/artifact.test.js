@@ -14,7 +14,16 @@ const { test } = require("node:test");
 
 const root = path.resolve(__dirname, "..");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "scripts/artifact-manifest.json"), "utf8"));
-const sha256 = file => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+// 与 verify-artifact.cjs 同口径：文本先归一化 CRLF→LF，避免 Windows checkout
+// 与本地工作树换行差异造成跨环境哈希失配（3.0 CI 曾因此整条流水线失败）。
+const TEXT_EXT = new Set([".cjs", ".js", ".html", ".json", ".css", ".md"]);
+const sha256 = file => {
+  let buf = fs.readFileSync(file);
+  if (TEXT_EXT.has(path.extname(file))) {
+    buf = Buffer.from(buf.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
+  }
+  return crypto.createHash("sha256").update(buf).digest("hex");
+};
 
 function walk(dir, base = "") {
   let out = [];

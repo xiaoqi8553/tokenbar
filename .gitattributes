@@ -1,3 +1,17 @@
+# 3.0 产物守门依赖逐文件 SHA256：仓库内文本文件强制 LF，避免 Windows
+# checkout 自动转 CRLF 导致本地/CI 哈希不一致（CI 曾因此整条流水线失败）。
+* text=auto eol=lf
+
+# 例外：Windows 脚本必须是 CRLF 才能在 cmd.exe 下可靠运行。
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# 二进制资产不做任何换行转换。
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff binary
+*.woff2 binary
