@@ -2,7 +2,7 @@
   "version": 3,
   "target": "source",
   "files": {
-    "package.json": "3f2d6c413f5c5a4a85d6a083c0a61b7c5616641e3746ec16d7b188c89f45c2c1",
+    "package.json": "886438c335cfc31ac6a19b714b4f2406b978602543750d81905fa39cb5dd2221",
     "desktop/main.cjs": "bbda8efc1861d8e5a016ee398fe102f135a6bbe4ebe9c123819d8dc642e9f86d",
     "desktop/preload.cjs": "6f299218b5b138c1274e7c61bfdd6ef5ae9bc45311cd7e637021fcb5775dcefb",
     "desktop/popover.html": "7f07a7b6c5b4cd20f1e3622a526b426d5acb15f0ff38eb19c19456103f444a8b",

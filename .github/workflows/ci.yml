@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Electron binary
+        run: npm run electron:install
+
       - name: Build dashboard
         run: npm run dashboard:build
 
@@ -57,6 +60,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Electron binary
+        run: npm run electron:install
 
       - name: Build dashboard
         run: npm run dashboard:build
