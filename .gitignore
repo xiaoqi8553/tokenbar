@@ -1,5 +1,6 @@
 # Runtime data
 data/usage-index.json
+data/imports/
 logs/
 
 # Local configuration and secrets
