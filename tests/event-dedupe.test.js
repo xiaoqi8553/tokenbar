@@ -6,7 +6,15 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { signatureOf, usageSignature, recordSignature } = require("../desktop/data/event-dedupe.cjs");
+const {
+  signatureOf,
+  usageSignature,
+  recordSignature,
+  fingerprintOf,
+  noteCollision,
+  collisionStats,
+  resetCollisionStats
+} = require("../desktop/data/event-dedupe.cjs");
 const { buildBaseline } = require("../desktop/data/history-baseline.cjs");
 const { CodexStore } = require("../desktop/data/codex-store.cjs");
 
@@ -270,4 +278,72 @@ test("弹窗过渡花费也按请求指纹去重，与明细花费同口径", ()
     Math.abs(transitional.cny - detail.totals.cost) < 1e-6,
     `过渡花费 ${transitional.cny} 应等于明细花费 ${detail.totals.cost}`
   );
+});
+
+// ---------------------------------------------------------------------------
+// 3.0 W1：指纹升级（新能力，signatureOf 的输出一个字符都不能变）
+// ---------------------------------------------------------------------------
+
+test("3.0 指纹升级：signatureOf 既有输出逐字不变（黄金快照依赖）", () => {
+  assert.equal(signatureOf(800, 200, 100, 1100, 30), "800:200:100:1100:30");
+  assert.equal(signatureOf(0, 0, 0, 0, 0), "0:0:0:0:0");
+  assert.equal(signatureOf("12", undefined, "3", 15, null), "12:0:3:15:0");
+  assert.equal(usageSignature({ input_tokens: 79695, cached_input_tokens: 77568, output_tokens: 184,
+    total_tokens: 79879, reasoning_output_tokens: 54 }), "79695:77568:184:79879:54");
+});
+
+test("3.0 指纹升级：request_id 优先，两条五元组完全相同的请求也能区分", () => {
+  const first = { request_id: "req-A", input_tokens: 0, cached_input_tokens: 0,
+    output_tokens: 0, total_tokens: 0, reasoning_output_tokens: 0 };
+  const second = { ...first, request_id: "req-B" };
+
+  assert.equal(signatureOf(0, 0, 0, 0, 0), signatureOf(0, 0, 0, 0, 0), "五元组确实相同");
+  assert.notEqual(fingerprintOf(first), fingerprintOf(second));
+  assert.equal(fingerprintOf(first), "rid:req-A");
+  assert.equal(fingerprintOf({ id: "req-C", ...first, request_id: undefined }).startsWith("rid:req-C"), true);
+  assert.equal(fingerprintOf({ requestId: "req-D", ...first, request_id: undefined }), "rid:req-D");
+});
+
+test("3.0 指纹升级：没有 request_id 时用真实存在的字段增强，不臆造字段", () => {
+  resetCollisionStats();
+  const bare = fingerprintOf({ i: 10, c: 0, o: 2, t: 12, r: 0 });
+  assert.equal(bare, "sig:10:0:2:12:0");
+
+  const enriched = fingerprintOf(
+    { i: 10, c: 0, o: 2, t: 12, r: 0, sessionId: "thread-1", lineNumber: 42,
+      timestamp: "2026-07-24T10:00:00Z", d: "2026-07-24", h: 10, m: "gpt-5" },
+    { threadId: "ctx-thread-9" }
+  );
+  assert.match(enriched, /^sig:10:0:2:12:0\|thread=thread-1\|seq=42\|ts=2026-07-24T10:00:00Z/);
+  assert.match(enriched, /\|d=2026-07-24\|h=10\|m=gpt-5$/);
+  assert.notEqual(enriched, bare);
+
+  // context 也能作为字段来源（事件本身不带时用外部上下文补齐）
+  const fromContext = fingerprintOf({ request_id: undefined, i: 10, c: 0, o: 2, t: 12, r: 0 },
+    { thread_id: "thread-2", seq: 7 });
+  assert.match(fromContext, /^sig:10:0:2:12:0\|thread=thread-2\|seq=7/);
+});
+
+test("3.0 指纹升级：碰撞保留计数并告警，且不同请求身份不会被合并", () => {
+  resetCollisionStats();
+  const first = { request_id: "req-A", i: 0, c: 0, o: 0, t: 0, r: 0 };
+  const second = { request_id: "req-B", i: 0, c: 0, o: 0, t: 0, r: 0 };
+
+  fingerprintOf(first);
+  assert.equal(collisionStats().total, 0, "同一请求重复调用不算碰撞");
+  fingerprintOf(first);
+  assert.equal(collisionStats().total, 0);
+
+  const secondFingerprint = fingerprintOf(second);
+  assert.notEqual(secondFingerprint, "rid:req-A");
+  assert.equal(collisionStats().total, 1);
+  assert.equal(collisionStats().keys["0:0:0:0:0"], 1);
+
+  const note = noteCollision("manual-key");
+  assert.equal(note.count, 1);
+  assert.match(note.warning, /疑似指纹碰撞/);
+  assert.equal(collisionStats().total, 2);
+
+  resetCollisionStats();
+  assert.deepEqual(collisionStats(), { total: 0, keys: {} });
 });

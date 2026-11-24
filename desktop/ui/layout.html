@@ -1,0 +1,219 @@
+<div class="boot" id="boot">
+  <div class="boot-card">
+    <div class="boot-mark">&gt;_</div>
+    <div class="boot-text" id="boot-text">正在读取本地会话日志…</div>
+    <div class="boot-bar"><i id="boot-fill"></i></div>
+    <div class="boot-hint" id="boot-hint">数据来自 ~/.codex/sessions 与 WorkBuddy 本地日志，不联网</div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">&gt;_</div>
+      <div>
+        <div class="brand-title">TokenBar<a class="ver" id="app-ver" title="查看 GitHub 仓库">v—</a></div>
+        <div class="brand-sub" id="brand-sub">本地用量看板</div>
+      </div>
+    </div>
+    <div class="range source" id="source" role="group" aria-label="数据源">
+      <button type="button" data-source="codex" aria-pressed="true">Codex</button>
+      <button type="button" data-source="workbuddy" aria-pressed="false">WorkBuddy</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="range" id="range" role="group" aria-label="时间范围"></div>
+    <button class="icon-btn" id="btn-refresh" title="重新扫描" aria-label="重新扫描">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+        <path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>
+      </svg>
+    </button>
+    <button class="sign-top" id="btn-auth" title="实时额度 · 切换账号" aria-label="实时额度">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span id="auth-top-label">实时额度</span>
+      <i class="sign-dot" id="auth-dot" hidden></i>
+    </button>
+    <button class="sign-top" id="btn-sign" title="科研通签到" aria-label="科研通签到">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
+      <span id="sign-top-label">科研通签到</span>
+      <i class="sign-dot" id="sign-dot" hidden></i>
+    </button>
+    <div class="range theme" id="theme-switch" role="group" aria-label="主题">
+      <button type="button" data-theme="light" aria-pressed="true" title="月之亮面 · 亮色">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>
+        <span>月之亮面</span>
+      </button>
+      <button type="button" data-theme="dark" aria-pressed="false" title="月之暗面 · 暗色">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>
+        <span>月之暗面</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stat-row" id="stat-row"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>用量趋势</h2>
+          <p class="sub" id="chart-sub">—</p>
+        </div>
+        <span class="badge" id="chart-badge">—</span>
+      </div>
+      <div class="summary" id="chart-summary"></div>
+      <div class="chart-wrap" tabindex="0" role="group" aria-label="每日 token 用量趋势图">
+        <svg id="chart" role="img" aria-label="每日 token 用量"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="legend">
+        <span><i class="clip"></i>超出纵轴 · 顶部尖角</span>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="card">
+        <div class="card-head">
+          <div><h2>模型分布</h2></div>
+          <span class="badge" id="model-badge">—</span>
+        </div>
+        <div class="bars" id="models"></div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <div><h2>项目分布</h2></div>
+          <span class="badge" id="project-badge">—</span>
+        </div>
+        <div class="bars" id="projects"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2 id="hour-title">活跃时段</h2></div>
+        <div class="hour-tools">
+          <span class="badge" id="hour-badge">—</span>
+          <div class="range mini" id="hour-tabs" role="group" aria-label="时段指标">
+            <button type="button" data-metric="tokens" aria-pressed="true">用量</button>
+            <button type="button" data-metric="speed" aria-pressed="false">速度</button>
+          </div>
+        </div>
+      </div>
+      <div class="hours" id="hours"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>会话记录</h2></div>
+        <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
+          <button type="button" data-view="sessions" aria-pressed="true">会话</button>
+          <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+        </div>
+        <span class="badge" id="session-badge">—</span>
+      </div>
+      <div class="table-wrap">
+        <table id="session-table">
+          <thead>
+            <tr>
+              <th style="width: 100px">最近活动</th>
+              <th>项目</th>
+              <th class="model-col" style="width: 230px">模型</th>
+              <th style="width: 80px; text-align: right">用量</th>
+              <th style="width: 68px; text-align: right">请求</th>
+              <th style="width: 88px; text-align: right">花费</th>
+              <th style="width: 104px; text-align: right" id="th-speed">速度</th>
+              <th class="col-duration" style="width: 110px; text-align: right">时长</th>
+            </tr>
+          </thead>
+          <tbody id="session-body"></tbody>
+        </table>
+        <table class="log-table" id="log-table" hidden>
+          <thead>
+            <tr>
+              <th style="width: 100px">最近活动</th>
+              <th style="width: 150px">项目</th>
+              <th class="model-col" style="width: 230px">模型</th>
+              <th style="width: 92px; text-align: right">新增输入</th>
+              <th style="width: 92px; text-align: right">缓存命中</th>
+              <th style="width: 76px; text-align: right">输出</th>
+              <th style="width: 84px; text-align: right">用量</th>
+              <th style="width: 68px; text-align: right">请求</th>
+              <th style="width: 88px; text-align: right">花费</th>
+              <th style="width: 96px; text-align: right">速度</th>
+            </tr>
+          </thead>
+          <tbody id="log-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">—</span>
+    <span style="flex:1"></span>
+    <button class="link" id="btn-sessions">日志目录</button>
+  </footer>
+
+  <div class="modal-mask" id="auth-modal" hidden>
+    <div class="sign-modal" role="dialog" aria-modal="true" aria-label="实时额度与账号">
+      <h3>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        实时额度
+        <span class="m-badge" id="a-badge">本地日志</span>
+      </h3>
+      <div class="m-sub" id="a-sub">复用本机 Codex 授权，点任意账号即可向官方查询 5 小时 / 每周额度（不上传凭证）</div>
+      <div id="a-accounts"></div>
+      <div class="a-hidden-bar" id="a-hidden-bar" hidden>
+        <button class="m-link" id="a-toggle-hidden">显示已隐藏的 0 个账号</button>
+        <span class="a-hidden-tip">仅从看板隐藏，本机授权文件不受影响</span>
+      </div>
+      <div class="dev-panel" id="a-dev-panel" hidden>
+        <div class="dev-hint">
+          1. 打开官方验证网址（会新开浏览器）：
+          <a class="dev-link" id="a-dev-url" href="https://auth.openai.com/codex/device" target="_blank" rel="noreferrer">https://auth.openai.com/codex/device</a><br>
+          2. 登录你的 ChatGPT 账号，输入下面的一次性配对码（15 分钟内有效）：
+        </div>
+        <div class="dev-row" style="margin-top:8px">
+          <span class="dev-code" id="a-dev-code">————</span>
+          <button class="m-btn ghost" id="a-dev-copy" style="height:32px">复制</button>
+        </div>
+        <div class="dev-status" id="a-dev-status">等待你在浏览器完成授权…</div>
+        <div class="dev-btns">
+          <button class="m-link" id="a-dev-open">重新打开验证网址</button>
+          <button class="m-link" id="a-dev-cancel">取消授权</button>
+        </div>
+      </div>
+      <div class="m-msg" id="a-msg" hidden></div>
+      <div class="m-foot">
+        <button class="m-link" id="a-oauth-add">＋ OAuth 授权添加账号</button>
+        <button class="m-link" id="a-refresh">刷新列表</button>
+        <button class="m-close" id="a-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="sign-modal" hidden>
+    <div class="sign-modal" role="dialog" aria-modal="true" aria-label="科研通签到">
+      <h3>
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 10 6l4.6.7-3.3 3.2.8 4.5L8 12l-4.1 2.4.8-4.5L1.4 6.7 6 6z"/></svg>
+        科研通签到
+        <span class="m-badge" id="m-badge">—</span>
+      </h3>
+      <div class="m-sub" id="m-sub">添加科研通账号，一键签到领积分（凭证本机加密保存）</div>
+      <div id="m-accounts"></div>
+      <div class="m-form">
+        <input type="email" id="m-email" placeholder="科研通邮箱" autocomplete="username" spellcheck="false">
+        <div class="m-form-row">
+          <input type="password" id="m-password" placeholder="密码（本机加密，不上传）" autocomplete="current-password">
+          <button class="m-btn" id="m-add">添加账号</button>
+        </div>
+      </div>
+      <button class="m-btn m-primary" id="m-sign">立即签到</button>
+      <div class="m-msg" id="m-msg" hidden></div>
+      <div class="m-foot">
+        <button class="m-link" id="m-open-site">打开科研通官网</button>
+        <button class="m-close" id="m-close">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>

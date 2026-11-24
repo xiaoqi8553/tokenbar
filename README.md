@@ -1,125 +1,123 @@
 # TokenBar
 
-**Windows tray app for token usage.** How much Codex and WorkBuddy used, what it would cost, how fast it ran — one click on the tray icon.
+<p align="center">
+  <a href="https://github.com/xiaoqi8553/tokenbar/actions/workflows/ci.yml"><img src="https://github.com/xiaoqi8553/tokenbar/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/xiaoqi8553/tokenbar/releases/latest"><img src="https://img.shields.io/github/v/release/xiaoqi8553/tokenbar?style=flat-square" alt="latest release"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" alt="Windows">
+  <a href="https://github.com/xiaoqi8553/tokenbar/releases"><img src="https://img.shields.io/github/downloads/xiaoqi8553/tokenbar/total?style=flat-square" alt="downloads"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/xiaoqi8553/tokenbar?style=flat-square" alt="license"></a>
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs welcome">
+</p>
 
-Windows 托盘里的 token 用量看板。Codex 和 WorkBuddy 用了多少、折多少钱、跑得多快，点一下图标就能看到。
+A local-first desktop dashboard for your Codex & WorkBuddy token usage.
 
-Token usage (tokens, speed, model/project split) reads local logs only — no upload. Three opt-in network features, all going straight to their official endpoints with your own credentials held only in this machine's memory: **实时额度** reuses the Codex login already on your machine to ask OpenAI for the real 5-hour / weekly quota (no new login; started automatically in the background); **OAuth 授权添加账号** runs Codex's official device-code flow in-app; **科研通签到** connects to ablesci.com only when you click it. None of them uploads your usage logs, and no credential is ever stored in this repository.
+Windows 托盘里的 token 用量看板：用了多少、折多少钱、跑得多快，点一下图标就能看到。
 
-Token 用量（tokens、速度、模型/项目分布）只读本地日志、不上传。三个联网功能都是可选的，且都直连官方接口、凭证只在本机内存中过一下：**实时额度**复用你机器上已有的 Codex 登录，向 OpenAI 查询真实的 5 小时 / 每周额度（无需重新登录，后台自动开始）；**OAuth 授权添加账号**在应用内走 Codex 官方设备码流程；**科研通签到**只有你点击时才访问 ablesci.com。三者都不上传用量日志，仓库里也不会存任何凭证。
+<figure>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/shots/dashboard-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/shots/dashboard-light.png">
+  <img src="docs/shots/dashboard-light.png" alt="TokenBar 完整看板">
+</picture>
+<figcaption>完整看板：额度、用量、花费、速度与按天趋势一屏看全，明暗双主题随你挑。</figcaption>
+</figure>
 
-All money is shown in **USD ($)**. The pricing table keeps CNY list prices internally and converts at the configurable `usdCny` rate (default 7.2) only for display.
+## Why TokenBar
 
-所有金额统一用**美元（$）**显示。价格表内部仍保存人民币刊例价，只在展示时按可配置的 `usdCny` 汇率（默认 7.2）折算。
+TokenBar 没有账号，也没有服务端。会话内容不会离开这台机器，读日志、算数字、画图都在本地完成。
 
-## What it shows / 看什么
+TokenBar tries to achieve the following goals:
 
-**Popover** — left-click the tray icon
+- **本地优先**：tokens、速度、模型 / 项目分布只读本地日志，不上传；应用无后端、无账号体系。
+- **复用已有授权**：实时额度直接读本机 Codex 登录查官方 5 小时 / 每周额度，不新增一套登录，30 秒刷新一次。
+- **口径透明**：累计、花费、速度怎么算都写在下面，去重前后的数字和取舍都有记录，可以自己对账。
+- **多源聚合**：Codex 与 WorkBuddy（国内 / 国际版）的日志汇到同一套图表，按会话 id 去重。
+- **隐私默认**：token 不出主进程，凭证用系统密钥库加密，隐藏账号只从看板隐藏、不删本地文件。
 
-**托盘弹窗** — 左键点图标
+## Features
 
-- 5-hour and 7-day quota windows: used %, remaining, reset time. The bar marks how much of the window has elapsed, so you can see if you're burning faster than time. When the live quota is available the card is marked **实时**; otherwise it falls back to the snapshot in local logs.
-- 5 小时 / 7 天额度窗口：已用百分比、剩余、重置时刻。进度条上标着时间走到哪了，花得比时间快还是慢一眼能看出来。拿到实时额度时卡片标注 **实时**，否则退回本地日志中的快照。
-- Today's tokens, request count, cache hit rate, plus a 14-day sparkline.
-- 今日用量、请求数、缓存命中率，右边一条 14 天迷你柱图。
-- WorkBuddy today / total / credits.
-- WorkBuddy 今日、累计、积分。
-- Equivalent cost, Codex + WorkBuddy combined.
-- 等价花费，Codex 与 WorkBuddy 合计。
-- **科研通签到**卡片：状态徽标（未配置 / `N/N 已签` / 今日已签 ✓）、一键签到按钮，可展开的账号管理（脱敏列表、添加、删除）。
-- **AbleSci sign-in** card: status badge (not configured / `N/N signed` / signed today ✓), one-tap sign button, and expandable account management (masked list, add, remove).
+左键点托盘图标看弹窗，双击看完整看板。两个数据源共用同一套图表，顶栏可切换 `Codex` / `WorkBuddy`。
 
-**Dashboard** — double-click the tray icon
+| 功能 | 一句话 |
+| --- | --- |
+| 额度窗口 | 5 小时 / 7 天已用、剩余、重置时刻，进度条标出时间走到哪；拿到实时额度时标注「实时」。 |
+| 今日与趋势 | 今日用量、请求数、缓存命中率与 14 天迷你柱图；看板趋势可切 7 / 14 / 30 天与全部，0 token 日保留占位。 |
+| 模型 / 项目分布 | 全量列出，行尾带金额与 tok/s，点行展开新增输入 / 缓存命中 / 输出 / 请求 / 花费 / 速度。 |
+| 活跃时段 | 24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。 |
+| 会话记录 | 「会话」按模型展开明细；「请求明细」一行一个「会话 × 模型」的扁平日志，视图选择会被记住。 |
+| 实时额度 | 列出本机检测到的 Codex 账号，点脱敏邮箱即查官方额度；可选 OAuth 设备码添加账号。 |
+| 科研通签到 | 多账号串行签到，状态徽标、积分与连续天数，密码加密只存本机。 |
+| 双主题 | 「月之亮面」/「月之暗面」，选择记住；不再有跟随系统模式。 |
 
-**完整看板** — 双击图标
+每张截图点开看原图：
 
-- Six metric cards: quota windows, today, total, cost, output speed, cache hit.
-- 六张指标卡：额度窗口、今日用量、累计用量、等价花费、输出速度、缓存命中。
-- Usage trend by day, switchable between 7 / 14 / 30 days and all time. Zero-token days keep their slot on the calendar, so the line falls back to the baseline instead of skipping the gap; the subtitle counts them. The Y axis ignores one-off spikes so ordinary days stay readable; days above the ceiling are marked and keep their real value in the tooltip. Below it: range total, range cost, daily average, peak day, period-over-period.
-- 用量趋势按天，可切 7 / 14 / 30 天与全部。0 token 的日子照样占着日历上的一格，曲线自己落回基线，缺口不会凭空消失；空白天数写在副标题里。纵轴不受单日尖峰牵着走，超出上限的日子有标记、真实值留在 tooltip 里。下面一行给出区间用量、区间花费、日均、单日峰值、环比。
-- Model and project split, recalculated per range, with cost and output speed on each row. Both cards scroll inside a fixed 244px frame and list **every** entry — no `Top 6 + Others` folding. Click a row to expand its fresh input / cache hit / output / requests / cost / speed; the expanded row and scroll position survive a refresh.
-- 模型 / 项目分布，跟着区间重算，行尾都带金额与输出速度。两张卡在固定 244px 框内滚动，**全量列出**每个条目（没有「前 6 + 其他 N 项」折叠）；点某行展开新增输入 / 缓存命中 / 输出 / 请求 / 花费 / 速度，刷新后展开状态与滚动位置都保留。
-- Active hours: 24 hours × tokens, or switch to tok/s to see output speed per hour.
-- 活跃时段：24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。
-- Session log with two views: **Sessions** lists every model of a session (no `+N` folding) and clicking a row expands its per-model breakdown; **Request details** is a CC Switch-style flat log, one row per session × model, with full model name, fresh input, cache hit, output, tokens, requests, cost and speed. The choice is remembered.
-- 会话记录有两个视图：**会话**把每个会话用到的模型全部列出（不再折叠成 `+N`），点某行展开该会话的模型明细；**请求明细**是 CC Switch 式的逐行日志，一行一个「会话 × 模型」，含完整模型名、新增输入、缓存命中、输出、用量、请求数、花费与速度。视图选择会被记住。
-- Top bar **科研通签到** button opens the same sign-in panel (shared accounts across popover and dashboard).
-- 顶栏**科研通签到**按钮打开同一个签到面板（弹窗与看板共用账号）。
-- Top bar **实时额度** button lists the Codex accounts found on this machine (`~/.codex/auth.json` and `~/.codex/XQ_acc`). Click any masked email to query the official quota for that account; no password or new login is needed. Tokens never leave the app.
-- 顶栏**实时额度**按钮列出本机检测到的 Codex 账号（`~/.codex/auth.json` 与 `~/.codex/XQ_acc`）。点任意脱敏邮箱即可查询该账号的官方额度，无需密码或重新登录，token 不会离开应用。
-- **OAuth device-code sign-in**: the same panel has a **+ OAuth 授权添加账号** button. It requests a one-time pairing code from OpenAI's official device-auth endpoint, shows you the verification URL (`auth.openai.com/codex/device`) and the code to enter in your browser, then polls until you approve — exactly the flow CC Switch and Codex CLI use. Approved tokens are saved atomically to `~/.codex/XQ_acc/<email>/auth.json`; your currently active `auth.json` is never touched. No password is ever typed into TokenBar, and no token reaches the renderer or any third-party server.
-- **OAuth 设备码授权**：同一个弹窗里点**＋ OAuth 授权添加账号**，应用向 OpenAI 官方设备码接口申请一次性配对码，显示验证网址（`auth.openai.com/codex/device`）和配对码，你在浏览器里登录并输入后应用自动轮询直到授权成功——与 CC Switch / Codex CLI 的流程完全一致。token 原子写入 `~/.codex/XQ_acc/<邮箱>/auth.json`，不动当前激活的 auth.json。你不需要在 TokenBar 里输入密码，token 也不会进入界面或任何第三方服务器。
-- In the **实时额度** panel, each account row has a **隐藏** button. Hidden accounts disappear from the list and can be restored with **显示已隐藏的 N 个账号**. The hidden list is stored only in TokenBar's own config — the actual `~/.codex` auth files are never touched, so Codex CLI and other tools are unaffected.
-- **实时额度**面板里每个账号行都有**隐藏**按钮，点后从列表消失，可通过**显示已隐藏的 N 个账号**随时恢复。隐藏清单只存在 TokenBar 自己的配置里，**不动本机 `~/.codex` 授权文件**，Codex CLI 等其他工具不受影响。
-- Top bar theme tags: **月之亮面** for light and **月之暗面** for dark. The choice is remembered; the old "follow system" mode is gone.
-- 顶栏主题标签：**月之亮面**对应亮色，**月之暗面**对应暗色。选择会被记住；不再有「跟随系统」模式。
+<table>
+  <tr>
+    <td><a href="docs/shots/popover.png"><img src="docs/shots/popover.png" alt="托盘弹窗" width="420"></a><br><b>托盘弹窗</b> — 额度、今日用量、等价花费与签到入口。</td>
+    <td><a href="docs/shots/auth-panel.png"><img src="docs/shots/auth-panel.png" alt="授权面板" width="420"></a><br><b>授权面板</b> — 本机 Codex 账号、OAuth 设备码授权与隐藏账号。</td>
+  </tr>
+  <tr>
+    <td><a href="docs/shots/dashboard-light.png"><img src="docs/shots/dashboard-light.png" alt="看板亮色" width="420"></a><br><b>完整看板 · 月之亮面</b> — 六张指标卡与按天趋势。</td>
+    <td><a href="docs/shots/dashboard-dark.png"><img src="docs/shots/dashboard-dark.png" alt="看板暗色" width="420"></a><br><b>完整看板 · 月之暗面</b> — 同一套图表的暗色主题。</td>
+  </tr>
+  <tr>
+    <td colspan="2"><a href="docs/shots/dashboard-hours.png"><img src="docs/shots/dashboard-hours.png" alt="活跃时段" width="560"></a><br><b>活跃时段</b> — 24 小时 × 用量 / tok/s 切换。</td>
+  </tr>
+</table>
 
-### 科研通签到 / AbleSci sign-in
+## Quick start
 
-Add one or more AbleSci accounts (email + password) in the popover or dashboard. Passwords are encrypted with the OS keystore (Electron `safeStorage`, DPAPI on Windows) and stored only in `%APPDATA%/TokenBar/data/`; only masked emails ever appear in the UI. Clicking **签到** logs each account in and hits `https://www.ablesci.com/user/sign`, reporting success / already-signed / failure per account. Accounts are signed in series to avoid triggering anti-bot checks. Token usage stats never use this connection — it happens only on click.
+仓库里是源码，没有直接下载的 exe；先构建一次。
 
-在弹窗或看板里添加一个或多个科研通账号（邮箱 + 密码）。密码用系统密钥库加密（Electron `safeStorage`，Windows 上是 DPAPI），只存在 `%APPDATA%/TokenBar/data/`，界面里只出现脱敏邮箱。点**签到**会为每个账号登录并请求 `https://www.ablesci.com/user/sign`，逐账号报告成功 / 今日已签 / 失败。多账号串行签到以避免触发风控。用量统计不走这条连接——只有点击时才会联网。
+```bash
+npm install
+npm run desktop:dir        # 免安装目录 → release/desktop/win-unpacked/TokenBar.exe
+npm run desktop:build      # NSIS 安装程序 → release/desktop/TokenBar-Setup-<version>.exe
+npm run desktop:shortcut   # 桌面快捷方式
+```
 
-The top bar switches between `Codex` and `WorkBuddy`; both reuse the same charts.
+1. **启动即扫描**：双击 `TokenBar.exe`（或桌面快捷方式），应用自动读 `~/.codex/sessions/**/*.jsonl` 与 `~/.workbuddy` / `~/.workbuddy-ai` 的日志（WorkBuddy 会话在 `~/.workbuddy-ai/projects/**/*.jsonl`），缓存写在 `%APPDATA%/TokenBar/data/`。关窗口不退，图标常驻托盘。
+2. **可选：查实时额度**：顶栏点「实时额度」，选本机检测到的 Codex 账号；要加账号就走「＋ OAuth 授权添加账号」的设备码流程。token 只在主进程内存里过一下。
+3. **可选：科研通签到**：在弹窗或看板添加科研通账号，点「签到」串行签到全部账号；不点就不联网。
 
-顶栏切换 `Codex` / `WorkBuddy`，两套复用同一套图表。
+需要看原始数据时用开发命令：
 
-## Data sources / 数据来源
+```bash
+npm install
+npm start                  # Electron 开发模式
+npm test                   # 数据层 + UI 断言，86 个测试
+npm run desktop:smoke      # 启动、托盘、窗口生命周期
+```
 
-| Source | Path |
-|---|---|
-| Codex sessions | `~/.codex/sessions/**/*.jsonl` |
-| Codex history index | `%APPDATA%/TokenBar/data/usage-index.json` |
-| WorkBuddy international | `~/.workbuddy-ai/projects/**/*.jsonl` |
-| WorkBuddy China | `~/.workbuddy/projects/**/*.jsonl` |
+生产依赖 **0** 个，devDependencies 只有 electron / electron-builder / playwright。
 
-WorkBuddy has two installs with different log directories. They often hold the same sessions, because the international build copies the old directory over on first launch. Files are deduplicated by session id, keeping the larger one, so nothing is counted twice.
+## Accounting
 
-WorkBuddy 国际版和国内版写日志的目录不同。两边的会话经常是同一批 —— 国际版首次启动会把旧目录整份搬过去。扫描时按会话 id 去重，只留体积更大的那份，不会重复计。
-
-### What is NOT counted / 不计入的部分
-
-TokenBar only reads `token_count` events from **local rollout files**. Codex Desktop also lists **cloud threads**: in `~/.codex/sqlite/codex.db` (`local_thread_catalog`) they have `source_kind = 'chatgpt'`, a `chatgpt:<account>` host, no `cwd`, and no rollout on disk. They do consume ChatGPT subscription quota, but the machine keeps only their title and timestamps — no token detail. Neither TokenBar nor CC Switch can reconstruct their token counts locally: CC Switch's `proxy_request_logs` is likewise filled by parsing local rollouts unless the local proxy is enabled. To get a session counted, run it as a local Codex session (VS Code extension / CLI / Desktop local mode), or route it through CC Switch's local proxy so the requests are logged.
-
-TokenBar 只统计**本地 rollout** 里的 `token_count` 事件。Codex Desktop 里还有一类**云端线程**：在 `~/.codex/sqlite/codex.db` 的 `local_thread_catalog` 中，它们 `source_kind = 'chatgpt'`、host 是 `chatgpt:<账号>`、没有 `cwd`，磁盘上也不写 rollout。这类会话照样扣 ChatGPT 订阅额度，但本机只留下标题和时间，**没有 token 明细**，TokenBar 和 CC Switch 都无法从本地补算（CC Switch 的 `proxy_request_logs` 默认也是解析本地 rollout 得来的，除非开启本地代理）。想让用量进看板，要么用本地 Codex 会话（VS Code 扩展 / CLI / Desktop 的 local 模式），要么让请求经过 CC Switch 本地代理被记账。
-
-## Accounting / 口径
+三个数字最容易算错：累计、花费、速度。下面写清楚每个怎么算，以及为什么。
 
 ### Total / 累计
 
-Two different numbers live in the logs, and mixing them gives absurd totals. **The total is disk logs ∪ history index, deduplicated by request fingerprint, then summed.**
+日志里有两套数字，混用会算出离谱的总量。**累计 = 磁盘日志 ∪ 历史索引，按请求指纹全局去重后相加。**
 
-日志里有两套数字，混用会算出离谱的总量。**累计 = 磁盘日志 ∪ 历史索引，按请求指纹全局去重后相加**（v2.3.0 起）。
+一条请求的指纹是它的用量五元组 `(input, cached_input, output, total, reasoning_output)`。旧索引记录和磁盘上的 `token_count` 事件共用 `event-dedupe.cjs`：历史索引里记过的请求，磁盘上若还留着同一份 rollout 就跳过。两边互补，可以直接相加。
 
-A request's fingerprint is its usage quintuple `(input, cached_input, output, total, reasoning_output)`. Both the old index records and the on-disk `token_count` events go through the same `event-dedupe.cjs`, so a request already stored in the history index is skipped when the same rollout is still on disk. The two sides become complementary and can simply be added.
+| 口径 | 本机结果 | 结论 |
+| --- | --- | --- |
+| 请求指纹去重，磁盘 + 索引相加 | 144 天 **5.13B** | UI 采用 |
+| 旧：按天取大者，索引未去重 | 6.58B | 多算 **1.36B**，fork replay 最多算 4 次 |
+| 只算磁盘日志（去重后净增） | 0.50B | 早期 rollout 已被清理 |
+| 每个文件累加最后一个 `total` | 3.78B | 错，resume 会话重复计 |
+| 每会话取最大 `total_token_usage` 相加 | 6.1B | 错，resume 会话带着旧总量 |
 
-请求指纹是这条请求的用量五元组 `(input, cached_input, output, total, reasoning_output)`。旧索引记录与磁盘上的 `token_count` 事件共用 `event-dedupe.cjs`：历史索引里已记过的请求，磁盘上若还留着同一份 rollout 就会跳过。两边因此互补，可以直接相加。
+两个坑方向相反：`resume` / `fork` 把此前整段会话重放进新 rollout 文件，按 `file:line` 累加就把同一批请求算很多遍；Codex 又会清理旧 rollout，磁盘只剩最近一段。本机 2026-07-24 的四个 rollout 文件有 **721～746 轮完全相同的公共前缀**，四份全加是 365.8M，去重后只有 94.7M。
 
-| Approach | Result on this machine | Verdict |
-|---|---|---|
-| Dedupe by request fingerprint, add disk + index | **5.13B** over 144 days | what the UI shows |
-| Old: larger per day over an un-deduped index | 6.58B | **1.36B too high** — fork replay counted up to 4× |
-| Disk logs only (net new after dedupe) | 0.50B | early rollouts were cleaned up |
-| Sum each file's last `total` | 3.78B | wrong, resumed sessions double count |
-| Max `total_token_usage` per session, summed | 6.1B | wrong, resumed sessions carry old totals |
+旧的「按天取大者」是在分不清同一请求时的近似。重建 v3 基线后，从 42,151 条索引记录里剔掉 **10,607 条 replay / 1.357B**，Codex 累计从 6.58B 降到 5.13B。作为参照，CC Switch v4 在这台机器上显示 4.87B（只含 Codex）：8 月以后两边逐日吻合，差的约 0.26B 是 CC Switch 从未导入的 `.zst` / `archived_sessions` 历史请求，是真实用量不是重复。WorkBuddy 另加约 0.45B，别拿合计去比 CC Switch 的 Codex 单源数字。
 
-Two traps pull in opposite directions: `resume` / `fork` replays the whole earlier conversation into a new rollout file, so counting by `file:line` charges the same request many times; and Codex deletes old rollouts, so disk only holds the recent stretch. On 2026-07-24 four rollout files shared a **721–746 event common prefix** — all four summed to 365.8M, but only 94.7M were distinct requests.
-
-两个坑方向相反：`resume` / `fork` 会把此前整段会话重放进新的 rollout 文件，按 `file:line` 累加就把同一批请求算了很多遍；而 Codex 又会清理旧 rollout，磁盘上只剩最近一段。本机 2026-07-24 的四个 rollout 文件有 **721～746 轮完全相同的公共前缀**，四份全加是 365.8M，按签名去重后只有 94.7M。
-
-The old "larger value per day" was an approximation for when identical requests couldn't be told apart. Rebuilding the v3 baseline removed **10,607 replay records / 1.357B** from 42,151 indexed rows; the resulting Codex total dropped from 6.58B to 5.13B. For reference, CC Switch v4 reports 4.87B Codex-only on this machine: from August onward the two agree day by day, and the remaining ~0.26B is history from `.zst` / `archived_sessions` that CC Switch never imported — real requests, not double counting. WorkBuddy adds another 0.45B; don't compare its combined number against CC Switch's Codex-only figure.
-
-旧的「按天取大者」是在无法区分同一请求时的近似。重建 v3 基线后，从 42,151 条索引记录里剔掉 **10,607 条 replay / 1.357B**，Codex 累计从 6.58B 降到 5.13B。作为参照，CC Switch v4 在这台机器上显示 4.87B（只含 Codex）：8 月以后两边逐日吻合，剩下的约 0.26B 是 CC Switch 从未导入过的 `.zst` / `archived_sessions` 历史请求，是真实用量而不是重复计算。WorkBuddy 另加约 0.45B；不要把两边合计拿去跟 CC Switch 的 Codex 单源数字对比。
-
-Baseline version 3, usage cache version 4 and detail cache version 7 all invalidate their predecessors, so the first launch after upgrading rebuilds once (about 1.5s on this machine). Nothing in `userData` is rewritten by hand — deleting the caches only forces a rescan.
-
-基线版本 3、用量缓存版本 4、明细缓存版本 7 都会让旧缓存自动失效，升级后首次启动会重建一次（本机约 1.5 秒）。不会手工改写 `userData` 里的原始文件，删缓存也只会触发重扫。
+基线版本 3、用量缓存版本 4、明细缓存版本 7 会让旧缓存自动失效，升级后首次启动重建一次（本机约 1.5 秒）。不会手工改写 `userData` 里的原始文件，删缓存只触发重扫。
 
 ### Cost / 花费
 
-The money shown is **list-price equivalent**, not what you were charged. Plus / Max is a flat subscription; these tokens weren't billed per unit. The number answers "what would this cost on the API".
-
-看板上的金额是按 API 刊例价折算的等价金额，不是订阅实扣。Plus / Max 是包月，这些 token 并没有逐笔付钱。这个数字回答的是「如果走 API 要花多少」。
+看板上的金额是按 API 刊例价折算的**等价金额**，不是订阅实扣。Plus / Max 是包月，这些 token 并没有逐笔付钱；这个数字回答的是「如果走 API 要花多少」。
 
 ```text
 cost = new input / 1e6 × input price
@@ -129,97 +127,58 @@ cost = new input / 1e6 × input price
 new input = inputTokens - cachedInputTokens
 ```
 
-Three ways to get this wrong:
+三个常见错误：
 
-- **Don't multiply `inputTokens` by the input price.** Both vendors include cached tokens in `inputTokens`, and cache hits are usually 95%+. Multiplying directly inflates cost several times over.
-- **Don't bill reasoning separately.** Every vendor already counts it in `output_tokens`.
-- **One canonical currency.** CNY-priced models are summed as-is; USD-priced models are divided by `usdCny` (default 7.2) so Codex and WorkBuddy money can be added together. The result is displayed in USD ($) everywhere.
+- **别拿 `inputTokens` 直接乘输入价**。两家厂商都把缓存命中算进 `inputTokens`，命中率常在 95% 以上，直接乘会把花费放大好几倍。
+- **别把 reasoning 单独计费**。各家都已经把它算进 `output_tokens`。
+- **统一币种**。人民币计价的模型原样相加，美元计价的除以 `usdCny`（默认 7.2），这样 Codex 和 WorkBuddy 的钱能加到一起，最后统一以 `$` 显示。
 
-Model names match by longest prefix: `glm-5.3-flashx` wins over `glm-5.3-flash`, which wins over `glm-5.3`. Unknown models fall back to a default rate and are labelled "estimated" — better an estimate than a zero.
-
-模型名用最长前缀匹配：`glm-5.3-flashx` 优先命中自己，其次 `glm-5.3-flash`，最后 `glm-5.3`。表里没有的型号按兜底价估算并标「估算」—— 宁可估，不记 0。
-
-Price data lives at `%APPDATA%/TokenBar/data/pricing.json`. Edit it and reopen the dashboard to apply.
-
-单价数据在 `%APPDATA%/TokenBar/data/pricing.json`，改完重开看板生效。
+模型名按最长前缀匹配：`glm-5.3-flashx` 优先于 `glm-5.3-flash`，再优先于 `glm-5.3`。表里没有的型号按兜底价估算并标「估算」——宁可估，不记 0。单价表在 `%APPDATA%/TokenBar/data/pricing.json`，改完重开看板生效。
 
 ### WorkBuddy
 
-Each model call carries a usage block: `inputTokens` (includes cache), `outputTokens`, `cached_tokens`, `reasoning_tokens`, `rawUsage.credit`.
+每次模型调用带一份 usage：`inputTokens`（含缓存）、`outputTokens`、`cached_tokens`、`reasoning_tokens`、`rawUsage.credit`。
 
-每条模型调用在 `providerData` 里带一份 usage：`inputTokens`（含缓存）、`outputTokens`、`cached_tokens`、`reasoning_tokens`、`rawUsage.credit`。
-
-- **Don't deduplicate by `conversationRequestId`.** One request is split into a dozen steps, each a separate model call with its own usage. Deduplicating by request id collapsed 985 calls into 27 on this machine. The key is `traceId|stepSeq`.
-- 不能按 `conversationRequestId` 去重。一次请求会拆成十几个 step，每个 step 都是一次独立调用、各带一份 usage。按请求 ID 去重会把 985 次压成 27 次。去重键是 `traceId|stepSeq`。
-- **Input includes cache.** `new input = input - cached`. Cache hit rate here is 98%, so the two buckets need to be read separately.
-- 输入含缓存，`新增输入 = input - cached`。本机缓存命中率 98%，两档要分开看。
-- **Speed comes from timestamps, not a duration field.** Codex logs `duration_ms` per turn; WorkBuddy doesn't. But `function_call` and `function_call_result` each carry a `timestamp`, and the gap between them is that turn's wall time. Pairing them by `parentId` gives the same number Codex reports.
-- 速度不是现成字段，是两个时间戳相减出来的。Codex 日志直接给 `duration_ms`，WorkBuddy 没有，但 `function_call` 和 `function_call_result` 各带一个 `timestamp`，两者之差就是这一轮的墙钟耗时，按 `parentId` 配对即可，口径与 Codex 一致。
+- **不能按 `conversationRequestId` 去重**。一次请求拆成十几个 step，每个 step 各带一份 usage；按请求 ID 去重会把 985 次压成 27 次。去重键是 `traceId|stepSeq`。
+- **输入含缓存**，`新增输入 = input - cached`。本机缓存命中率 98%，两档要分开看。
+- **速度从时间戳算，不是现成字段**。Codex 直接给 `duration_ms`，WorkBuddy 用 `function_call_result.timestamp − function_call.timestamp`（按 `parentId` 配对），口径与 Codex 一致。
 
 ### Speed / 速度
 
-`tps = output tokens ÷ turn duration`. This is **whole-turn throughput**, not raw streaming decode speed — it includes tool calls and waiting, so a session that spends 30s running a shell command looks slow even if the model replied instantly.
+`tps = 输出 tokens ÷ 轮耗时`。这是**整轮吞吐**，不是纯流式解码速度：里面包含工具调用和等待，所以一轮跑了 30 秒 shell 命令的会话会显得慢，哪怕模型秒回。
 
-`tps = 输出 tokens ÷ 轮耗时`。这是**整轮吞吐**，不是纯流式解码速度 —— 里面包含了工具调用和等待，所以一轮里跑了 30 秒 shell 命令的会话会显得慢，哪怕模型本身秒回。
+| 数据源 | 耗时来自 |
+| --- | --- |
+| Codex | `task_complete.duration_ms`，按 `turn_id` 与 `token_usage_record` 配对 |
+| WorkBuddy | `function_call_result.timestamp − function_call.timestamp`，按 `parentId` 配对 |
 
-| Source | Where the duration comes from |
-|---|---|
-| Codex | `task_complete.duration_ms` per turn, paired with `token_usage_record` by `turn_id` |
-| WorkBuddy | `function_call_result.timestamp − function_call.timestamp`, paired by `parentId` |
+配不上的轮次直接不计入，不当成 0 拉低平均。会话表两个数据源都显示 `tok/s`；WorkBuddy 一轮都配不上时退回显示积分，这一列不会空着。
 
-Sessions without a matched pair are excluded rather than counted as zero — that keeps the average honest.
+## Privacy
 
-配不上的轮次直接不计入，不会当成 0 拉低平均。
+- **token 不出主进程**：授权 token 只留在 Electron 主进程内存，不进渲染进程、日志或命令行参数；界面只出现脱敏邮箱。
+- **无后端、无账号、无遥测**：用量只在本地算，没有任何上传路径；科研通签到只在点击时直连 ablesci.com。
+- **凭证加密落盘**：科研通密码优先用 Electron `safeStorage`（Windows 上是 DPAPI），不可用时退回本机派生的 AES-256-GCM，密文只存 `%APPDATA%/TokenBar/data/`。
+- **隐藏不等于删除**：「隐藏」只把账号从看板列表挪走，清单存在 TokenBar 自己的配置里；`~/.codex` 下的授权文件一个字节都不动，Codex CLI 照常用。
 
-Sessions table shows `tok/s` for both sources. A WorkBuddy session with no matched turns falls back to showing its credits, so the column is never blank.
+## FAQ
 
-会话表两个数据源都显示 `tok/s`。WorkBuddy 会话如果一轮都配不上，就退回显示它的积分，这一列不会空着。
+**为什么 ChatGPT 云端线程不计入？**
+Codex Desktop 的云端线程在 `~/.codex/sqlite/codex.db` 里 `source_kind = 'chatgpt'`、没有 `cwd`，磁盘上也不写 rollout，本机只有标题和时间。它照样扣订阅额度，但没有任何 token 明细可算——TokenBar 和 CC Switch 都补不出来。想进看板就用本地会话（CLI / 扩展 / Desktop local 模式），或让请求经过 CC Switch 本地代理。
 
-## Install / 安装
+**为什么金额是美元？**
+刊例价表内部保留人民币原价，只在展示边界按 `pricing.json` 的 `usdCny`（默认 7.2）折算成 `$`，这样 Codex 和 WorkBuddy 的钱能加到一起。这个数字是「走 API 要花多少」的等价估算，不是订阅实扣。
 
-This repo is source only — there is no exe to download. Build it once:
+**为什么和 CC Switch 的数字对不上？**
+看去重口径：重写基线前 TokenBar 是 6.58B，CC Switch v4 是 4.87B；按请求指纹去重后 TokenBar 收敛到 5.13B，8 月以后两边逐日吻合。剩下约 0.26B 是 CC Switch 从未导入的 `.zst` / `archived_sessions` 真实历史请求，不是重复计算。另外 CC Switch 的数字只含 Codex，TokenBar 合计里还有 WorkBuddy 约 0.45B，别拿合计去比单源。
 
-仓库里只有源码，没有可直接下载的 exe。先构建一次：
+**隐藏账号是不是把本地文件删了？**
+不删，点「隐藏」只是让它从看板列表消失，「显示已隐藏的 N 个账号」随时能恢复，`~/.codex` 里的授权文件原封不动。账号多了想眼净——这些玩意怎么清除啊？不用删文件，隐藏一下就够了。
 
-```bash
-npm install
-npm run desktop:dir        # portable folder → release/desktop/win-unpacked/TokenBar.exe
-npm run desktop:build      # NSIS installer → release/desktop/TokenBar-Setup-<version>.exe
-npm run desktop:shortcut   # desktop shortcut
-```
+## Contributing
 
-Runs on double-click, sits in the tray, closing the window doesn't quit.
-
-免安装版双击就跑，托盘常驻，关窗口不退。
-
-## Develop / 开发
-
-```bash
-npm install
-npm start                  # Electron in dev mode
-npm test                   # data layer + UI assertions
-npm run usage:audit        # compare the total-accounting approaches
-npm run usage:verify       # verify the deduplicated total against the raw index
-npm run desktop:smoke      # startup, tray, window lifecycle
-```
-
-```text
-desktop/
-  main.cjs                    main process: tray, popover, dashboard window, IPC
-  popover.html                tray popover
-  dashboard.html              full dashboard (single file, no build step)
-  data/codex-store.cjs        Codex: scan, per-request dedupe, speed, cost
-  data/event-dedupe.cjs       request fingerprint shared by index and disk logs
-  data/workbuddy-store.cjs    WorkBuddy: two roots, dedupe by session id, speed
-  data/history-baseline.cjs   old index → per-day summary (v3: deduplicated)
-  data/pricing.cjs            price table and conversion
-tests/                        data layer and UI assertions
-```
-
-Caches live in `%APPDATA%/TokenBar/data/`. Deleting them only forces a rescan.
-
-缓存都在 `%APPDATA%/TokenBar/data/`，删掉只会重扫，不影响正确性。
+欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（86 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
 
 ## License
 
-MIT
+MIT — 见 [LICENSE](./LICENSE)。
