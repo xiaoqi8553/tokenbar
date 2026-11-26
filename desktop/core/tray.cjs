@@ -35,6 +35,18 @@ function attachWorkBuddySummary(ctx) {
   ctx.pushStatusToPopover(ctx);
 }
 
+/** 把 Antigravity 的当日/累计摘要挂到最新快照上，弹窗与托盘共用 */
+function attachAntigravitySummary(ctx) {
+  if (!ctx.agyStore || !ctx.latestStatus) return;
+  try {
+    ctx.latestStatus.antigravity = ctx.agyStore.summary();
+  } catch {
+    return;
+  }
+  ctx.updateTray(ctx);
+  ctx.pushStatusToPopover(ctx);
+}
+
 /** 把实时额度挂到 latestStatus.quota，并记录来源，供界面标注「实时」 */
 function applyLiveQuota(ctx, result) {
   if (!result || !result.quota || !ctx.latestStatus) return;
@@ -119,6 +131,7 @@ function updateTray(ctx) {
     { label: `今日用量：${ctx.formatTokens(ctx, data?.today?.totalTokens)} tokens`, enabled: false },
     { label: `累计用量：${ctx.formatTokens(ctx, data?.totals?.totalTokens)} tokens`, enabled: false },
     { label: `WorkBuddy 今日：${ctx.formatTokens(ctx, data?.workbuddy?.today?.totalTokens)} tokens`, enabled: false },
+    { label: `Antigravity 今日：${ctx.formatTokens(ctx, data?.antigravity?.today?.totalTokens)} tokens`, enabled: false },
     { type: "separator" },
     { label: "立即同步数据", click: () => { ctx.refreshTrayStatus(ctx, true); } },
     {
@@ -169,7 +182,7 @@ function createTray(ctx) {
 
 function installTray(ctx) {
   Object.assign(ctx, {
-    pushStatusToPopover, pushAbleSciChanged, pushDetailProgress, attachWorkBuddySummary,
+    pushStatusToPopover, pushAbleSciChanged, pushDetailProgress, attachWorkBuddySummary, attachAntigravitySummary,
     applyLiveQuota, refreshLiveQuota, attachLiveQuota, formatTokens, runTraySign,
     updateTray, createTray
   });
@@ -178,6 +191,6 @@ function installTray(ctx) {
 
 module.exports = {
   installTray, pushStatusToPopover, pushAbleSciChanged, pushDetailProgress,
-  attachWorkBuddySummary, applyLiveQuota, refreshLiveQuota, attachLiveQuota,
+  attachWorkBuddySummary, attachAntigravitySummary, applyLiveQuota, refreshLiveQuota, attachLiveQuota,
   formatTokens, runTraySign, updateTray, createTray
 };

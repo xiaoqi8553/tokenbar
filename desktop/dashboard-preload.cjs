@@ -21,6 +21,11 @@ contextBridge.exposeInMainWorld("dashboard", {
   workbuddyRefresh: () => ipcRenderer.invoke("dashboard:workbuddy-refresh"),
   /** 打开 ~/.workbuddy/projects */
   openWorkBuddy: () => ipcRenderer.invoke("dashboard:open-workbuddy"),
+  /** Antigravity 明细（第三个数据源，结构与 Codex 明细一致） */
+  antigravityDetail: () => ipcRenderer.invoke("dashboard:antigravity-detail"),
+  antigravityRefresh: () => ipcRenderer.invoke("dashboard:antigravity-refresh"),
+  /** 打开 Antigravity brain 日志目录 */
+  openAntigravity: () => ipcRenderer.invoke("dashboard:open-antigravity"),
   /** 扫描进度与状态推送 */
   onProgress: callback => {
     const handler = (_event, payload) => callback(payload);

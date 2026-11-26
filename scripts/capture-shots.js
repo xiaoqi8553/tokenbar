@@ -168,6 +168,7 @@ async function main() {
       ...childEnv,
       CODEX_HOME: temporaryRoot,
       WORKBUDDY_HOME: path.join(temporaryRoot, "no-workbuddy"),
+      ANTIGRAVITY_HOME: path.join(temporaryRoot, "no-antigravity"),
       CODEX_TOKEN_DASHBOARD_SMOKE: "1",
       CODEX_TOKEN_DASHBOARD_SMOKE_TIMEOUT: "90000"
     },

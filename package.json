@@ -1,8 +1,8 @@
 {
   "name": "tokenbar",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": false,
-  "description": "Windows 托盘里的 token 用量看板：Codex 与 WorkBuddy 的用量、额度窗口、输出速度和等价花费，只读本地日志。",
+  "description": "Windows 托盘里的 token 用量看板：Codex、WorkBuddy 与 Antigravity 的用量、额度窗口、输出速度和等价花费，只读本地日志。",
   "author": "Xiaoqi",
   "main": "desktop/main.cjs",
   "scripts": {

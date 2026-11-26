@@ -711,6 +711,7 @@
     <div class="line"><span>输出 / 其中推理</span><b id="d-output">—</b></div>
     <div class="line"><span>会话数 / 请求数</span><b id="d-count">—</b></div>
     <div class="line"><span>WorkBuddy 今日 / 累计</span><b id="d-wb">—</b></div>
+    <div class="line"><span>Antigravity 今日 / 累计</span><b id="d-agy">—</b></div>
     <div class="line"><span>等价花费（刊例价）</span><b id="d-cost">—</b></div>
   </div>
 
@@ -896,19 +897,32 @@
         : "未检测到 WorkBuddy 日志";
     }
 
-    // 等价花费：Codex 与 WorkBuddy 都是按 API 刊例价折算，不是实际扣费
+    const agy = status.antigravity;
+    const agyNode = $("d-agy");
+    if (agyNode) {
+      agyNode.textContent = agy && agy.totals && agy.totals.totalTokens
+        ? `${formatTokens(agy.today ? agy.today.totalTokens : 0)} / ${formatTokens(agy.totals.totalTokens)}`
+        : "—";
+      agyNode.title = agy && agy.totals
+        ? `Antigravity ${agy.sessions || 0} 个会话 · ${(agy.totals.records || 0).toLocaleString("zh-CN")} 次调用`
+        : "未检测到 Antigravity 日志";
+    }
+
+    // 等价花费：Codex、WorkBuddy 与 Antigravity 都是按 API 刊例价折算，不是实际扣费
     const costNode = $("d-cost");
     if (costNode) {
       const codexCost = status.cost;
       const wbCost = wb && wb.cost;
-      if (codexCost || wbCost) {
+      const agyCost = agy && agy.cost;
+      if (codexCost || wbCost || agyCost) {
         const parts = [];
         if (codexCost) parts.push(`Codex ${formatMoney(codexCost.cny)}`);
-        if (wbCost) parts.push(`WorkBuddy ${formatMoney(wbCost.cny)}`);
+        if (wbCost) parts.push(`WB ${formatMoney(wbCost.cny)}`);
+        if (agyCost && agyCost.cny > 0) parts.push(`AGY ${formatMoney(agyCost.cny)}`);
         costNode.textContent = parts.join(" + ");
-        const totalCny = (codexCost ? codexCost.cny : 0) + (wbCost ? wbCost.cny : 0);
+        const totalCny = (codexCost ? codexCost.cny : 0) + (wbCost ? wbCost.cny : 0) + (agyCost ? agyCost.cny : 0);
         costNode.title = `合计 ${formatMoney(totalCny)} · 今日 ${formatMoney(
-          (codexCost ? codexCost.todayCny : 0) + (wbCost ? wbCost.todayCny : 0)
+          (codexCost ? codexCost.todayCny : 0) + (wbCost ? wbCost.todayCny : 0) + (agyCost ? agyCost.todayCny : 0)
         )} · 按官方 API 刊例价折算，非订阅实扣`;
       } else {
         costNode.textContent = "—";

@@ -186,6 +186,7 @@
     });
     $("btn-sessions").addEventListener("click", () => {
       if (state.source === "workbuddy" && window.dashboard.openWorkBuddy) window.dashboard.openWorkBuddy();
+      else if (state.source === "antigravity" && window.dashboard.openAntigravity) window.dashboard.openAntigravity();
       else window.dashboard.openSessions();
     });
     // 版本号可点：直接在浏览器打开仓库，方便确认「这是哪一版」

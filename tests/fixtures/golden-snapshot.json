@@ -449,6 +449,453 @@
             "output": 8.4
           },
           "note": ""
+        },
+        {
+          "match": "gemini-4-neon",
+          "label": "Gemini 4 Neon",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.15,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 1.08,
+            "output": 108
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-4-argon",
+          "label": "Gemini 4 Argon",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.1,
+          "output": 10,
+          "cny": {
+            "input": 14.4,
+            "cached": 0.7200000000000001,
+            "output": 72
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-4-carbon",
+          "label": "Gemini 4 Carbon",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.1,
+          "output": 10,
+          "cny": {
+            "input": 14.4,
+            "cached": 0.7200000000000001,
+            "output": 72
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-4-hydrogen",
+          "label": "Gemini 4 Hydrogen",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 1.5,
+          "cached": 0.075,
+          "output": 7.5,
+          "cny": {
+            "input": 10.8,
+            "cached": 0.54,
+            "output": 54
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.75,
+          "cached": 0.075,
+          "output": 3.75,
+          "cny": {
+            "input": 5.4,
+            "cached": 0.54,
+            "output": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.7-flash",
+          "label": "Gemini 3.7 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.75,
+          "cached": 0.075,
+          "output": 3.75,
+          "cny": {
+            "input": 5.4,
+            "cached": 0.54,
+            "output": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.6-flash",
+          "label": "Gemini 3.6 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.75,
+          "cached": 0.075,
+          "output": 3.75,
+          "cny": {
+            "input": 5.4,
+            "cached": 0.54,
+            "output": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.5-flash-lite",
+          "label": "Gemini 3.5 Flash Lite",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.3,
+          "cached": 0.03,
+          "output": 2.5,
+          "cny": {
+            "input": 2.16,
+            "cached": 0.216,
+            "output": 18
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.5-flash",
+          "label": "Gemini 3.5 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 1.5,
+          "cached": 0.15,
+          "output": 9,
+          "cny": {
+            "input": 10.8,
+            "cached": 1.08,
+            "output": 64.8
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.1-pro",
+          "label": "Gemini 3.1 Pro",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.2,
+          "output": 12,
+          "cny": {
+            "input": 14.4,
+            "cached": 1.4400000000000002,
+            "output": 86.4
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3.1-flash-lite",
+          "label": "Gemini 3.1 Flash Lite",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.25,
+          "cached": 0.025,
+          "output": 1.5,
+          "cny": {
+            "input": 1.8,
+            "cached": 0.18000000000000002,
+            "output": 10.8
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3-pro",
+          "label": "Gemini 3 Pro",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.2,
+          "output": 12,
+          "cny": {
+            "input": 14.4,
+            "cached": 1.4400000000000002,
+            "output": 86.4
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-3-flash",
+          "label": "Gemini 3 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.5,
+          "cached": 0.05,
+          "output": 3,
+          "cny": {
+            "input": 3.6,
+            "cached": 0.36000000000000004,
+            "output": 21.6
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-2.5-pro",
+          "label": "Gemini 2.5 Pro",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 1.25,
+          "cached": 0.125,
+          "output": 10,
+          "cny": {
+            "input": 9,
+            "cached": 0.9,
+            "output": 72
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-2.5-flash-lite",
+          "label": "Gemini 2.5 Flash Lite",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.1,
+          "cached": 0.01,
+          "output": 0.4,
+          "cny": {
+            "input": 0.7200000000000001,
+            "cached": 0.07200000000000001,
+            "output": 2.8800000000000003
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-2.5-flash",
+          "label": "Gemini 2.5 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.3,
+          "cached": 0.03,
+          "output": 2.5,
+          "cny": {
+            "input": 2.16,
+            "cached": 0.216,
+            "output": 18
+          },
+          "note": ""
+        },
+        {
+          "match": "gemini-2.0-flash",
+          "label": "Gemini 2.0 Flash",
+          "vendor": "Google",
+          "currency": "USD",
+          "input": 0.1,
+          "cached": 0.025,
+          "output": 0.4,
+          "cny": {
+            "input": 0.7200000000000001,
+            "cached": 0.18000000000000002,
+            "output": 2.8800000000000003
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-sonnet-5",
+          "label": "Claude Sonnet 5",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 2,
+          "cached": 0.2,
+          "output": 10,
+          "cny": {
+            "input": 14.4,
+            "cached": 1.4400000000000002,
+            "output": 72,
+            "cacheWrite": 18
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-opus-4-7",
+          "label": "Claude Opus 4.7",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 5,
+          "cached": 0.5,
+          "output": 25,
+          "cny": {
+            "input": 36,
+            "cached": 3.6,
+            "output": 180,
+            "cacheWrite": 45
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-opus-4-6",
+          "label": "Claude Opus 4.6",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 5,
+          "cached": 0.5,
+          "output": 25,
+          "cny": {
+            "input": 36,
+            "cached": 3.6,
+            "output": 180,
+            "cacheWrite": 45
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-sonnet-4-6",
+          "label": "Claude Sonnet 4.6",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.3,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 2.16,
+            "output": 108,
+            "cacheWrite": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-opus-4-5",
+          "label": "Claude Opus 4.5",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 5,
+          "cached": 0.5,
+          "output": 25,
+          "cny": {
+            "input": 36,
+            "cached": 3.6,
+            "output": 180,
+            "cacheWrite": 45
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-sonnet-4-5",
+          "label": "Claude Sonnet 4.5",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.3,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 2.16,
+            "output": 108,
+            "cacheWrite": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-haiku-4-5",
+          "label": "Claude Haiku 4.5",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 1,
+          "cached": 0.1,
+          "output": 5,
+          "cny": {
+            "input": 7.2,
+            "cached": 0.7200000000000001,
+            "output": 36,
+            "cacheWrite": 9
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-opus-4-1",
+          "label": "Claude Opus 4.1",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 15,
+          "cached": 1.5,
+          "output": 75,
+          "cny": {
+            "input": 108,
+            "cached": 10.8,
+            "output": 540,
+            "cacheWrite": 135
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-opus-4",
+          "label": "Claude Opus 4",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 15,
+          "cached": 1.5,
+          "output": 75,
+          "cny": {
+            "input": 108,
+            "cached": 10.8,
+            "output": 540,
+            "cacheWrite": 135
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-sonnet-4",
+          "label": "Claude Sonnet 4",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.3,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 2.16,
+            "output": 108,
+            "cacheWrite": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-3-5-sonnet",
+          "label": "Claude 3.5 Sonnet",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 3,
+          "cached": 0.3,
+          "output": 15,
+          "cny": {
+            "input": 21.6,
+            "cached": 2.16,
+            "output": 108,
+            "cacheWrite": 27
+          },
+          "note": ""
+        },
+        {
+          "match": "claude-3-5-haiku",
+          "label": "Claude 3.5 Haiku",
+          "vendor": "Anthropic",
+          "currency": "USD",
+          "input": 0.8,
+          "cached": 0.08,
+          "output": 4,
+          "cny": {
+            "input": 5.760000000000001,
+            "cached": 0.5760000000000001,
+            "output": 28.8,
+            "cacheWrite": 7.2
+          },
+          "note": ""
         }
       ]
     },
@@ -907,7 +1354,7 @@
     },
     "baseline": null,
     "today": {
-      "day": "2026-11-24",
+      "day": "2026-11-26",
       "totalTokens": 0,
       "inputTokens": 0,
       "cachedInputTokens": 0,
@@ -916,7 +1363,7 @@
       "records": 0
     },
     "yesterday": {
-      "day": "2026-11-23",
+      "day": "2026-11-25",
       "totalTokens": 0,
       "inputTokens": 0,
       "cachedInputTokens": 0,
@@ -925,24 +1372,6 @@
       "records": 0
     },
     "series": [
-      {
-        "day": "2026-11-11",
-        "totalTokens": 0,
-        "inputTokens": 0,
-        "cachedInputTokens": 0,
-        "outputTokens": 0,
-        "reasoningOutputTokens": 0,
-        "records": 0
-      },
-      {
-        "day": "2026-11-12",
-        "totalTokens": 0,
-        "inputTokens": 0,
-        "cachedInputTokens": 0,
-        "outputTokens": 0,
-        "reasoningOutputTokens": 0,
-        "records": 0
-      },
       {
         "day": "2026-11-13",
         "totalTokens": 0,
@@ -1044,6 +1473,24 @@
       },
       {
         "day": "2026-11-24",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-25",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-26",
         "totalTokens": 0,
         "inputTokens": 0,
         "cachedInputTokens": 0,

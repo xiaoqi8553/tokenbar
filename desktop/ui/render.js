@@ -314,13 +314,92 @@
     ];
   }
 
+  function antigravityCards() {
+    const detail = state.detail;
+    const totals = detail.totals;
+    const today = detail.today;
+    const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
+    const todayRate = today && today.inputTokens ? (today.cachedInputTokens / today.inputTokens) * 100 : 0;
+    const ttftMs = detail.throughput && detail.throughput.ttftMs;
+    const ttftTurns = detail.throughput && detail.throughput.turns ? detail.throughput.turns : 0;
+    const rootHint = (detail.roots || [])
+      .filter(item => item.files > 0)
+      .map(item => {
+        const parts = String(item.root).split(/[\\/]/).filter(Boolean);
+        return parts.length >= 2 && parts[parts.length - 2] === ".gemini"
+          ? "~/.gemini/" + parts[parts.length - 1]
+          : "~/" + (parts[parts.length - 1] || "antigravity");
+      })
+      .join(" + ") || "~/.gemini/antigravity";
+
+    return [
+      {
+        label: "今日用量",
+        window: "00:00 起",
+        num: today ? fmtTokens(today.totalTokens) : "—",
+        unit: "tokens",
+        hideMeter: true,
+        foot: today
+          ? "<b>" + fmtCount(today.records) + "</b> 次调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
+          : "今天还没有记录",
+        hints: today
+          ? ["新增输入 " + fmtTokens(Math.max(0, today.inputTokens - today.cachedInputTokens)) + " · 输出 " + fmtTokens(today.outputTokens)]
+          : []
+      },
+      {
+        label: "累计用量",
+        window: detail.series.length + " 天",
+        num: fmtTokens(totals.totalTokens),
+        unit: "tokens",
+        hideMeter: true,
+        foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
+        hints: ["来源 " + rootHint]
+      },
+      {
+        label: "等价花费",
+        window: "累计",
+        num: fmtMoney(detail.cost ? detail.cost.cny : 0),
+        money: true,
+        unit: "",
+        hideMeter: true,
+        title: "美元计价 · 按官方 API 刊例价折算",
+        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
+        hints: ["按 CC Switch 同口径折算"]
+      },
+      {
+        label: "缓存命中率",
+        window: "输入口径",
+        num: fmtPercent(cacheRate, 1),
+        unit: "命中",
+        percent: cacheRate,
+        level: "ok",
+        foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
+        hints: ["input 已含缓存还原，不重复扣除"]
+      },
+      {
+        label: "首字延迟",
+        window: "TTFT 中位数",
+        num: ttftMs !== null && ttftMs !== undefined ? fmtSpeed(ttftMs) : "—",
+        unit: "",
+        hideMeter: true,
+        foot: ttftTurns
+          ? "<b>" + fmtCount(ttftTurns) + "</b> 轮带原生计时"
+          : "暂无原生计时样本",
+        hints: ["来自 conversations/*.db"]
+      },
+      speedCard()
+    ];
+  }
+
   function renderStats() {
     const detail = state.detail;
-    if (!detail && state.source === "workbuddy") return;
+    if (!detail && (state.source === "workbuddy" || state.source === "antigravity")) return;
 
     let cards;
     if (state.source === "workbuddy") {
       cards = workbuddyCards();
+    } else if (state.source === "antigravity") {
+      cards = antigravityCards();
     } else {
       const quota = (state.status && state.status.quota) || null;
       const liveTag = quota && quota.source === "api" ? " · 实时" : "";
@@ -573,7 +652,11 @@
       (note ? '<small>' + note + '</small>' : '') + '</div></div>'
     ).join("");
 
-    $("chart-badge").textContent = state.source === "workbuddy" ? "WorkBuddy · 本地日志" : "Codex · 本地日志";
+    $("chart-badge").textContent = state.source === "workbuddy"
+      ? "WorkBuddy · 本地日志"
+      : state.source === "antigravity"
+        ? "Antigravity · 本地日志"
+        : "Codex · 本地日志";
   }
 
   // 悬停提示
@@ -980,13 +1063,18 @@
       return;
     }
     dot.setAttribute("data-tone", detail.builtAt ? "" : "muted");
+    const sourcePrefix = detail.source === "workbuddy"
+      ? "WorkBuddy · "
+      : detail.source === "antigravity"
+        ? "Antigravity · "
+        : "Codex · ";
     $("status-text").textContent =
-      (detail.source === "workbuddy" ? "WorkBuddy · " : "Codex · ") +
+      sourcePrefix +
       detail.scannedFiles + " 个日志 · " + detail.sessions + " 个会话 · " +
       (detail.builtAt ? new Date(detail.builtAt).toLocaleString("zh-CN", { hour12: false }) : "—");
 
     const legacyDays = detail.baseline && detail.baseline.days ? detail.baseline.days : detail.series.length;
-    if (detail.source === "workbuddy") {
+    if (detail.source === "workbuddy" || detail.source === "antigravity") {
       const todayTokens = detail.today ? detail.today.totalTokens : 0;
       $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
         (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
@@ -994,10 +1082,12 @@
         (legacyDays > 1 && todayTokens > 0 ? " · 今日 " + fmtTokens(todayTokens) : "");
     } else {
       const wbToday = workbuddyTodayTokens();
+      const agyToday = antigravityTodayTokens();
       $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
         (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
         (legacyDays ? " · " + legacyDays + " 天" : "") +
-        (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "");
+        (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "") +
+        (agyToday > 0 ? " · Antigravity " + fmtTokens(agyToday) + " 今日" : "");
     }
   }
 

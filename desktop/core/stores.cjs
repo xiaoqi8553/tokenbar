@@ -71,6 +71,21 @@ async function initStore(ctx, paths, baseline) {
     })
     .catch(error => ctx.log(ctx, `workbuddy scan failed: ${error.message}`));
 
+  ctx.agyStore = new ctx.AntigravityStore({
+    roots: ctx.antigravityRoots(ctx),
+    cacheFile: paths.antigravityCache,
+    pricing
+  });
+  ctx.agyStore.loadCache();
+  ctx.agyStore.build()
+    .then(() => {
+      const summary = ctx.agyStore.summary();
+      const sources = (summary.roots || []).filter(item => item.files > 0).map(item => `${path.basename(item.root)}:${item.files}`).join(" + ");
+      ctx.log(ctx, `antigravity: ${ctx.agyStore.files.size} files (${sources || "none"}), ${(summary.totals.totalTokens / 1e6).toFixed(1)}M tokens`);
+      ctx.attachAntigravitySummary(ctx);
+    })
+    .catch(error => ctx.log(ctx, `antigravity scan failed: ${error.message}`));
+
   const snapshot = await ctx.store.init({ full: false });
   ctx.latestStatus = snapshot;
   ctx.attachLiveQuota(ctx);

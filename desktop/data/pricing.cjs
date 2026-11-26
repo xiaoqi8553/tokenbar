@@ -253,6 +253,283 @@ const DEFAULT_ENTRIES = [
     input: 2.1,
     cached: 0.42,
     output: 8.4
+  },
+
+  // ---------------- Google Gemini（USD，对齐 CC Switch） ----------------
+  {
+    match: "gemini-4-neon",
+    label: "Gemini 4 Neon",
+    vendor: "Google",
+    currency: "USD",
+    input: 3,
+    cached: 0.15,
+    output: 15
+  },
+  {
+    match: "gemini-4-argon",
+    label: "Gemini 4 Argon",
+    vendor: "Google",
+    currency: "USD",
+    input: 2,
+    cached: 0.1,
+    output: 10
+  },
+  {
+    match: "gemini-4-carbon",
+    label: "Gemini 4 Carbon",
+    vendor: "Google",
+    currency: "USD",
+    input: 2,
+    cached: 0.1,
+    output: 10
+  },
+  {
+    match: "gemini-4-hydrogen",
+    label: "Gemini 4 Hydrogen",
+    vendor: "Google",
+    currency: "USD",
+    input: 1.5,
+    cached: 0.075,
+    output: 7.5
+  },
+  {
+    match: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.75,
+    cached: 0.075,
+    output: 3.75
+  },
+  {
+    match: "gemini-3.7-flash",
+    label: "Gemini 3.7 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.75,
+    cached: 0.075,
+    output: 3.75
+  },
+  {
+    match: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.75,
+    cached: 0.075,
+    output: 3.75
+  },
+  {
+    match: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash Lite",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.3,
+    cached: 0.03,
+    output: 2.5
+  },
+  {
+    match: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 1.5,
+    cached: 0.15,
+    output: 9
+  },
+  {
+    match: "gemini-3.1-pro",
+    label: "Gemini 3.1 Pro",
+    vendor: "Google",
+    currency: "USD",
+    input: 2,
+    cached: 0.2,
+    output: 12
+  },
+  {
+    match: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.25,
+    cached: 0.025,
+    output: 1.5
+  },
+  {
+    match: "gemini-3-pro",
+    label: "Gemini 3 Pro",
+    vendor: "Google",
+    currency: "USD",
+    input: 2,
+    cached: 0.2,
+    output: 12
+  },
+  {
+    match: "gemini-3-flash",
+    label: "Gemini 3 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.5,
+    cached: 0.05,
+    output: 3
+  },
+  {
+    match: "gemini-2.5-pro",
+    label: "Gemini 2.5 Pro",
+    vendor: "Google",
+    currency: "USD",
+    input: 1.25,
+    cached: 0.125,
+    output: 10
+  },
+  {
+    match: "gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash Lite",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.1,
+    cached: 0.01,
+    output: 0.4
+  },
+  {
+    match: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.3,
+    cached: 0.03,
+    output: 2.5
+  },
+  {
+    match: "gemini-2.0-flash",
+    label: "Gemini 2.0 Flash",
+    vendor: "Google",
+    currency: "USD",
+    input: 0.1,
+    cached: 0.025,
+    output: 0.4
+  },
+
+  // ---------------- Anthropic Claude（USD，对齐 CC Switch） ----------------
+  {
+    match: "claude-sonnet-5",
+    label: "Claude Sonnet 5",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 2,
+    cached: 0.2,
+    output: 10,
+    cacheWrite: 2.5
+  },
+  {
+    match: "claude-opus-4-7",
+    label: "Claude Opus 4.7",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 5,
+    cached: 0.5,
+    output: 25,
+    cacheWrite: 6.25
+  },
+  {
+    match: "claude-opus-4-6",
+    label: "Claude Opus 4.6",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 5,
+    cached: 0.5,
+    output: 25,
+    cacheWrite: 6.25
+  },
+  {
+    match: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 3,
+    cached: 0.3,
+    output: 15,
+    cacheWrite: 3.75
+  },
+  {
+    match: "claude-opus-4-5",
+    label: "Claude Opus 4.5",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 5,
+    cached: 0.5,
+    output: 25,
+    cacheWrite: 6.25
+  },
+  {
+    match: "claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 3,
+    cached: 0.3,
+    output: 15,
+    cacheWrite: 3.75
+  },
+  {
+    match: "claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 1,
+    cached: 0.1,
+    output: 5,
+    cacheWrite: 1.25
+  },
+  {
+    match: "claude-opus-4-1",
+    label: "Claude Opus 4.1",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 15,
+    cached: 1.5,
+    output: 75,
+    cacheWrite: 18.75
+  },
+  {
+    match: "claude-opus-4",
+    label: "Claude Opus 4",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 15,
+    cached: 1.5,
+    output: 75,
+    cacheWrite: 18.75
+  },
+  {
+    match: "claude-sonnet-4",
+    label: "Claude Sonnet 4",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 3,
+    cached: 0.3,
+    output: 15,
+    cacheWrite: 3.75
+  },
+  {
+    match: "claude-3-5-sonnet",
+    label: "Claude 3.5 Sonnet",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 3,
+    cached: 0.3,
+    output: 15,
+    cacheWrite: 3.75
+  },
+  {
+    match: "claude-3-5-haiku",
+    label: "Claude 3.5 Haiku",
+    vendor: "Anthropic",
+    currency: "USD",
+    input: 0.8,
+    cached: 0.08,
+    output: 4,
+    cacheWrite: 1
   }
 ];
 
@@ -293,7 +570,8 @@ function normalizeEntry(raw) {
   const match = String(raw.match || "").trim().toLowerCase();
   if (!match) return null;
   const currency = String(raw.currency || "CNY").toUpperCase() === "USD" ? "USD" : "CNY";
-  return {
+  const cacheWrite = num(raw.cacheWrite, 0);
+  const entry = {
     match,
     label: String(raw.label || raw.match),
     vendor: String(raw.vendor || "—"),
@@ -304,6 +582,8 @@ function normalizeEntry(raw) {
     note: raw.note ? String(raw.note) : "",
     estimated: Boolean(raw.estimated)
   };
+  if (cacheWrite > 0) entry.cacheWrite = cacheWrite;
+  return entry;
 }
 
 /** 把内置表与用户覆盖合并，返回可直接用于计算的表 */
@@ -329,39 +609,128 @@ function looksLikePath(name) {
   return /[\\/]/.test(name) || /^[a-z]:/i.test(name) || name.length > 64;
 }
 
-/** 按「最长匹配」找价格：glm-5.3-flashx 优先于 glm-5.3-flash，再优先于 glm-5.3 */
-function priceEntry(model, table) {
-  const key = String(model || "").trim().toLowerCase();
-  if (!key || looksLikePath(key)) return null;
-  let best = null;
-  for (const entry of table.entries) {
-    if (!key.includes(entry.match)) continue;
-    if (!best || entry.match.length > best.match.length) best = entry;
+const KNOWN_NAMESPACE_PREFIXES = [
+  "models/", "google/", "anthropic/", "openai/",
+  "openai.", "anthropic.", "google.", "moonshot.", "moonshotai.", "bedrock.", "global."
+];
+const EFFORT_SUFFIXES = ["-minimal", "-low", "-medium", "-high", "-xhigh"];
+const PLACEHOLDER_MODELS = new Set([
+  "", "unknown", "null", "none",
+  "orchestrator-carbon", "orchestrator-argon", "orchestrator-neon",
+  "gemini-pro-orchestrator", "gemini-pro-orchestrator-argon",
+  "gemini-pro-orchestrator-g1-pro", "gemini-pro-orchestrator-neon",
+  "gemini-flash"
+]);
+
+function normalizeCandidateId(raw) {
+  let key = String(raw || "").trim();
+  if (!key) return "";
+  if (key.includes(" ")) {
+    key = key.toLowerCase().replace(/ \(/g, "-").replace(/[()]/g, "").trim().split(/\s+/).filter(Boolean).join("-");
+  } else {
+    key = key.toLowerCase();
   }
-  return best;
+  for (const prefix of KNOWN_NAMESPACE_PREFIXES) {
+    if (key.startsWith(prefix)) {
+      key = key.slice(prefix.length);
+      break;
+    }
+  }
+  const colonIdx = key.indexOf(":");
+  if (colonIdx > 0) key = key.slice(0, colonIdx);
+  return key.trim();
+}
+
+function pricingCandidates(model) {
+  const base = normalizeCandidateId(model);
+  if (!base || looksLikePath(base) || PLACEHOLDER_MODELS.has(base)) return [];
+
+  const out = [];
+  const seen = new Map();
+  const queue = [{ id: base, allowSubstring: true }];
+
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item.id) continue;
+    const prev = seen.get(item.id);
+    if (prev !== undefined) {
+      if (!prev && item.allowSubstring) seen.set(item.id, true);
+      continue;
+    }
+    seen.set(item.id, item.allowSubstring);
+    out.push(item);
+
+    const id = item.id;
+    const allowSubstring = item.allowSubstring;
+
+    if (id.startsWith("claude-") && id.includes(".")) {
+      queue.push({ id: id.replace(/\./g, "-"), allowSubstring });
+    }
+    if (id.startsWith("claude-") && id.endsWith("-thinking") && id.length > "claude--thinking".length) {
+      queue.push({ id: id.slice(0, -"-thinking".length), allowSubstring });
+    }
+    for (const suffix of EFFORT_SUFFIXES) {
+      if (id.endsWith(suffix) && id.length > suffix.length) {
+        queue.push({ id: id.slice(0, -suffix.length), allowSubstring });
+      }
+    }
+    if (id === "gemini-4-hydrogen-tiered" || id === "gemini-4-hydrogen-orchestrator" || id === "gemini-flash-worker-agy") {
+      queue.push({ id: "gemini-4-hydrogen", allowSubstring: false });
+    }
+    const flashTiered = id.match(/^gemini-(\d+(?:\.\d+)*)-flash-tiered$/);
+    if (flashTiered) {
+      queue.push({ id: `gemini-${flashTiered[1]}-flash`, allowSubstring: false });
+    }
+  }
+
+  return out;
+}
+
+/** 按「精确优先 + 最长匹配」找价格：glm-5.3-flashx 优先于 glm-5.3-flash，并兼容 CC Switch 的 AGY 型号归一化 */
+function priceEntry(model, table) {
+  const candidates = pricingCandidates(model);
+  if (!candidates.length) return null;
+
+  for (const cand of candidates) {
+    const exact = table.entries.find(entry => entry.match === cand.id);
+    if (exact) return exact;
+  }
+
+  for (const cand of candidates) {
+    if (!cand.allowSubstring) continue;
+    let best = null;
+    for (const entry of table.entries) {
+      if (!cand.id.includes(entry.match)) continue;
+      if (!best || entry.match.length > best.match.length) best = entry;
+    }
+    if (best) return best;
+  }
+
+  return null;
 }
 
 /** 折成人民币单价（每 100 万 tokens） */
 function unitPriceCny(entry, rate) {
   if (!entry) return null;
-  if (entry.currency === "USD") {
-    return { input: entry.input * rate, cached: entry.cached * rate, output: entry.output * rate };
-  }
-  return { input: entry.input, cached: entry.cached, output: entry.output };
+  const mul = entry.currency === "USD" ? rate : 1;
+  const out = { input: entry.input * mul, cached: entry.cached * mul, output: entry.output * mul };
+  if (entry.cacheWrite > 0) out.cacheWrite = entry.cacheWrite * mul;
+  return out;
 }
 
 /**
  * 单个桶的花费（人民币）
- * @param {{inputTokens:number,cachedInputTokens:number,outputTokens:number}} bucket
- * @param {{input:number,cached:number,output:number}} unit 每百万 tokens 的人民币单价
+ * @param {{inputTokens:number,cachedInputTokens:number,cacheWriteTokens?:number,outputTokens:number}} bucket
+ * @param {{input:number,cached:number,cacheWrite?:number,output:number}} unit 每百万 tokens 的人民币单价
  */
 function costOfBucket(bucket, unit) {
   if (!bucket || !unit) return 0;
   const input = Math.max(0, num(bucket.inputTokens));
   const cached = Math.min(input, Math.max(0, num(bucket.cachedInputTokens)));
+  const cacheWrite = Math.max(0, num(bucket.cacheWriteTokens));
   const output = Math.max(0, num(bucket.outputTokens));
   const fresh = input - cached;
-  return (fresh * unit.input + cached * unit.cached + output * unit.output) / 1e6;
+  return (fresh * unit.input + cached * unit.cached + cacheWrite * num(unit.cacheWrite) + output * unit.output) / 1e6;
 }
 
 /**
@@ -393,7 +762,7 @@ function describeTable(table, modelNames) {
   for (const name of modelNames || []) {
     const entry = priceEntry(name, table);
     // 路径型脏键（历史索引里混进来的文件名）不参与定价，界面显示「—」
-    if (!entry && looksLikePath(String(name))) {
+    if (!entry && looksLikePath(normalizeCandidateId(name) || String(name))) {
       models[name] = { label: String(name), vendor: "—", currency: "CNY", unit: null, estimated: false, note: "" };
       continue;
     }

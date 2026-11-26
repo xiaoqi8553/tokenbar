@@ -42,6 +42,7 @@ const mainEvents = new Set(ipcFileSources.flatMap(src => channels(src, "ctx.ipcM
 const DASHBOARD_INVOKE = [
   "dashboard:get-detail", "dashboard:refresh", "dashboard:status", "dashboard:meta",
   "dashboard:workbuddy-detail", "dashboard:workbuddy-refresh", "dashboard:open-workbuddy",
+  "dashboard:antigravity-detail", "dashboard:antigravity-refresh", "dashboard:open-antigravity",
   "dashboard:open-sessions", "dashboard:open-external",
   "ablesci:list", "ablesci:add", "ablesci:remove", "ablesci:sign", "ablesci:open-site",
   "codex-auth:list", "codex-auth:fetch", "codex-auth:active",
@@ -50,7 +51,8 @@ const DASHBOARD_INVOKE = [
 ];
 const DASHBOARD_METHODS = [
   "getDetail", "refresh", "getStatus", "getMeta", "workbuddyDetail", "workbuddyRefresh",
-  "openWorkBuddy", "onProgress", "onStatus", "openSessions", "openExternal",
+  "openWorkBuddy", "antigravityDetail", "antigravityRefresh", "openAntigravity",
+  "onProgress", "onStatus", "openSessions", "openExternal",
   "ablesciList", "ablesciAdd", "ablesciRemove", "ablesciSign", "ablesciOpenSite",
   "codexAuthList", "codexAuthFetch", "codexAuthActive", "codexAuthDeviceStart",
   "codexAuthDevicePoll", "codexAuthDeviceStatus", "codexAuthDeviceCancel",
@@ -67,7 +69,7 @@ const CODEXBAR_INVOKE = [
 const CODEXBAR_EVENTS = ["popover:status", "ablesci:changed"];
 const CODEXBAR_SEND = ["popover:set-height"];
 
-test("dashboard-preload 白名单逐字锁死：25 个方法、23 个 invoke channel", () => {
+test("dashboard-preload 白名单逐字锁死：28 个方法、26 个 invoke channel", () => {
   const names = methods(dashboardPreload);
   assert.ok(names.length >= 22, `window.dashboard 方法数 ${names.length} < 22`);
   assert.deepEqual([...names].sort(), [...DASHBOARD_METHODS].sort());

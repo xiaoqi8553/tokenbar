@@ -12,8 +12,9 @@ function registerDashboardHandlers(ctx) {
     if (!ctx.store) throw new Error("用量数据层尚未初始化，请稍候重试");
     const detail = await ctx.store.buildDetail({ onProgress: progress => ctx.pushDetailProgress(ctx, progress) });
     ctx.latestStatus = ctx.store.snapshot();
-    // 新快照是干净的：WorkBuddy 摘要与实时额度都要重新挂上
+    // 新快照是干净的：WorkBuddy / Antigravity 摘要与实时额度都要重新挂上
     ctx.attachWorkBuddySummary(ctx);
+    ctx.attachAntigravitySummary(ctx);
     ctx.attachLiveQuota(ctx);
     ctx.updateTray(ctx);
     ctx.pushStatusToPopover(ctx);
@@ -26,6 +27,7 @@ function registerDashboardHandlers(ctx) {
     const detail = await ctx.store.buildDetail({ onProgress: progress => ctx.pushDetailProgress(ctx, progress) });
     ctx.latestStatus = ctx.store.snapshot();
     ctx.attachWorkBuddySummary(ctx);
+    ctx.attachAntigravitySummary(ctx);
     ctx.attachLiveQuota(ctx);
     ctx.updateTray(ctx);
     ctx.pushStatusToPopover(ctx);
@@ -47,6 +49,21 @@ function registerDashboardHandlers(ctx) {
     return detail;
   });
 
+  // Antigravity 用量：对齐 CC Switch 口径，切到该标签时按需构建
+  ctx.ipcMain.handle("dashboard:antigravity-detail", async () => {
+    if (!ctx.agyStore) return null;
+    const detail = await ctx.agyStore.build({ onProgress: progress => ctx.pushDetailProgress(ctx, progress) });
+    ctx.attachAntigravitySummary(ctx);
+    return detail;
+  });
+
+  ctx.ipcMain.handle("dashboard:antigravity-refresh", async () => {
+    if (!ctx.agyStore) return null;
+    const detail = await ctx.agyStore.build({ onProgress: progress => ctx.pushDetailProgress(ctx, progress), force: true });
+    ctx.attachAntigravitySummary(ctx);
+    return detail;
+  });
+
   ctx.ipcMain.handle("dashboard:meta", () => ({
     name: ctx.PRODUCT_NAME,
     version: ctx.app.getVersion(),
@@ -60,6 +77,11 @@ function registerDashboardHandlers(ctx) {
     // 优先打开有数据的那套（国际版在前）
     const target = roots.find(root => ctx.fs.existsSync(ctx.path.join(root, "projects"))) || roots[0];
     return ctx.shell.openPath(ctx.path.join(target, "projects"));
+  });
+  ctx.ipcMain.handle("dashboard:open-antigravity", () => {
+    const roots = ctx.antigravityRoots(ctx);
+    const target = roots.find(root => ctx.fs.existsSync(ctx.path.join(root, "brain"))) || roots[0];
+    return ctx.shell.openPath(ctx.path.join(target, "brain"));
   });
   ctx.ipcMain.handle("dashboard:open-external", (_event, url) => {
     if (typeof url === "string" && /^https:\/\//i.test(url)) ctx.shell.openExternal(url);

@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format base
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-26
+
+新增 **Antigravity** 数据源完整支持（对齐 CC Switch 计算口径），零新增生产依赖，单元测试扩展到 **115** 个。
+
+### Added
+
+- **Antigravity 多根目录日志扫描**：新增 `desktop/data/antigravity-store.cjs`，自动扫描 `~/.gemini/antigravity-cli`、`~/.gemini/antigravity`、`~/.gemini/antigravity-acp`、`~/.cc-switch/agy/*/antigravity-cli` 与 `~/.t3/{userdata,dev}/providers/antigravity/*/antigravity-acp`（支持 `ANTIGRAVITY_HOME` / `AGY_HOME` 覆盖），按会话 ID 与文件大小/修改时间跨目录去重并支持增量缓存。
+- **零依赖 SQLite + Protobuf 伴生解码**：新增 `desktop/data/antigravity-native.cjs`，通过 Node / Electron 内置 `node:sqlite` 以只读方式读取 `conversations/<id>.db` 与 `conversation_summaries.db`，并内置轻量 Protobuf Wire 解析器提取真实模型 / `-tiered` 档位（field `19` / `21`）、`first_token` 首字延迟（TTFT）与 `streaming` 耗时，准确识别 Orchestrator 与 Worker 子代理调用。
+- **CC Switch 同口径定价与模型归一化**：在 `desktop/data/pricing.cjs` 补充 Google Gemini 4 / 3.x / 2.x 与 Anthropic Claude USD 单价及 `cacheWrite` 分档计费，支持 `models/` / 厂商前缀、`claude-*` 命名规整、`-thinking` / 档位后缀裁剪、`-tiered` 精确回退与 `-flash-lite` 防误匹配。
+- **三数据源桌面看板与弹窗联动**：主进程（`ctx.agyStore`、30 秒定时刷新）、托盘弹窗（`#d-agy` 行与合算美元花费 `#d-cost`）、看板顶栏三数据源切换（`Codex | WorkBuddy | Antigravity`）、首字延迟（TTFT 中位数）指标展示与 `dashboard:antigravity-*` IPC 通道全面接入。
+- **自动化测试与冒烟验证**：新增 7 项 `tests/antigravity-store.test.js` 单元测试，并在 `scripts/desktop-smoke.js` 加入三源切换与 Antigravity 用量渲染端到端验证。
+
+### Changed
+
+- **Antigravity 原生 Token 口径转换**：兼容 Antigravity 原生 `transcript_full.jsonl`（`input_tokens` 为不含缓存的新增输入、`output_tokens` 已含 thinking、`PLANNER_RESPONSE` + `DONE` 过滤、`step_index` 覆写取末条与 `agy:<session>:<step>` 去重），入库映射为 `inputTokens = rawInput + cacheRead`，使看板各卡片与费用估算严格对齐 CC Switch 且不重复扣减。
+- **文档与构建产物更新**：同步更新 `README.md`、`package.json` 描述、`scripts/verify-artifact.cjs` 白名单、`scripts/artifact-manifest.json` 与 `docs/shots/` 截图。
+
 ## [3.0.0] - 2026-11-24
 
 品质升级波次：数据层、UI 构建、授权流程、去重口径、可观测性与发布工程一起收口。测试 **108** 个，生产依赖 **0** 个。
@@ -36,5 +53,6 @@ All notable changes to this project will be documented in this file. Format base
 - **隐藏不等于删除**：用户问「这些玩意怎么清除啊」——隐藏账号只写 TokenBar 自己的配置，`~/.codex` 授权文件一个字节不碰；科研通密码仍走 `safeStorage`（Windows DPAPI）→ AES-256-GCM 降级，密文只存本机 `userData`。
 - **凭证零入库**：全量扫描历史与工作区，API Key / token / 真实邮箱均未进入仓库；测试一律使用 `alice@example.com` 等假邮箱。
 
+[3.1.0]: https://github.com/xiaoqi8553/tokenbar/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/xiaoqi8553/tokenbar/compare/v2.6.1...v3.0.0
-[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.1.0...HEAD

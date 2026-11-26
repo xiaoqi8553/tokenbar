@@ -15,6 +15,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { CodexStore } = require("./data/codex-store.cjs");
 const { WorkBuddyStore } = require("./data/workbuddy-store.cjs");
+const { AntigravityStore } = require("./data/antigravity-store.cjs");
 const { loadTable, ensureTableFile } = require("./data/pricing.cjs");
 const { buildBaseline, baselineIsFresh, loadBaseline, saveBaseline } = require("./data/history-baseline.cjs");
 const { createAbleSciStore } = require("./data/ablesci-store.cjs");
@@ -43,7 +44,7 @@ const ctx = {
   // 依赖注入
   app, BrowserWindow, Menu, Tray, shell, ipcMain, screen, nativeImage, safeStorage, Notification,
   fs, os, path, crypto,
-  CodexStore, WorkBuddyStore,
+  CodexStore, WorkBuddyStore, AntigravityStore,
   // 计价数据入口已移除，但单价数据仍由 loadTable(paths.pricing) 装载（见 core/stores.cjs）。
   loadTable: p => loadTable(p),
   ensureTableFile,
@@ -68,6 +69,7 @@ const ctx = {
   preferences: { launchAtLogin: false, startMode: "popover", popoverOnly: true },
   store: null,
   wbStore: null,
+  agyStore: null,
   ablesciStore: null,
   codexAuthStore: null,
   /** 启动诊断日志的落盘位置，start() 阶段才确定 */
@@ -114,11 +116,14 @@ if (process.env.CODEX_TOKEN_BOOT_MARK) {
 function attachWorkBuddySummary() {
   return ctx.attachWorkBuddySummary(ctx);
 }
+function attachAntigravitySummary() {
+  return ctx.attachAntigravitySummary(ctx);
+}
 async function refreshTrayStatus(force = false) {
   if (!ctx.store) return;
   // 实时额度走独立节奏：store 内部有 30 秒节流，失败也只是留旧值
   ctx.refreshLiveQuota(ctx).catch(() => {});
-  // WorkBuddy 是第二个数据源：build() 自带 _promise 防并发，只重扫 size/mtime
+  // WorkBuddy / Antigravity 是独立数据源：build() 自带 _promise 防并发，只重扫 size/mtime
   // 变过的文件；放进 30 秒轮询不会重复劳动，且不阻塞托盘/弹窗的 Codex 刷新。
   const wbStore = ctx.wbStore;
   if (wbStore) {
@@ -126,16 +131,29 @@ async function refreshTrayStatus(force = false) {
       .then(() => attachWorkBuddySummary())
       .catch(error => ctx.log(ctx, `workbuddy refresh failed: ${error.message}`));
   }
+  const agyStore = ctx.agyStore;
+  if (agyStore) {
+    agyStore.build()
+      .then(() => attachAntigravitySummary())
+      .catch(error => ctx.log(ctx, `antigravity refresh failed: ${error.message}`));
+  }
   try {
     ctx.latestStatus = await ctx.store.refresh({ full: false });
     ctx.startupError = "";
   } catch (error) {
     ctx.startupError = `读取用量失败：${error.message}`;
   }
-  // 快照是全新的对象，WorkBuddy 摘要要重新挂上
+  // 快照是全新的对象，WorkBuddy 与 Antigravity 摘要要重新挂上
   if (ctx.latestStatus && wbStore) {
     try {
       ctx.latestStatus.workbuddy = wbStore.summary();
+    } catch {
+      /* 摘要失败不影响主数据 */
+    }
+  }
+  if (ctx.latestStatus && agyStore) {
+    try {
+      ctx.latestStatus.antigravity = agyStore.summary();
     } catch {
       /* 摘要失败不影响主数据 */
     }

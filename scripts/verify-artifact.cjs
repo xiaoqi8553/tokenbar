@@ -38,7 +38,9 @@ const REQUIRED = [
   "desktop/data/event-dedupe.cjs",
   "desktop/data/history-baseline.cjs",
   "desktop/data/pricing.cjs",
-  "desktop/data/workbuddy-store.cjs"
+  "desktop/data/workbuddy-store.cjs",
+  "desktop/data/antigravity-native.cjs",
+  "desktop/data/antigravity-store.cjs"
 ];
 
 // 3.0 深度重构后新增的模块（构建产物白名单扩展时逐项登记）

@@ -199,6 +199,7 @@
     padding: 5px 12px;
     border-radius: 7px;
     cursor: pointer;
+    white-space: nowrap;
     transition: background .16s ease, color .16s ease;
   }
 
@@ -979,7 +980,7 @@
     <div class="boot-mark">&gt;_</div>
     <div class="boot-text" id="boot-text">正在读取本地会话日志…</div>
     <div class="boot-bar"><i id="boot-fill"></i></div>
-    <div class="boot-hint" id="boot-hint">数据来自 ~/.codex/sessions 与 WorkBuddy 本地日志，不联网</div>
+    <div class="boot-hint" id="boot-hint">数据来自 ~/.codex/sessions、WorkBuddy 与 Antigravity 本地日志，不联网</div>
   </div>
 </div>
 
@@ -995,6 +996,7 @@
     <div class="range source" id="source" role="group" aria-label="数据源">
       <button type="button" data-source="codex" aria-pressed="true">Codex</button>
       <button type="button" data-source="workbuddy" aria-pressed="false">WorkBuddy</button>
+      <button type="button" data-source="antigravity" aria-pressed="false">Antigravity</button>
     </div>
     <div class="spacer"></div>
     <div class="range" id="range" role="group" aria-label="时间范围"></div>
@@ -1212,12 +1214,15 @@
   /** 用户是否显式选过「月之亮面 / 月之暗面」；选过就以用户选择为准 */
   let themeExplicit = localStorage.getItem("codex.theme") === "light" || localStorage.getItem("codex.theme") === "dark";
 
+  const SOURCES = ["codex", "workbuddy", "antigravity"];
+  const savedSource = localStorage.getItem("codex.source");
+
   const state = {
     /** 当前展示的数据源明细（等于 data[source]） */
     detail: null,
-    /** 两个数据源各自缓存一份，切换时不用重新扫描 */
-    data: { codex: null, workbuddy: null },
-    source: localStorage.getItem("codex.source") === "workbuddy" ? "workbuddy" : "codex",
+    /** 三个数据源各自缓存一份，切换时不用重新扫描 */
+    data: { codex: null, workbuddy: null, antigravity: null },
+    source: SOURCES.includes(savedSource) ? savedSource : "codex",
     status: null,
     meta: null,
     range: Number(localStorage.getItem("codex.range") || 14) || 14,
@@ -1292,8 +1297,9 @@
     if (!bucket || !unit) return 0;
     const input = Math.max(0, bucket.inputTokens || 0);
     const cached = Math.min(input, Math.max(0, bucket.cachedInputTokens || 0));
+    const cacheWrite = Math.max(0, bucket.cacheWriteTokens || 0);
     const output = Math.max(0, bucket.outputTokens || 0);
-    return ((input - cached) * unit.input + cached * unit.cached + output * unit.output) / 1e6;
+    return ((input - cached) * unit.input + cached * unit.cached + cacheWrite * (unit.cacheWrite || 0) + output * unit.output) / 1e6;
   }
 
   /**
@@ -1931,13 +1937,92 @@
     ];
   }
 
+  function antigravityCards() {
+    const detail = state.detail;
+    const totals = detail.totals;
+    const today = detail.today;
+    const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
+    const todayRate = today && today.inputTokens ? (today.cachedInputTokens / today.inputTokens) * 100 : 0;
+    const ttftMs = detail.throughput && detail.throughput.ttftMs;
+    const ttftTurns = detail.throughput && detail.throughput.turns ? detail.throughput.turns : 0;
+    const rootHint = (detail.roots || [])
+      .filter(item => item.files > 0)
+      .map(item => {
+        const parts = String(item.root).split(/[\\/]/).filter(Boolean);
+        return parts.length >= 2 && parts[parts.length - 2] === ".gemini"
+          ? "~/.gemini/" + parts[parts.length - 1]
+          : "~/" + (parts[parts.length - 1] || "antigravity");
+      })
+      .join(" + ") || "~/.gemini/antigravity";
+
+    return [
+      {
+        label: "今日用量",
+        window: "00:00 起",
+        num: today ? fmtTokens(today.totalTokens) : "—",
+        unit: "tokens",
+        hideMeter: true,
+        foot: today
+          ? "<b>" + fmtCount(today.records) + "</b> 次调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
+          : "今天还没有记录",
+        hints: today
+          ? ["新增输入 " + fmtTokens(Math.max(0, today.inputTokens - today.cachedInputTokens)) + " · 输出 " + fmtTokens(today.outputTokens)]
+          : []
+      },
+      {
+        label: "累计用量",
+        window: detail.series.length + " 天",
+        num: fmtTokens(totals.totalTokens),
+        unit: "tokens",
+        hideMeter: true,
+        foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
+        hints: ["来源 " + rootHint]
+      },
+      {
+        label: "等价花费",
+        window: "累计",
+        num: fmtMoney(detail.cost ? detail.cost.cny : 0),
+        money: true,
+        unit: "",
+        hideMeter: true,
+        title: "美元计价 · 按官方 API 刊例价折算",
+        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
+        hints: ["按 CC Switch 同口径折算"]
+      },
+      {
+        label: "缓存命中率",
+        window: "输入口径",
+        num: fmtPercent(cacheRate, 1),
+        unit: "命中",
+        percent: cacheRate,
+        level: "ok",
+        foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
+        hints: ["input 已含缓存还原，不重复扣除"]
+      },
+      {
+        label: "首字延迟",
+        window: "TTFT 中位数",
+        num: ttftMs !== null && ttftMs !== undefined ? fmtSpeed(ttftMs) : "—",
+        unit: "",
+        hideMeter: true,
+        foot: ttftTurns
+          ? "<b>" + fmtCount(ttftTurns) + "</b> 轮带原生计时"
+          : "暂无原生计时样本",
+        hints: ["来自 conversations/*.db"]
+      },
+      speedCard()
+    ];
+  }
+
   function renderStats() {
     const detail = state.detail;
-    if (!detail && state.source === "workbuddy") return;
+    if (!detail && (state.source === "workbuddy" || state.source === "antigravity")) return;
 
     let cards;
     if (state.source === "workbuddy") {
       cards = workbuddyCards();
+    } else if (state.source === "antigravity") {
+      cards = antigravityCards();
     } else {
       const quota = (state.status && state.status.quota) || null;
       const liveTag = quota && quota.source === "api" ? " · 实时" : "";
@@ -2190,7 +2275,11 @@
       (note ? '<small>' + note + '</small>' : '') + '</div></div>'
     ).join("");
 
-    $("chart-badge").textContent = state.source === "workbuddy" ? "WorkBuddy · 本地日志" : "Codex · 本地日志";
+    $("chart-badge").textContent = state.source === "workbuddy"
+      ? "WorkBuddy · 本地日志"
+      : state.source === "antigravity"
+        ? "Antigravity · 本地日志"
+        : "Codex · 本地日志";
   }
 
   // 悬停提示
@@ -2597,13 +2686,18 @@
       return;
     }
     dot.setAttribute("data-tone", detail.builtAt ? "" : "muted");
+    const sourcePrefix = detail.source === "workbuddy"
+      ? "WorkBuddy · "
+      : detail.source === "antigravity"
+        ? "Antigravity · "
+        : "Codex · ";
     $("status-text").textContent =
-      (detail.source === "workbuddy" ? "WorkBuddy · " : "Codex · ") +
+      sourcePrefix +
       detail.scannedFiles + " 个日志 · " + detail.sessions + " 个会话 · " +
       (detail.builtAt ? new Date(detail.builtAt).toLocaleString("zh-CN", { hour12: false }) : "—");
 
     const legacyDays = detail.baseline && detail.baseline.days ? detail.baseline.days : detail.series.length;
-    if (detail.source === "workbuddy") {
+    if (detail.source === "workbuddy" || detail.source === "antigravity") {
       const todayTokens = detail.today ? detail.today.totalTokens : 0;
       $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
         (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
@@ -2611,10 +2705,12 @@
         (legacyDays > 1 && todayTokens > 0 ? " · 今日 " + fmtTokens(todayTokens) : "");
     } else {
       const wbToday = workbuddyTodayTokens();
+      const agyToday = antigravityTodayTokens();
       $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
         (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
         (legacyDays ? " · " + legacyDays + " 天" : "") +
-        (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "");
+        (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "") +
+        (agyToday > 0 ? " · Antigravity " + fmtTokens(agyToday) + " 今日" : "");
     }
   }
 
@@ -2676,6 +2772,14 @@
     return detail && detail.today ? detail.today.totalTokens : 0;
   }
 
+  /** Antigravity 今日用量：优先用弹窗快照，没有就退回明细 */
+  function antigravityTodayTokens() {
+    const fromStatus = state.status && state.status.antigravity && state.status.antigravity.today;
+    if (fromStatus && fromStatus.totalTokens) return fromStatus.totalTokens;
+    const detail = state.data.antigravity;
+    return detail && detail.today ? detail.today.totalTokens : 0;
+  }
+
   function applySourceTabs() {
     for (const node of $("source").querySelectorAll("button")) {
       node.setAttribute("aria-pressed", String(node.dataset.source === state.source));
@@ -2696,7 +2800,11 @@
         renderAll();
         return;
       }
-      $("status-text").textContent = state.source === "workbuddy" ? "正在读取 WorkBuddy 日志…" : "正在读取 Codex 日志…";
+      $("status-text").textContent = state.source === "workbuddy"
+        ? "正在读取 WorkBuddy 日志…"
+        : state.source === "antigravity"
+          ? "正在读取 Antigravity 日志…"
+          : "正在读取 Codex 日志…";
       loadSource(state.source).then(() => {
         state.detail = state.data[state.source];
         renderAll();
@@ -2714,6 +2822,11 @@
       detail = refresh && api.workbuddyRefresh ? await api.workbuddyRefresh() : await api.workbuddyDetail();
       if (!detail) throw new Error("WorkBuddy 数据层尚未初始化");
       state.data.workbuddy = detail;
+    } else if (source === "antigravity") {
+      if (!api.antigravityDetail) throw new Error("当前版本不支持 Antigravity 数据源");
+      detail = refresh && api.antigravityRefresh ? await api.antigravityRefresh() : await api.antigravityDetail();
+      if (!detail) throw new Error("Antigravity 数据层尚未初始化");
+      state.data.antigravity = detail;
     } else {
       detail = refresh ? await api.refresh() : await api.getDetail();
       state.data.codex = detail;
@@ -2726,9 +2839,10 @@
     button.dataset.busy = "1";
     try {
       await loadSource("codex", { refresh });
-      if (state.source === "workbuddy") {
-        $("status-text").textContent = "正在读取 WorkBuddy 日志…";
-        await loadSource("workbuddy", { refresh }).catch(() => {});
+      if (state.source !== "codex") {
+        const label = state.source === "antigravity" ? "Antigravity" : "WorkBuddy";
+        $("status-text").textContent = "正在读取 " + label + " 日志…";
+        await loadSource(state.source, { refresh }).catch(() => {});
       }
       try {
         state.status = await window.dashboard.getStatus();
@@ -2739,9 +2853,9 @@
       $("app").hidden = false;
       renderAll();
       hideBoot();
-      // 后台预热另一个数据源，切换时不用等扫描
-      const other = state.source === "workbuddy" ? "codex" : "workbuddy";
-      if (!state.data[other]) {
+      // 后台预热其余数据源，切换时不用等扫描
+      for (const other of SOURCES) {
+        if (other === state.source || state.data[other]) continue;
         loadSource(other).then(() => {
           if (state.source === other) {
             state.detail = state.data[other];
@@ -2753,7 +2867,7 @@
       }
     } catch (error) {
       $("boot-text").textContent = "读取失败：" + (error && error.message ? error.message : error);
-      $("boot-hint").textContent = "请确认 ~/.codex/sessions 与 ~/.workbuddy(-ai)/projects 目录存在";
+      $("boot-hint").textContent = "请确认 ~/.codex/sessions、WorkBuddy 与 Antigravity 目录存在";
     } finally {
       button.dataset.busy = "0";
     }
@@ -3214,6 +3328,7 @@
     });
     $("btn-sessions").addEventListener("click", () => {
       if (state.source === "workbuddy" && window.dashboard.openWorkBuddy) window.dashboard.openWorkBuddy();
+      else if (state.source === "antigravity" && window.dashboard.openAntigravity) window.dashboard.openAntigravity();
       else window.dashboard.openSessions();
     });
     // 版本号可点：直接在浏览器打开仓库，方便确认「这是哪一版」

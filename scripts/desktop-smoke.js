@@ -78,6 +78,17 @@ function writeFixture(sessionsDir) {
   fs.writeFileSync(path.join(dir, "rollout-desktop-smoke-old.jsonl"), oldLines.map(line => JSON.stringify(line)).join("\n") + "\n", "utf8");
 }
 
+function writeAntigravityFixture(agyRoot) {
+  const logsDir = path.join(agyRoot, "brain", "smoke-agy-1", ".system_generated", "logs");
+  fs.mkdirSync(logsDir, { recursive: true });
+  const now = new Date().toISOString();
+  const rows = [
+    { step_index: 0, type: "USER_INPUT", status: "DONE", created_at: now, content: "changed setting `Model Selection` from None to Gemini 4 Hydrogen (XHigh). No need" },
+    { step_index: 1, type: "PLANNER_RESPONSE", status: "DONE", created_at: now, input_tokens: 800, cache_read_tokens: 200, output_tokens: 150 }
+  ];
+  fs.writeFileSync(path.join(logsDir, "transcript_full.jsonl"), rows.map(line => JSON.stringify(line)).join("\n") + "\n", "utf8");
+}
+
 async function findPage(browser, match, timeout) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -93,8 +104,10 @@ async function findPage(browser, match, timeout) {
 async function main() {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "tokenbar-smoke-"));
   const sessions = path.join(temporaryRoot, "sessions");
+  const agyHome = path.join(temporaryRoot, "agy");
   fs.mkdirSync(sessions, { recursive: true });
   writeFixture(sessions);
+  writeAntigravityFixture(agyHome);
   // 造一个假的本机 Codex 授权，让实时额度弹窗有账号行可渲染（token 是测试假值）
   const fakeJwt = payload => "h." + Buffer.from(JSON.stringify(payload)).toString("base64url") + ".s";
   fs.writeFileSync(path.join(temporaryRoot, "auth.json"), JSON.stringify({
@@ -125,6 +138,7 @@ async function main() {
       ...smokeEnv,
       CODEX_HOME: temporaryRoot,
       WORKBUDDY_HOME: path.join(temporaryRoot, "no-workbuddy"),
+      ANTIGRAVITY_HOME: agyHome,
       CODEX_TOKEN_DASHBOARD_SMOKE: "1",
       CODEX_TOKEN_DASHBOARD_SMOKE_TIMEOUT: "90000"
     },
@@ -237,7 +251,7 @@ async function main() {
     assert.ok(info.hasSignModal, "完整看板应该有科研通签到面板");
     assert.ok(info.signApi, "看板 preload 应暴露签到 API");
     assert.match(info.title, /TokenBar/);
-    assert.deepEqual(info.sources.sort(), ["codex", "workbuddy"]);
+    assert.deepEqual(info.sources.sort(), ["antigravity", "codex", "workbuddy"]);
     assert.deepEqual(info.ranges.sort(), ["0", "14", "30", "7"]);
     assert.deepEqual(info.hourMetrics.sort(), ["speed", "tokens"]);
     assert.notEqual(info.hourBadge.trim(), "—", "时段徽标应该已经有数据");
@@ -474,6 +488,29 @@ async function main() {
     }));
     assert.match(allTime.sub, /\d+ 天有记录 · \d+ 天零用量/, "全部时间也要显示空白天数");
     assert.equal(allTime.zeroMarks, 0, "全部时间也不该出现零用量标记：" + allTime.sub);
+
+    // 5. 切到 Antigravity 数据源：验证三源切换、用量归属（800+200+150=1150，fmtTokens 为 1.1K）与卡片渲染
+    await dashboard.click('#source button[data-source="antigravity"]');
+    await dashboard.waitForFunction(
+      () => /Antigravity/.test((document.querySelector("#chart-badge") || {}).textContent || ""),
+      null,
+      { timeout: 15_000 }
+    );
+    const agyInfo = await dashboard.evaluate(() => ({
+      badge: (document.querySelector("#chart-badge") || {}).textContent || "",
+      status: (document.querySelector("#status-text") || {}).textContent || "",
+      statText: (document.querySelector("#stat-row") || {}).innerText || "",
+      models: [...document.querySelectorAll("#models .bar-name")].map(el => el.textContent.trim()),
+      pressed: [...document.querySelectorAll("#source button")].filter(el => el.getAttribute("aria-pressed") === "true").map(el => el.dataset.source)
+    }));
+    assert.match(agyInfo.badge, /Antigravity/);
+    assert.match(agyInfo.status, /Antigravity/);
+    assert.match(agyInfo.statText, /1\.1K/);
+    assert.match(agyInfo.statText, /新增输入 800 · 输出 150/);
+    assert.match(agyInfo.statText, /命中 200 · 输入 1K/);
+    assert.match(agyInfo.statText, /首字延迟/);
+    assert.deepEqual(agyInfo.models, ["gemini-4-hydrogen-xhigh"]);
+    assert.deepEqual(agyInfo.pressed, ["antigravity"]);
 
     assert.equal(child.exitCode, null, `测试期间应用不应该退出：\n${processOutput}`);
     process.stdout.write(`desktop smoke passed: ${JSON.stringify({ popover: popoverInfo.title, ...info, bodyText: undefined })}\n`);

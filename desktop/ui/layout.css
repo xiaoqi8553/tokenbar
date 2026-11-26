@@ -118,6 +118,7 @@
     padding: 5px 12px;
     border-radius: 7px;
     cursor: pointer;
+    white-space: nowrap;
     transition: background .16s ease, color .16s ease;
   }
 

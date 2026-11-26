@@ -29,9 +29,10 @@ test("2.0 项目名与版本已经换到 TokenBar", () => {
   assert.doesNotMatch(readme, /Codex Token 用量看板/);
 });
 
-test("2.0 桌面看板仍是双数据源 + 时段徽标", () => {
+test("2.0 桌面看板支持三数据源 + 时段徽标", () => {
   assert.match(dashboard, /data-source="codex"/);
   assert.match(dashboard, /data-source="workbuddy"/);
+  assert.match(dashboard, /data-source="antigravity"/);
   assert.match(dashboard, /id="hour-badge"/);
   assert.match(dashboard, /id="hour-tabs"/);
   assert.match(dashboard, /等价花费/);

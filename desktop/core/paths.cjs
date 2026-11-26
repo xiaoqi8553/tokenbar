@@ -60,6 +60,7 @@ function userDataPaths(ctx) {
     usageIndex: path.join(userData, "data", "usage-index.json"),
     baseline: path.join(userData, "data", "history-baseline.json"),
     workbuddyCache: path.join(userData, "data", "workbuddy-detail-cache.json"),
+    antigravityCache: path.join(userData, "data", "antigravity-detail-cache.json"),
     pricing: path.join(userData, "data", "pricing.json"),
     ablesciAccounts: path.join(userData, "data", "ablesci-accounts.json"),
     ablesciState: path.join(userData, "data", "ablesci-state.json"),
@@ -91,6 +92,77 @@ function workBuddyRoots(ctx) {
   return existing.length ? existing : [path.join(home, ".workbuddy")];
 }
 
+/**
+ * Antigravity 多根目录发现（对齐 CC Switch `agy.rs`）：
+ *   ~/.gemini/antigravity-cli、~/.gemini/antigravity、~/.gemini/antigravity-acp、
+ *   ~/.cc-switch/agy/<provider>/antigravity-cli、~/.t3/.../antigravity-acp。
+ */
+function antigravityRoots(ctx) {
+  const { path, os, fs } = ctx;
+  const envHome = (process.env.ANTIGRAVITY_HOME || process.env.AGY_HOME || "").trim();
+  if (envHome) {
+    const candidates = [
+      envHome,
+      path.join(envHome, "antigravity-cli"),
+      path.join(envHome, "antigravity"),
+      path.join(envHome, "antigravity-acp")
+    ];
+    const existing = candidates.filter(dir => fs.existsSync(path.join(dir, "brain")));
+    return existing.length ? [...new Set(existing)] : [envHome];
+  }
+
+  const home = os.homedir();
+  const subdirs = dir => {
+    try {
+      return fs.readdirSync(dir, { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => path.join(dir, entry.name))
+        .sort();
+    } catch {
+      return [];
+    }
+  };
+
+  const candidates = [
+    path.join(home, ".gemini", "antigravity-cli"),
+    path.join(home, ".gemini", "antigravity"),
+    path.join(home, ".gemini", "antigravity-acp")
+  ];
+
+  for (const dir of subdirs(path.join(home, ".cc-switch", "agy"))) {
+    candidates.push(path.join(dir, "antigravity-cli"));
+  }
+
+  const t3Homes = [];
+  const t3Env = (process.env.T3CODE_HOME || "").trim();
+  if (t3Env) t3Homes.push(t3Env);
+  t3Homes.push(path.join(home, ".t3"));
+  for (const t3Home of [...new Set(t3Homes)]) {
+    for (const stateDir of ["userdata", "dev"]) {
+      for (const instanceDir of subdirs(path.join(t3Home, stateDir, "providers", "antigravity"))) {
+        candidates.push(path.join(instanceDir, "antigravity-acp"));
+      }
+    }
+  }
+
+  const out = [];
+  const seen = new Set();
+  for (const dir of candidates) {
+    if (!fs.existsSync(path.join(dir, "brain"))) continue;
+    let key = path.resolve(dir);
+    try {
+      key = fs.realpathSync(dir);
+    } catch {
+      /* ignore */
+    }
+    if (process.platform === "win32") key = key.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(dir);
+  }
+  return out.length ? out : [path.join(home, ".gemini", "antigravity")];
+}
+
 function migrateUserData(ctx, paths) {
   ctx.fs.mkdirSync(paths.data, { recursive: true });
   ctx.fs.mkdirSync(paths.logs, { recursive: true });
@@ -101,8 +173,17 @@ function installPaths(ctx) {
   ctx.userDataPaths = userDataPaths;
   ctx.sessionsDir = sessionsDir;
   ctx.workBuddyRoots = workBuddyRoots;
+  ctx.antigravityRoots = antigravityRoots;
   ctx.migrateUserData = migrateUserData;
   return ctx;
 }
 
-module.exports = { installPaths, adoptLegacyUserData, userDataPaths, sessionsDir, workBuddyRoots, migrateUserData };
+module.exports = {
+  installPaths,
+  adoptLegacyUserData,
+  userDataPaths,
+  sessionsDir,
+  workBuddyRoots,
+  antigravityRoots,
+  migrateUserData
+};

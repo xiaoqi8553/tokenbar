@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs welcome">
 </p>
 
-A local-first desktop dashboard for your Codex & WorkBuddy token usage.
+A local-first desktop dashboard for your Codex, WorkBuddy & Antigravity token usage.
 
 Windows 托盘里的 token 用量看板：用了多少、折多少钱、跑得多快，点一下图标就能看到。
 
@@ -31,12 +31,12 @@ TokenBar tries to achieve the following goals:
 - **本地优先**：tokens、速度、模型 / 项目分布只读本地日志，不上传；应用无后端、无账号体系。
 - **复用已有授权**：实时额度直接读本机 Codex 登录查官方 5 小时 / 每周额度，不新增一套登录，30 秒刷新一次。
 - **口径透明**：累计、花费、速度怎么算都写在下面，去重前后的数字和取舍都有记录，可以自己对账。
-- **多源聚合**：Codex 与 WorkBuddy（国内 / 国际版）的日志汇到同一套图表，按会话 id 去重。
+- **多源聚合**：Codex、WorkBuddy（国内 / 国际版）与 Antigravity 的日志汇到同一套图表，按会话与请求去重。
 - **隐私默认**：token 不出主进程，凭证用系统密钥库加密，隐藏账号只从看板隐藏、不删本地文件。
 
 ## Features
 
-左键点托盘图标看弹窗，双击看完整看板。两个数据源共用同一套图表，顶栏可切换 `Codex` / `WorkBuddy`。
+左键点托盘图标看弹窗，双击看完整看板。三个数据源共用同一套图表，顶栏可切换 `Codex` / `WorkBuddy` / `Antigravity`。
 
 | 功能 | 一句话 |
 | --- | --- |
@@ -76,7 +76,7 @@ npm run desktop:build      # NSIS 安装程序 → release/desktop/TokenBar-Setu
 npm run desktop:shortcut   # 桌面快捷方式
 ```
 
-1. **启动即扫描**：双击 `TokenBar.exe`（或桌面快捷方式），应用自动读 `~/.codex/sessions/**/*.jsonl` 与 `~/.workbuddy` / `~/.workbuddy-ai` 的日志（WorkBuddy 会话在 `~/.workbuddy-ai/projects/**/*.jsonl`），缓存写在 `%APPDATA%/TokenBar/data/`。关窗口不退，图标常驻托盘。
+1. **启动即扫描**：双击 `TokenBar.exe`（或桌面快捷方式），应用自动读 `~/.codex/sessions/**/*.jsonl`、`~/.workbuddy` / `~/.workbuddy-ai`（WorkBuddy 会话在 `~/.workbuddy-ai/projects/**/*.jsonl`）以及 Antigravity（`~/.gemini/antigravity*`、`~/.cc-switch/agy` 等根目录下的 `brain/*/transcript_full.jsonl`）日志，缓存写在 `%APPDATA%/TokenBar/data/`。关窗口不退，图标常驻托盘。
 2. **可选：查实时额度**：顶栏点「实时额度」，选本机检测到的 Codex 账号；要加账号就走「＋ OAuth 授权添加账号」的设备码流程。token 只在主进程内存里过一下。
 3. **可选：科研通签到**：在弹窗或看板添加科研通账号，点「签到」串行签到全部账号；不点就不联网。
 
@@ -85,7 +85,7 @@ npm run desktop:shortcut   # 桌面快捷方式
 ```bash
 npm install
 npm start                  # Electron 开发模式
-npm test                   # 数据层 + UI 断言，108 个测试
+npm test                   # 数据层 + UI 断言，115 个测试
 npm run desktop:smoke      # 启动、托盘、窗口生命周期
 ```
 
@@ -131,7 +131,7 @@ new input = inputTokens - cachedInputTokens
 
 - **别拿 `inputTokens` 直接乘输入价**。两家厂商都把缓存命中算进 `inputTokens`，命中率常在 95% 以上，直接乘会把花费放大好几倍。
 - **别把 reasoning 单独计费**。各家都已经把它算进 `output_tokens`。
-- **统一币种**。人民币计价的模型原样相加，美元计价的除以 `usdCny`（默认 7.2），这样 Codex 和 WorkBuddy 的钱能加到一起，最后统一以 `$` 显示。
+- **统一币种**。人民币计价的模型原样相加，美元计价的除以 `usdCny`（默认 7.2），这样 Codex、WorkBuddy 和 Antigravity 的钱能加到一起，最后统一以 `$` 显示。
 
 模型名按最长前缀匹配：`glm-5.3-flashx` 优先于 `glm-5.3-flash`，再优先于 `glm-5.3`。表里没有的型号按兜底价估算并标「估算」——宁可估，不记 0。单价表在 `%APPDATA%/TokenBar/data/pricing.json`，改完重开看板生效。
 
@@ -143,6 +143,14 @@ new input = inputTokens - cachedInputTokens
 - **输入含缓存**，`新增输入 = input - cached`。本机缓存命中率 98%，两档要分开看。
 - **速度从时间戳算，不是现成字段**。Codex 直接给 `duration_ms`，WorkBuddy 用 `function_call_result.timestamp − function_call.timestamp`（按 `parentId` 配对），口径与 Codex 一致。
 
+### Antigravity（对齐 CC Switch 口径）
+
+Antigravity 扫描 CLI（`~/.gemini/antigravity-cli`）、桌面端 / IDE（`~/.gemini/antigravity`）、ACP（`~/.gemini/antigravity-acp`）及私有配置目录下的 `brain/<id>/.system_generated/logs/transcript_full.jsonl`，仅统计 `PLANNER_RESPONSE` 且 `status === "DONE"` 的记录，按 `agy:<sessionId>:<step_index>` 去重：
+
+- **Token 语义不重复扣减**：Antigravity 导出的 `input_tokens` 已经是**新增输入**（不含 `cache_read_tokens`），`output_tokens` 也已经**包含思考 tokens**。TokenBar 内部映射为 `inputTokens = rawInput + cacheRead`，保证「新增输入」「缓存命中」「命中率」及等价花费与 CC Switch 严格一致。
+- **模型归属**：优先取响应行 `model`，其次按 `step_index` 顺序继承 `Model Selection` 切换事件；子代理与 Orchestrator（Carbon / Argon / Neon / Hydrogen worker）则以只读方式查询伴生 `conversations/<id>.db`（`steps -> gen_metadata`）还原真实模型与 `-tiered` 档位。
+- **速度与 TTFT**：从 `conversations/<id>.db` 读取 `first_token` 与 `streaming` 时长计算 `tok/s` 与首字延迟中位数。
+
 ### Speed / 速度
 
 `tps = 输出 tokens ÷ 轮耗时`。这是**整轮吞吐**，不是纯流式解码速度：里面包含工具调用和等待，所以一轮跑了 30 秒 shell 命令的会话会显得慢，哪怕模型秒回。
@@ -151,8 +159,9 @@ new input = inputTokens - cachedInputTokens
 | --- | --- |
 | Codex | `task_complete.duration_ms`，按 `turn_id` 与 `token_usage_record` 配对 |
 | WorkBuddy | `function_call_result.timestamp − function_call.timestamp`，按 `parentId` 配对 |
+| Antigravity | `conversations/<id>.db` 中 `gen_metadata` 的 `first_token + streaming` 时长 |
 
-配不上的轮次直接不计入，不当成 0 拉低平均。会话表两个数据源都显示 `tok/s`；WorkBuddy 一轮都配不上时退回显示积分，这一列不会空着。
+配不上的轮次直接不计入，不当成 0 拉低平均。会话表三个数据源都显示 `tok/s`；WorkBuddy 一轮都配不上时退回显示积分，这一列不会空着。
 
 ## Privacy
 
@@ -167,7 +176,7 @@ new input = inputTokens - cachedInputTokens
 Codex Desktop 的云端线程在 `~/.codex/sqlite/codex.db` 里 `source_kind = 'chatgpt'`、没有 `cwd`，磁盘上也不写 rollout，本机只有标题和时间。它照样扣订阅额度，但没有任何 token 明细可算——TokenBar 和 CC Switch 都补不出来。想进看板就用本地会话（CLI / 扩展 / Desktop local 模式），或让请求经过 CC Switch 本地代理。
 
 **为什么金额是美元？**
-刊例价表内部保留人民币原价，只在展示边界按 `pricing.json` 的 `usdCny`（默认 7.2）折算成 `$`，这样 Codex 和 WorkBuddy 的钱能加到一起。这个数字是「走 API 要花多少」的等价估算，不是订阅实扣。
+刊例价表内部保留人民币原价，只在展示边界按 `pricing.json` 的 `usdCny`（默认 7.2）折算成 `$`，这样 Codex、WorkBuddy 和 Antigravity 的钱能加到一起。这个数字是「走 API 要花多少」的等价估算，不是订阅实扣。
 
 **为什么和 CC Switch 的数字对不上？**
 看去重口径：重写基线前 TokenBar 是 6.58B，CC Switch v4 是 4.87B；按请求指纹去重后 TokenBar 收敛到 5.13B，8 月以后两边逐日吻合。剩下约 0.26B 是 CC Switch 从未导入的 `.zst` / `archived_sessions` 真实历史请求，不是重复计算。另外 CC Switch 的数字只含 Codex，TokenBar 合计里还有 WorkBuddy 约 0.45B，别拿合计去比单源。
@@ -177,7 +186,7 @@ Codex Desktop 的云端线程在 `~/.codex/sqlite/codex.db` 里 `source_kind = '
 
 ## Contributing
 
-欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（108 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
+欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（115 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
 
 ## License
 

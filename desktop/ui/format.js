@@ -16,12 +16,15 @@
   /** 用户是否显式选过「月之亮面 / 月之暗面」；选过就以用户选择为准 */
   let themeExplicit = localStorage.getItem("codex.theme") === "light" || localStorage.getItem("codex.theme") === "dark";
 
+  const SOURCES = ["codex", "workbuddy", "antigravity"];
+  const savedSource = localStorage.getItem("codex.source");
+
   const state = {
     /** 当前展示的数据源明细（等于 data[source]） */
     detail: null,
-    /** 两个数据源各自缓存一份，切换时不用重新扫描 */
-    data: { codex: null, workbuddy: null },
-    source: localStorage.getItem("codex.source") === "workbuddy" ? "workbuddy" : "codex",
+    /** 三个数据源各自缓存一份，切换时不用重新扫描 */
+    data: { codex: null, workbuddy: null, antigravity: null },
+    source: SOURCES.includes(savedSource) ? savedSource : "codex",
     status: null,
     meta: null,
     range: Number(localStorage.getItem("codex.range") || 14) || 14,
@@ -96,8 +99,9 @@
     if (!bucket || !unit) return 0;
     const input = Math.max(0, bucket.inputTokens || 0);
     const cached = Math.min(input, Math.max(0, bucket.cachedInputTokens || 0));
+    const cacheWrite = Math.max(0, bucket.cacheWriteTokens || 0);
     const output = Math.max(0, bucket.outputTokens || 0);
-    return ((input - cached) * unit.input + cached * unit.cached + output * unit.output) / 1e6;
+    return ((input - cached) * unit.input + cached * unit.cached + cacheWrite * (unit.cacheWrite || 0) + output * unit.output) / 1e6;
   }
 
   /**

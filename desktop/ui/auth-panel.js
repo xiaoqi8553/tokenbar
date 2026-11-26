@@ -46,6 +46,14 @@
     return detail && detail.today ? detail.today.totalTokens : 0;
   }
 
+  /** Antigravity 今日用量：优先用弹窗快照，没有就退回明细 */
+  function antigravityTodayTokens() {
+    const fromStatus = state.status && state.status.antigravity && state.status.antigravity.today;
+    if (fromStatus && fromStatus.totalTokens) return fromStatus.totalTokens;
+    const detail = state.data.antigravity;
+    return detail && detail.today ? detail.today.totalTokens : 0;
+  }
+
   function applySourceTabs() {
     for (const node of $("source").querySelectorAll("button")) {
       node.setAttribute("aria-pressed", String(node.dataset.source === state.source));
@@ -66,7 +74,11 @@
         renderAll();
         return;
       }
-      $("status-text").textContent = state.source === "workbuddy" ? "正在读取 WorkBuddy 日志…" : "正在读取 Codex 日志…";
+      $("status-text").textContent = state.source === "workbuddy"
+        ? "正在读取 WorkBuddy 日志…"
+        : state.source === "antigravity"
+          ? "正在读取 Antigravity 日志…"
+          : "正在读取 Codex 日志…";
       loadSource(state.source).then(() => {
         state.detail = state.data[state.source];
         renderAll();
@@ -84,6 +96,11 @@
       detail = refresh && api.workbuddyRefresh ? await api.workbuddyRefresh() : await api.workbuddyDetail();
       if (!detail) throw new Error("WorkBuddy 数据层尚未初始化");
       state.data.workbuddy = detail;
+    } else if (source === "antigravity") {
+      if (!api.antigravityDetail) throw new Error("当前版本不支持 Antigravity 数据源");
+      detail = refresh && api.antigravityRefresh ? await api.antigravityRefresh() : await api.antigravityDetail();
+      if (!detail) throw new Error("Antigravity 数据层尚未初始化");
+      state.data.antigravity = detail;
     } else {
       detail = refresh ? await api.refresh() : await api.getDetail();
       state.data.codex = detail;
@@ -96,9 +113,10 @@
     button.dataset.busy = "1";
     try {
       await loadSource("codex", { refresh });
-      if (state.source === "workbuddy") {
-        $("status-text").textContent = "正在读取 WorkBuddy 日志…";
-        await loadSource("workbuddy", { refresh }).catch(() => {});
+      if (state.source !== "codex") {
+        const label = state.source === "antigravity" ? "Antigravity" : "WorkBuddy";
+        $("status-text").textContent = "正在读取 " + label + " 日志…";
+        await loadSource(state.source, { refresh }).catch(() => {});
       }
       try {
         state.status = await window.dashboard.getStatus();
@@ -109,9 +127,9 @@
       $("app").hidden = false;
       renderAll();
       hideBoot();
-      // 后台预热另一个数据源，切换时不用等扫描
-      const other = state.source === "workbuddy" ? "codex" : "workbuddy";
-      if (!state.data[other]) {
+      // 后台预热其余数据源，切换时不用等扫描
+      for (const other of SOURCES) {
+        if (other === state.source || state.data[other]) continue;
         loadSource(other).then(() => {
           if (state.source === other) {
             state.detail = state.data[other];
@@ -123,7 +141,7 @@
       }
     } catch (error) {
       $("boot-text").textContent = "读取失败：" + (error && error.message ? error.message : error);
-      $("boot-hint").textContent = "请确认 ~/.codex/sessions 与 ~/.workbuddy(-ai)/projects 目录存在";
+      $("boot-hint").textContent = "请确认 ~/.codex/sessions、WorkBuddy 与 Antigravity 目录存在";
     } finally {
       button.dataset.busy = "0";
     }

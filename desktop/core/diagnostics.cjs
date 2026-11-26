@@ -66,7 +66,7 @@ function installShotDiagnostics(ctx) {
             await new Promise(resolve => setTimeout(resolve, SHOT_RESIZE_WAIT_MS));
           }
         }
-        // 排查用：先切到指定数据源（codex / workbuddy）再截图
+        // 排查用：先切到指定数据源（codex / workbuddy / antigravity）再截图
         if (process.env.CODEX_TOKEN_DASHBOARD_SHOT_SOURCE) {
           const source = String(process.env.CODEX_TOKEN_DASHBOARD_SHOT_SOURCE).replace(/[^a-z]/gi, "");
           await ctx.mainWindow.webContents.executeJavaScript(
