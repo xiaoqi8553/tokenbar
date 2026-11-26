@@ -47,7 +47,8 @@ const DASHBOARD_INVOKE = [
   "ablesci:list", "ablesci:add", "ablesci:remove", "ablesci:sign", "ablesci:open-site",
   "codex-auth:list", "codex-auth:fetch", "codex-auth:active",
   "codex-auth:device-start", "codex-auth:device-poll", "codex-auth:device-status",
-  "codex-auth:device-cancel", "codex-auth:hide", "codex-auth:unhide"
+  "codex-auth:device-cancel", "codex-auth:hide", "codex-auth:unhide",
+  "antigravity-auth:list", "antigravity-auth:fetch", "antigravity-auth:active"
 ];
 const DASHBOARD_METHODS = [
   "getDetail", "refresh", "getStatus", "getMeta", "workbuddyDetail", "workbuddyRefresh",
@@ -56,7 +57,8 @@ const DASHBOARD_METHODS = [
   "ablesciList", "ablesciAdd", "ablesciRemove", "ablesciSign", "ablesciOpenSite",
   "codexAuthList", "codexAuthFetch", "codexAuthActive", "codexAuthDeviceStart",
   "codexAuthDevicePoll", "codexAuthDeviceStatus", "codexAuthDeviceCancel",
-  "codexAuthHide", "codexAuthUnhide"
+  "codexAuthHide", "codexAuthUnhide",
+  "antigravityAuthList", "antigravityAuthFetch", "antigravityAuthActive"
 ];
 const CODEXBAR_INVOKE = [
   "popover:refresh", "popover:open-dashboard", "popover:open-status-page",
@@ -69,7 +71,7 @@ const CODEXBAR_INVOKE = [
 const CODEXBAR_EVENTS = ["popover:status", "ablesci:changed"];
 const CODEXBAR_SEND = ["popover:set-height"];
 
-test("dashboard-preload 白名单逐字锁死：28 个方法、26 个 invoke channel", () => {
+test("dashboard-preload 白名单逐字锁死：31 个方法、29 个 invoke channel", () => {
   const names = methods(dashboardPreload);
   assert.ok(names.length >= 22, `window.dashboard 方法数 ${names.length} < 22`);
   assert.deepEqual([...names].sort(), [...DASHBOARD_METHODS].sort());

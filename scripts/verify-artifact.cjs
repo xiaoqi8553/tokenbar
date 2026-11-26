@@ -40,7 +40,8 @@ const REQUIRED = [
   "desktop/data/pricing.cjs",
   "desktop/data/workbuddy-store.cjs",
   "desktop/data/antigravity-native.cjs",
-  "desktop/data/antigravity-store.cjs"
+  "desktop/data/antigravity-store.cjs",
+  "desktop/data/antigravity-quota-store.cjs"
 ];
 
 // 3.0 深度重构后新增的模块（构建产物白名单扩展时逐项登记）

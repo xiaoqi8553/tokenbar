@@ -20,6 +20,7 @@ const { loadTable, ensureTableFile } = require("./data/pricing.cjs");
 const { buildBaseline, baselineIsFresh, loadBaseline, saveBaseline } = require("./data/history-baseline.cjs");
 const { createAbleSciStore } = require("./data/ablesci-store.cjs");
 const { createCodexAuthStore } = require("./data/codex-auth-store.cjs");
+const { createAntigravityQuotaStore } = require("./data/antigravity-quota-store.cjs");
 
 const C = require("./core/constants.cjs");
 const { logger: baseLogger, createLogger } = require("./core/logger.cjs");
@@ -49,7 +50,7 @@ const ctx = {
   loadTable: p => loadTable(p),
   ensureTableFile,
   buildBaseline, baselineIsFresh, loadBaseline, saveBaseline,
-  createAbleSciStore, createCodexAuthStore,
+  createAbleSciStore, createCodexAuthStore, createAntigravityQuotaStore,
   PRODUCT_NAME, APP_ROOT, SMOKE,
   DESKTOP_DIR: path.join(APP_ROOT, "desktop"),
 
@@ -72,6 +73,7 @@ const ctx = {
   agyStore: null,
   ablesciStore: null,
   codexAuthStore: null,
+  agyQuotaStore: null,
   /** 启动诊断日志的落盘位置，start() 阶段才确定 */
   logFile: null,
   logger: baseLogger
@@ -123,6 +125,7 @@ async function refreshTrayStatus(force = false) {
   if (!ctx.store) return;
   // 实时额度走独立节奏：store 内部有 30 秒节流，失败也只是留旧值
   ctx.refreshLiveQuota(ctx).catch(() => {});
+  ctx.refreshAntigravityQuota(ctx, force).catch(() => {});
   // WorkBuddy / Antigravity 是独立数据源：build() 自带 _promise 防并发，只重扫 size/mtime
   // 变过的文件；放进 30 秒轮询不会重复劳动，且不阻塞托盘/弹窗的 Codex 刷新。
   const wbStore = ctx.wbStore;
@@ -159,6 +162,7 @@ async function refreshTrayStatus(force = false) {
     }
   }
   ctx.attachLiveQuota(ctx);
+  ctx.attachAntigravityQuota(ctx);
   ctx.updateTray(ctx);
   ctx.pushStatusToPopover(ctx);
   }

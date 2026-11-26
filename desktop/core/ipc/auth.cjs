@@ -56,6 +56,25 @@ function registerCodexAuthHandlers(ctx) {
     if (!ctx.codexAuthStore) return false;
     return ctx.codexAuthStore.unhideAccount(accountId);
   });
+
+  // Antigravity 实时额度：复用本机钥匙串 `gemini:antigravity` 与 CC Switch 账号表（只读）
+  ctx.ipcMain.handle("antigravity-auth:list", () => {
+    if (!ctx.agyQuotaStore) return { accounts: [], activeId: null };
+    try { return ctx.agyQuotaStore.list(); }
+    catch (e) { return { accounts: [], activeId: null, error: e.message }; }
+  });
+  ctx.ipcMain.handle("antigravity-auth:fetch", async (_event, accountId, opts) => {
+    if (!ctx.agyQuotaStore) throw new Error("Antigravity 额度模块尚未就绪");
+    const result = await ctx.agyQuotaStore.fetchQuota(accountId, opts || {});
+    ctx.applyAntigravityQuota(ctx, result);
+    return result;
+  });
+  ctx.ipcMain.handle("antigravity-auth:active", async (_event, opts) => {
+    if (!ctx.agyQuotaStore) return null;
+    const result = await ctx.agyQuotaStore.activeQuota(opts || {});
+    if (result) ctx.applyAntigravityQuota(ctx, result);
+    return result;
+  });
 }
 
 function installAuthIpc(ctx) {

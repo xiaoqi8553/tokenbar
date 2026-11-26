@@ -219,6 +219,36 @@
 
   .pace.warn { color: var(--warn); }
 
+  .agy-quota {
+    padding: 0 16px 11px;
+  }
+
+  .agy-quota[hidden] { display: none; }
+
+  .agy-quota-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .agy-row { margin-top: 6px; }
+  .agy-row:first-of-type { margin-top: 0; }
+  .agy-row-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11.5px;
+    margin-bottom: 4px;
+  }
+  .agy-row-name { font-weight: 560; color: var(--text); }
+  .agy-row-meta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .agy-track { height: 4px; }
+  .agy-err { margin-top: 4px; font-size: 11px; color: var(--text-3); }
+  .agy-err[hidden] { display: none; }
+
   /* ------------------------------------------------------------- structure */
 
   .rule {
@@ -660,6 +690,29 @@
     <div class="pace" id="pace-weekly"></div>
   </div>
 
+  <div class="agy-quota" id="agy-quota" hidden>
+    <div class="rule" style="margin:0 0 10px"></div>
+    <div class="agy-quota-head">
+      <span class="quota-name">Antigravity 额度</span>
+      <span class="quota-window" id="agy-plan">—</span>
+    </div>
+    <div class="agy-row" id="agy-row-gemini">
+      <div class="agy-row-top">
+        <span class="agy-row-name">Gemini</span>
+        <span class="agy-row-meta" id="agy-meta-gemini">—</span>
+      </div>
+      <div class="track agy-track"><span class="fill" id="fill-agy-gemini"></span></div>
+    </div>
+    <div class="agy-row" id="agy-row-3p">
+      <div class="agy-row-top">
+        <span class="agy-row-name">Claude / GPT</span>
+        <span class="agy-row-meta" id="agy-meta-3p">—</span>
+      </div>
+      <div class="track agy-track"><span class="fill" id="fill-agy-3p"></span></div>
+    </div>
+    <div class="agy-err" id="agy-quota-err" hidden></div>
+  </div>
+
   <div class="rule"></div>
 
   <div class="today">
@@ -848,6 +901,58 @@
     pace.className = "pace" + (/快于/.test(text) ? " warn" : "");
   }
 
+  function renderAgyGroup(prefix, group) {
+    const row = $(`agy-row-${prefix}`);
+    const fill = $(`fill-agy-${prefix}`);
+    const meta = $(`agy-meta-${prefix}`);
+    if (!row || !fill || !meta) return;
+    if (!group || !group.primary) {
+      row.hidden = true;
+      return;
+    }
+    row.hidden = false;
+    const p = group.primary;
+    const pct = Math.max(0, Math.min(100, p.usedPercent));
+    const rem = Math.max(0, Math.min(100, 100 - pct));
+    fill.style.width = `${pct}%`;
+    fill.className = "fill" + (pct >= 90 ? " danger" : pct >= 70 ? " warn" : "");
+    const parts = [];
+    if (group.fiveHour) parts.push(`5h 剩 ${Math.round(group.fiveHour.remainingPercent)}%`);
+    if (group.weekly) parts.push(`周剩 ${Math.round(group.weekly.remainingPercent)}%`);
+    if (group.argonWeekly) parts.push(`Argon 剩 ${Math.round(group.argonWeekly.remainingPercent)}%`);
+    meta.textContent = parts.length ? parts.join(" · ") : `剩余 ${Math.round(rem)}%`;
+    row.title = (group.tiers || [])
+      .map(t => `${t.label}: 已用 ${t.usedPercent.toFixed(1)}% · 剩余 ${t.remainingPercent.toFixed(1)}%${t.resetsAt ? " · " + resetCountdown(t.resetsAt) : ""}`)
+      .join("\n");
+  }
+
+  function renderAgyQuota(status) {
+    const box = $("agy-quota");
+    if (!box) return;
+    const agyQuota = status && status.antigravityQuota;
+    const agyError = status && status.antigravityQuotaError;
+    const hasAgyUsage = Boolean(status && status.antigravity && status.antigravity.totals && status.antigravity.totals.totalTokens);
+    if (!agyQuota && !agyError && !hasAgyUsage) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const planLabel = agyQuota && agyQuota.planType ? `实时 · ${agyQuota.planType}` : (agyQuota ? "实时" : "暂无额度");
+    $("agy-plan").textContent = planLabel;
+    renderAgyGroup("gemini", agyQuota && agyQuota.gemini);
+    renderAgyGroup("3p", agyQuota && agyQuota.thirdParty);
+    const errNode = $("agy-quota-err");
+    if (errNode) {
+      if (!agyQuota && agyError) {
+        errNode.hidden = false;
+        errNode.textContent = agyError;
+      } else {
+        errNode.hidden = true;
+        errNode.textContent = "";
+      }
+    }
+  }
+
   function renderSpark(series) {
     const svg = $("spark");
     if (!svg) return;
@@ -953,6 +1058,7 @@
 
     renderQuota("session", quota.session);
     renderQuota("weekly", quota.weekly);
+    renderAgyQuota(status);
 
     const today = status.today || {};
     const split = splitTokens(today.totalTokens);

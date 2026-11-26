@@ -170,12 +170,50 @@
     return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
 
+  let lastCodexAuthData = { accounts: [] };
+
+  function syncAuthTopLabel() {
+    const label = $("auth-top-label");
+    const dot = $("auth-dot");
+    if (!label || !dot) return;
+    if (state.source === "antigravity") {
+      const agyQuota = state.status && state.status.antigravityQuota;
+      const g = agyQuota && agyQuota.gemini && agyQuota.gemini.primary;
+      const t = agyQuota && agyQuota.thirdParty && agyQuota.thirdParty.primary;
+      const pick = g && t ? (g.usedPercent >= t.usedPercent ? g : t) : (g || t);
+      if (pick) {
+        label.textContent = "额度 " + Math.round(pick.usedPercent) + "%";
+        dot.hidden = false;
+        return;
+      }
+    }
+    const accounts = Array.isArray(lastCodexAuthData.accounts) ? lastCodexAuthData.accounts : [];
+    const active = accounts.find(a => a.id === lastCodexAuthData.activeId && a.quota);
+    if (active && active.quota && active.quota.session) {
+      label.textContent = "额度 " + Math.round(active.quota.session.usedPercent) + "%";
+      dot.hidden = false;
+      return;
+    }
+    const statusCodex = state.status && state.status.quota;
+    if (statusCodex && statusCodex.source === "api" && statusCodex.session) {
+      label.textContent = "额度 " + Math.round(statusCodex.session.usedPercent) + "%";
+      dot.hidden = false;
+      return;
+    }
+    label.textContent = "实时额度";
+    dot.hidden = true;
+  }
+
   async function loadAuthAccounts() {
     const d = window.dashboard;
-    if (!d || !d.codexAuthList) return;
+    if (!d) return;
     try {
-      const data = await d.codexAuthList();
-      renderAuthAccounts(data || { accounts: [] });
+      const [codexData, agyData] = await Promise.all([
+        d.codexAuthList ? d.codexAuthList() : Promise.resolve({ accounts: [] }),
+        d.antigravityAuthList ? d.antigravityAuthList() : Promise.resolve({ accounts: [] })
+      ]);
+      renderAuthAccounts(codexData || { accounts: [] });
+      renderAgyAuthAccounts(agyData || { accounts: [] });
     } catch (e) {
       $("a-badge").textContent = "读取失败";
       authMsg(String(e && e.message ? e.message : e), true);
@@ -185,24 +223,21 @@
   let showHiddenAccounts = false;
 
   function renderAuthAccounts(data) {
+    lastCodexAuthData = data || { accounts: [] };
     const accounts = Array.isArray(data.accounts) ? data.accounts : [];
     const activeId = data.activeId;
     const hiddenCount = Number(data.hiddenCount) || accounts.filter(a => a.isHidden).length;
     const badge = $("a-badge");
-    const dot = $("auth-dot");
     // 顶部标签：显示当前激活账号的实时额度来源（隐藏的账号不影响额度展示）
     const active = accounts.find(a => a.id === activeId && a.quota);
     if (active && active.quota && active.quota.session) {
-      $("auth-top-label").textContent = "额度 " + Math.round(active.quota.session.usedPercent) + "%";
-      dot.hidden = false;
       badge.textContent = "实时 · " + active.email;
       badge.className = "m-badge done";
     } else {
-      $("auth-top-label").textContent = "实时额度";
-      dot.hidden = true;
       badge.textContent = accounts.length ? accounts.length + " 个账号" : "未检测到账号";
       badge.className = "m-badge";
     }
+    syncAuthTopLabel();
 
     // 隐藏账号数量条：有隐藏账号时给出恢复入口
     const hiddenBar = $("a-hidden-bar");
@@ -241,6 +276,77 @@
         '<div class="m-mail">' + escapeHtml(a.email) + (a.id === activeId ? ' <span class="q-tag">当前</span>' : '') + '</div>' +
         detail + '</div>' + tag + hideBtn + '</div>';
     }).join("");
+  }
+
+  function renderAgyAuthAccounts(data) {
+    const list = $("agy-accounts");
+    const badge = $("agy-badge");
+    if (!list || !badge) return;
+    const accounts = Array.isArray(data && data.accounts) ? data.accounts : [];
+    const activeId = data && data.activeId;
+    const active = accounts.find(a => a.id === activeId && a.quota) || accounts.find(a => a.quota);
+    if (active && active.quota) {
+      badge.textContent = "实时" + (active.planType ? " · " + active.planType : "");
+      badge.className = "m-badge done";
+    } else {
+      badge.textContent = accounts.length ? accounts.length + " 个账号" : "未检测到登录";
+      badge.className = "m-badge";
+    }
+
+    if (!accounts.length) {
+      list.innerHTML = '<div class="m-sub" style="margin:0 0 4px">没有检测到本机 Antigravity 登录凭据（gemini:antigravity）。</div>';
+      return;
+    }
+
+    list.innerHTML = accounts.map(a => {
+      const q = a.quota;
+      const g = q && q.gemini;
+      const t = q && q.thirdParty;
+      const live = Boolean(q && (g || t));
+      const tag = a.error ? '<span class="q-tag err">失败</span>'
+        : live ? '<span class="q-tag live">' + escapeHtml(a.planType || "实时") + '</span>'
+        : '<span class="q-tag">未查询</span>';
+      let detail = '<div class="q-quota">点击查询 Antigravity 实时额度</div>';
+      if (live) {
+        const lines = [];
+        if (g) {
+          lines.push("Gemini: " + (g.fiveHour ? "5h 剩 <b>" + Math.round(g.fiveHour.remainingPercent) + "%</b>" : "") +
+            (g.weekly ? (g.fiveHour ? " / " : "") + "周剩 <b>" + Math.round(g.weekly.remainingPercent) + "%</b>" : "") +
+            (g.argonWeekly ? " / Argon <b>" + Math.round(g.argonWeekly.remainingPercent) + "%</b>" : ""));
+        }
+        if (t) {
+          lines.push("Claude/GPT: " + (t.fiveHour ? "5h 剩 <b>" + Math.round(t.fiveHour.remainingPercent) + "%</b>" : "") +
+            (t.weekly ? (t.fiveHour ? " / " : "") + "周剩 <b>" + Math.round(t.weekly.remainingPercent) + "%</b>" : ""));
+        }
+        detail = '<div class="q-quota">' + lines.join(" ｜ ") + '</div>';
+      } else if (a.error) {
+        detail = '<div class="q-quota">' + escapeHtml(a.error) + '</div>';
+      }
+      return '<div class="m-acct q-acct agy-acct' + (a.id === activeId ? ' is-active' : '') +
+        '" data-agy-id="' + escapeHtml(a.id) + '">' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="m-mail">' + escapeHtml(a.email || "Antigravity") + (a.id === activeId ? ' <span class="q-tag">当前</span>' : '') + '</div>' +
+        detail + '</div>' + tag + '</div>';
+    }).join("");
+  }
+
+  async function doFetchAgyQuota(accountId) {
+    const d = window.dashboard;
+    if (!d || !d.antigravityAuthFetch) return;
+    authMsg("正在向 Google 查询 Antigravity 额度…");
+    try {
+      const result = await d.antigravityAuthFetch(accountId, { force: true });
+      authMsg("已更新 " + (result.email || "Antigravity") + " 的实时额度。");
+      if (d.getStatus) {
+        d.getStatus().then(status => {
+          if (status) { state.status = status; renderStats(); renderStatus(); }
+        }).catch(() => {});
+      }
+      loadAuthAccounts();
+    } catch (e) {
+      authMsg("Antigravity 查询失败：" + (e && e.message ? e.message : String(e)), true);
+      loadAuthAccounts();
+    }
   }
 
   function openAuthModal() { $("auth-modal").hidden = false; loadAuthAccounts(); }
@@ -405,6 +511,14 @@
       if (!row) return;
       doFetchQuota(row.getAttribute("data-id"));
     });
+    const agyList = $("agy-accounts");
+    if (agyList) {
+      agyList.addEventListener("click", event => {
+        const row = event.target.closest(".agy-acct");
+        if (!row) return;
+        doFetchAgyQuota(row.getAttribute("data-agy-id"));
+      });
+    }
     // 页面隐藏时停止设备码轮询，避免后台空转 / 取消时刷错误
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) stopDevicePolling();

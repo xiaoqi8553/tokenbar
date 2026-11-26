@@ -16,6 +16,7 @@ function registerDashboardHandlers(ctx) {
     ctx.attachWorkBuddySummary(ctx);
     ctx.attachAntigravitySummary(ctx);
     ctx.attachLiveQuota(ctx);
+    ctx.attachAntigravityQuota(ctx);
     ctx.updateTray(ctx);
     ctx.pushStatusToPopover(ctx);
     return detail;
@@ -29,6 +30,7 @@ function registerDashboardHandlers(ctx) {
     ctx.attachWorkBuddySummary(ctx);
     ctx.attachAntigravitySummary(ctx);
     ctx.attachLiveQuota(ctx);
+    ctx.attachAntigravityQuota(ctx);
     ctx.updateTray(ctx);
     ctx.pushStatusToPopover(ctx);
     return detail;
@@ -54,6 +56,7 @@ function registerDashboardHandlers(ctx) {
     if (!ctx.agyStore) return null;
     const detail = await ctx.agyStore.build({ onProgress: progress => ctx.pushDetailProgress(ctx, progress) });
     ctx.attachAntigravitySummary(ctx);
+    ctx.refreshAntigravityQuota(ctx).catch(() => {});
     return detail;
   });
 
@@ -61,6 +64,7 @@ function registerDashboardHandlers(ctx) {
     if (!ctx.agyStore) return null;
     const detail = await ctx.agyStore.build({ onProgress: progress => ctx.pushDetailProgress(ctx, progress), force: true });
     ctx.attachAntigravitySummary(ctx);
+    await ctx.refreshAntigravityQuota(ctx, true).catch(() => {});
     return detail;
   });
 

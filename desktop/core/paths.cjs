@@ -61,6 +61,8 @@ function userDataPaths(ctx) {
     baseline: path.join(userData, "data", "history-baseline.json"),
     workbuddyCache: path.join(userData, "data", "workbuddy-detail-cache.json"),
     antigravityCache: path.join(userData, "data", "antigravity-detail-cache.json"),
+    antigravityQuotaCache: path.join(userData, "data", "antigravity-quota-cache.json"),
+    ccSwitchAgyAccounts: path.join(ctx.os.homedir(), ".cc-switch", "agy_accounts.json"),
     pricing: path.join(userData, "data", "pricing.json"),
     ablesciAccounts: path.join(userData, "data", "ablesci-accounts.json"),
     ablesciState: path.join(userData, "data", "ablesci-state.json"),

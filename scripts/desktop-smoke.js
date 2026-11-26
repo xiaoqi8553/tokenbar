@@ -454,6 +454,10 @@ async function main() {
       hasAuthList: !!(window.dashboard && typeof window.dashboard.codexAuthList === "function"),
       hideApi: !!(window.dashboard && typeof window.dashboard.codexAuthHide === "function"
         && typeof window.dashboard.codexAuthUnhide === "function"),
+      agyQuotaApi: !!(window.dashboard && typeof window.dashboard.antigravityAuthList === "function"
+        && typeof window.dashboard.antigravityAuthFetch === "function"
+        && typeof window.dashboard.antigravityAuthActive === "function"),
+      hasAgyAccounts: !!document.querySelector("#agy-accounts"),
       hideButtons: document.querySelectorAll("#a-accounts .q-hide").length,
       hideBar: !!document.querySelector("#a-hidden-bar")
     }));
@@ -462,6 +466,8 @@ async function main() {
     assert.ok(oauthUi.api, "preload 应暴露设备码授权 API");
     assert.ok(oauthUi.hasAuthList, "preload 应暴露账号列表 API");
     assert.ok(oauthUi.hideApi, "preload 应暴露隐藏/恢复账号 API");
+    assert.ok(oauthUi.agyQuotaApi, "preload 应暴露 Antigravity 额度查询 API");
+    assert.ok(oauthUi.hasAgyAccounts, "授权弹窗应包含 Antigravity 账号区域");
     assert.ok(oauthUi.hideBar, "应有隐藏账号恢复入口");
     assert.ok(oauthUi.hideButtons > 0, "每个账号行都应有隐藏按钮");
     await dashboard.click("#a-close");
@@ -505,10 +511,10 @@ async function main() {
     }));
     assert.match(agyInfo.badge, /Antigravity/);
     assert.match(agyInfo.status, /Antigravity/);
+    assert.match(agyInfo.statText, /Gemini 额度/);
+    assert.match(agyInfo.statText, /Claude \/ GPT 额度/);
     assert.match(agyInfo.statText, /1\.1K/);
     assert.match(agyInfo.statText, /新增输入 800 · 输出 150/);
-    assert.match(agyInfo.statText, /命中 200 · 输入 1K/);
-    assert.match(agyInfo.statText, /首字延迟/);
     assert.deepEqual(agyInfo.models, ["gemini-4-hydrogen-xhigh"]);
     assert.deepEqual(agyInfo.pressed, ["antigravity"]);
 

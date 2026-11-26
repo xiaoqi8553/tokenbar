@@ -257,6 +257,7 @@
     font: 540 12.5px/1 "Segoe UI", "Microsoft YaHei UI", sans-serif;
     cursor: pointer;
     position: relative;
+    white-space: nowrap;
     transition: color .16s ease, border-color .16s ease, background .16s ease;
   }
   .sign-top:hover { color: var(--text); border-color: color-mix(in srgb, var(--text-3) 50%, transparent); }
@@ -351,7 +352,13 @@
   .m-close { background: none; border: 0; color: var(--text-3); font-size: 13px; cursor: pointer; }
 
   /* 账号列表单独滚动，底部「OAuth 授权 / 刷新 / 关闭」始终可见 */
-  #a-accounts { max-height: 330px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  #a-accounts { max-height: 230px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  #agy-accounts { max-height: 180px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  .a-sec-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 12px 0 6px; font-size: 12px; font-weight: 620; color: var(--text-2);
+  }
+  .a-sec-head:first-of-type { margin-top: 2px; }
   .a-hidden-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 11.5px; }
   .a-hidden-bar[hidden] { display: none; }
   .a-hidden-tip { color: var(--text-3); }
@@ -1139,12 +1146,20 @@
         实时额度
         <span class="m-badge" id="a-badge">本地日志</span>
       </h3>
-      <div class="m-sub" id="a-sub">复用本机 Codex 授权，点任意账号即可向官方查询 5 小时 / 每周额度（不上传凭证）</div>
+      <div class="m-sub" id="a-sub">复用本机 Codex / Antigravity 授权，点任意账号即可查询官方实时额度（不上传凭证）</div>
+      <div class="a-sec-head">
+        <span>Codex 账号</span>
+      </div>
       <div id="a-accounts"></div>
       <div class="a-hidden-bar" id="a-hidden-bar" hidden>
         <button class="m-link" id="a-toggle-hidden">显示已隐藏的 0 个账号</button>
         <span class="a-hidden-tip">仅从看板隐藏，本机授权文件不受影响</span>
       </div>
+      <div class="a-sec-head" id="agy-sec-head">
+        <span>Antigravity 账号</span>
+        <span class="m-badge" id="agy-badge">—</span>
+      </div>
+      <div id="agy-accounts"></div>
       <div class="dev-panel" id="a-dev-panel" hidden>
         <div class="dev-hint">
           1. 打开官方验证网址（会新开浏览器）：
@@ -1815,7 +1830,8 @@
 
     const hints = [];
     if (recentSpeed) hints.push("近 14 天 " + recentSpeed.tps.toFixed(1) + " tok/s");
-    if (todaySpeed && todaySpeed.ttftMs) hints.push("首字 " + fmtSpeed(todaySpeed.ttftMs));
+    const ttft = (todaySpeed && todaySpeed.ttftMs) || (speed && speed.ttftMs) || null;
+    if (ttft) hints.push("首字 " + fmtSpeed(ttft));
 
     return {
       label: "输出速度",
@@ -1937,14 +1953,82 @@
     ];
   }
 
+  function agyQuotaCard(title, group, planType, fallbackErr, scopeHint) {
+    const primary = group && group.primary ? group.primary : null;
+    const winShort = primary
+      ? (primary.window === "5h" ? "5 小时" : primary.window === "argon" ? "Argon 周" : "每周")
+      : "";
+    const windowParts = [planType || "", winShort, primary ? "实时" : ""].filter(Boolean);
+    const windowLabel = windowParts.length ? windowParts.join(" · ") : "实时窗口";
+
+    if (!primary) {
+      return {
+        label: title,
+        window: windowLabel,
+        num: "—",
+        unit: "",
+        hideMeter: true,
+        foot: fallbackErr ? "查询失败" : "暂无额度快照",
+        hints: [fallbackErr || scopeHint || "登录 Antigravity 后自动同步"]
+      };
+    }
+
+    const used = Math.max(0, Math.min(100, primary.usedPercent));
+    const remaining = Math.max(0, 100 - used);
+    const pace = quotaPace(primary);
+    const totalMs = primary.windowMinutes ? primary.windowMinutes * 60000 : 0;
+    const resetMs = primary.resetsAt ? primary.resetsAt * 1000 : null;
+    const elapsedPercent = resetMs && totalMs
+      ? Math.max(0, Math.min(100, ((totalMs - (resetMs - Date.now())) / totalMs) * 100))
+      : null;
+
+    const hints = [];
+    const others = (group.tiers || []).filter(t => t.id !== primary.id);
+    if (others.length) {
+      hints.push(others.map(t => {
+        const shortName = t.window === "5h" ? "5h" : t.window === "argon" ? "Argon" : "每周";
+        return shortName + " 已用 " + fmtPercent(t.usedPercent);
+      }).join(" · "));
+    } else if (scopeHint) {
+      hints.push(scopeHint);
+    }
+    if (resetMs) {
+      hints.push(fmtClock(resetMs) + " 重置" + (pace ? " · " + pace.text : ""));
+    } else if (scopeHint && others.length) {
+      hints.push(scopeHint);
+    }
+
+    const tipLines = (group.tiers || []).map(t =>
+      t.label + "：已用 " + t.usedPercent.toFixed(1) + "% · 剩余 " + t.remainingPercent.toFixed(1) + "%" +
+      (t.resetsAt ? "（" + fmtClock(t.resetsAt * 1000) + " 重置）" : "")
+    );
+
+    return {
+      label: title,
+      window: windowLabel,
+      num: fmtPercent(used),
+      unit: "已用",
+      percent: used,
+      pace: elapsedPercent,
+      title: tipLines.join("\n"),
+      foot: [
+        '<span class="dot" data-tone="' + (pace ? pace.tone : "muted") + '"></span>',
+        "剩余 <b>" + fmtPercent(remaining) + "</b>",
+        resetMs ? " · " + fmtClock(resetMs) + " 重置" : ""
+      ].join(""),
+      hints
+    };
+  }
+
   function antigravityCards() {
     const detail = state.detail;
     const totals = detail.totals;
     const today = detail.today;
     const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
     const todayRate = today && today.inputTokens ? (today.cachedInputTokens / today.inputTokens) * 100 : 0;
-    const ttftMs = detail.throughput && detail.throughput.ttftMs;
-    const ttftTurns = detail.throughput && detail.throughput.turns ? detail.throughput.turns : 0;
+    const agyQuota = state.status && state.status.antigravityQuota;
+    const agyQuotaErr = state.status && state.status.antigravityQuotaError;
+    const planType = agyQuota && agyQuota.planType;
     const rootHint = (detail.roots || [])
       .filter(item => item.files > 0)
       .map(item => {
@@ -1956,6 +2040,8 @@
       .join(" + ") || "~/.gemini/antigravity";
 
     return [
+      agyQuotaCard("Gemini 额度", agyQuota && agyQuota.gemini, planType, agyQuotaErr, "Gemini 4 · Flash 共享池"),
+      agyQuotaCard("Claude / GPT 额度", agyQuota && agyQuota.thirdParty, planType, agyQuotaErr, "Claude · GPT-OSS 共享池"),
       {
         label: "今日用量",
         window: "00:00 起",
@@ -1976,7 +2062,7 @@
         unit: "tokens",
         hideMeter: true,
         foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
-        hints: ["来源 " + rootHint]
+        hints: ["缓存命中 " + fmtPercent(cacheRate, 1), "来源 " + rootHint]
       },
       {
         label: "等价花费",
@@ -1988,27 +2074,6 @@
         title: "美元计价 · 按官方 API 刊例价折算",
         foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
         hints: ["按 CC Switch 同口径折算"]
-      },
-      {
-        label: "缓存命中率",
-        window: "输入口径",
-        num: fmtPercent(cacheRate, 1),
-        unit: "命中",
-        percent: cacheRate,
-        level: "ok",
-        foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
-        hints: ["input 已含缓存还原，不重复扣除"]
-      },
-      {
-        label: "首字延迟",
-        window: "TTFT 中位数",
-        num: ttftMs !== null && ttftMs !== undefined ? fmtSpeed(ttftMs) : "—",
-        unit: "",
-        hideMeter: true,
-        foot: ttftTurns
-          ? "<b>" + fmtCount(ttftTurns) + "</b> 轮带原生计时"
-          : "暂无原生计时样本",
-        hints: ["来自 conversations/*.db"]
       },
       speedCard()
     ];
@@ -2712,6 +2777,7 @@
         (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "") +
         (agyToday > 0 ? " · Antigravity " + fmtTokens(agyToday) + " 今日" : "");
     }
+    if (typeof syncAuthTopLabel === "function") syncAuthTopLabel();
   }
 
   function renderAll() {
@@ -2896,12 +2962,50 @@
     return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
 
+  let lastCodexAuthData = { accounts: [] };
+
+  function syncAuthTopLabel() {
+    const label = $("auth-top-label");
+    const dot = $("auth-dot");
+    if (!label || !dot) return;
+    if (state.source === "antigravity") {
+      const agyQuota = state.status && state.status.antigravityQuota;
+      const g = agyQuota && agyQuota.gemini && agyQuota.gemini.primary;
+      const t = agyQuota && agyQuota.thirdParty && agyQuota.thirdParty.primary;
+      const pick = g && t ? (g.usedPercent >= t.usedPercent ? g : t) : (g || t);
+      if (pick) {
+        label.textContent = "额度 " + Math.round(pick.usedPercent) + "%";
+        dot.hidden = false;
+        return;
+      }
+    }
+    const accounts = Array.isArray(lastCodexAuthData.accounts) ? lastCodexAuthData.accounts : [];
+    const active = accounts.find(a => a.id === lastCodexAuthData.activeId && a.quota);
+    if (active && active.quota && active.quota.session) {
+      label.textContent = "额度 " + Math.round(active.quota.session.usedPercent) + "%";
+      dot.hidden = false;
+      return;
+    }
+    const statusCodex = state.status && state.status.quota;
+    if (statusCodex && statusCodex.source === "api" && statusCodex.session) {
+      label.textContent = "额度 " + Math.round(statusCodex.session.usedPercent) + "%";
+      dot.hidden = false;
+      return;
+    }
+    label.textContent = "实时额度";
+    dot.hidden = true;
+  }
+
   async function loadAuthAccounts() {
     const d = window.dashboard;
-    if (!d || !d.codexAuthList) return;
+    if (!d) return;
     try {
-      const data = await d.codexAuthList();
-      renderAuthAccounts(data || { accounts: [] });
+      const [codexData, agyData] = await Promise.all([
+        d.codexAuthList ? d.codexAuthList() : Promise.resolve({ accounts: [] }),
+        d.antigravityAuthList ? d.antigravityAuthList() : Promise.resolve({ accounts: [] })
+      ]);
+      renderAuthAccounts(codexData || { accounts: [] });
+      renderAgyAuthAccounts(agyData || { accounts: [] });
     } catch (e) {
       $("a-badge").textContent = "读取失败";
       authMsg(String(e && e.message ? e.message : e), true);
@@ -2911,24 +3015,21 @@
   let showHiddenAccounts = false;
 
   function renderAuthAccounts(data) {
+    lastCodexAuthData = data || { accounts: [] };
     const accounts = Array.isArray(data.accounts) ? data.accounts : [];
     const activeId = data.activeId;
     const hiddenCount = Number(data.hiddenCount) || accounts.filter(a => a.isHidden).length;
     const badge = $("a-badge");
-    const dot = $("auth-dot");
     // 顶部标签：显示当前激活账号的实时额度来源（隐藏的账号不影响额度展示）
     const active = accounts.find(a => a.id === activeId && a.quota);
     if (active && active.quota && active.quota.session) {
-      $("auth-top-label").textContent = "额度 " + Math.round(active.quota.session.usedPercent) + "%";
-      dot.hidden = false;
       badge.textContent = "实时 · " + active.email;
       badge.className = "m-badge done";
     } else {
-      $("auth-top-label").textContent = "实时额度";
-      dot.hidden = true;
       badge.textContent = accounts.length ? accounts.length + " 个账号" : "未检测到账号";
       badge.className = "m-badge";
     }
+    syncAuthTopLabel();
 
     // 隐藏账号数量条：有隐藏账号时给出恢复入口
     const hiddenBar = $("a-hidden-bar");
@@ -2967,6 +3068,77 @@
         '<div class="m-mail">' + escapeHtml(a.email) + (a.id === activeId ? ' <span class="q-tag">当前</span>' : '') + '</div>' +
         detail + '</div>' + tag + hideBtn + '</div>';
     }).join("");
+  }
+
+  function renderAgyAuthAccounts(data) {
+    const list = $("agy-accounts");
+    const badge = $("agy-badge");
+    if (!list || !badge) return;
+    const accounts = Array.isArray(data && data.accounts) ? data.accounts : [];
+    const activeId = data && data.activeId;
+    const active = accounts.find(a => a.id === activeId && a.quota) || accounts.find(a => a.quota);
+    if (active && active.quota) {
+      badge.textContent = "实时" + (active.planType ? " · " + active.planType : "");
+      badge.className = "m-badge done";
+    } else {
+      badge.textContent = accounts.length ? accounts.length + " 个账号" : "未检测到登录";
+      badge.className = "m-badge";
+    }
+
+    if (!accounts.length) {
+      list.innerHTML = '<div class="m-sub" style="margin:0 0 4px">没有检测到本机 Antigravity 登录凭据（gemini:antigravity）。</div>';
+      return;
+    }
+
+    list.innerHTML = accounts.map(a => {
+      const q = a.quota;
+      const g = q && q.gemini;
+      const t = q && q.thirdParty;
+      const live = Boolean(q && (g || t));
+      const tag = a.error ? '<span class="q-tag err">失败</span>'
+        : live ? '<span class="q-tag live">' + escapeHtml(a.planType || "实时") + '</span>'
+        : '<span class="q-tag">未查询</span>';
+      let detail = '<div class="q-quota">点击查询 Antigravity 实时额度</div>';
+      if (live) {
+        const lines = [];
+        if (g) {
+          lines.push("Gemini: " + (g.fiveHour ? "5h 剩 <b>" + Math.round(g.fiveHour.remainingPercent) + "%</b>" : "") +
+            (g.weekly ? (g.fiveHour ? " / " : "") + "周剩 <b>" + Math.round(g.weekly.remainingPercent) + "%</b>" : "") +
+            (g.argonWeekly ? " / Argon <b>" + Math.round(g.argonWeekly.remainingPercent) + "%</b>" : ""));
+        }
+        if (t) {
+          lines.push("Claude/GPT: " + (t.fiveHour ? "5h 剩 <b>" + Math.round(t.fiveHour.remainingPercent) + "%</b>" : "") +
+            (t.weekly ? (t.fiveHour ? " / " : "") + "周剩 <b>" + Math.round(t.weekly.remainingPercent) + "%</b>" : ""));
+        }
+        detail = '<div class="q-quota">' + lines.join(" ｜ ") + '</div>';
+      } else if (a.error) {
+        detail = '<div class="q-quota">' + escapeHtml(a.error) + '</div>';
+      }
+      return '<div class="m-acct q-acct agy-acct' + (a.id === activeId ? ' is-active' : '') +
+        '" data-agy-id="' + escapeHtml(a.id) + '">' +
+        '<div style="flex:1;min-width:0">' +
+        '<div class="m-mail">' + escapeHtml(a.email || "Antigravity") + (a.id === activeId ? ' <span class="q-tag">当前</span>' : '') + '</div>' +
+        detail + '</div>' + tag + '</div>';
+    }).join("");
+  }
+
+  async function doFetchAgyQuota(accountId) {
+    const d = window.dashboard;
+    if (!d || !d.antigravityAuthFetch) return;
+    authMsg("正在向 Google 查询 Antigravity 额度…");
+    try {
+      const result = await d.antigravityAuthFetch(accountId, { force: true });
+      authMsg("已更新 " + (result.email || "Antigravity") + " 的实时额度。");
+      if (d.getStatus) {
+        d.getStatus().then(status => {
+          if (status) { state.status = status; renderStats(); renderStatus(); }
+        }).catch(() => {});
+      }
+      loadAuthAccounts();
+    } catch (e) {
+      authMsg("Antigravity 查询失败：" + (e && e.message ? e.message : String(e)), true);
+      loadAuthAccounts();
+    }
   }
 
   function openAuthModal() { $("auth-modal").hidden = false; loadAuthAccounts(); }
@@ -3131,6 +3303,14 @@
       if (!row) return;
       doFetchQuota(row.getAttribute("data-id"));
     });
+    const agyList = $("agy-accounts");
+    if (agyList) {
+      agyList.addEventListener("click", event => {
+        const row = event.target.closest(".agy-acct");
+        if (!row) return;
+        doFetchAgyQuota(row.getAttribute("data-agy-id"));
+      });
+    }
     // 页面隐藏时停止设备码轮询，避免后台空转 / 取消时刷错误
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) stopDevicePolling();

@@ -56,5 +56,9 @@ contextBridge.exposeInMainWorld("dashboard", {
   codexAuthDeviceStatus: sessionId => ipcRenderer.invoke("codex-auth:device-status", sessionId),
   codexAuthDeviceCancel: sessionId => ipcRenderer.invoke("codex-auth:device-cancel", sessionId),
   codexAuthHide: accountId => ipcRenderer.invoke("codex-auth:hide", accountId),
-  codexAuthUnhide: accountId => ipcRenderer.invoke("codex-auth:unhide", accountId)
+  codexAuthUnhide: accountId => ipcRenderer.invoke("codex-auth:unhide", accountId),
+  /** Antigravity 实时额度（只读本机钥匙串 gemini:antigravity 与官方用量接口） */
+  antigravityAuthList: () => ipcRenderer.invoke("antigravity-auth:list"),
+  antigravityAuthFetch: (accountId, opts) => ipcRenderer.invoke("antigravity-auth:fetch", accountId, opts),
+  antigravityAuthActive: opts => ipcRenderer.invoke("antigravity-auth:active", opts)
 });

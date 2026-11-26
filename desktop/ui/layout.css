@@ -176,6 +176,7 @@
     font: 540 12.5px/1 "Segoe UI", "Microsoft YaHei UI", sans-serif;
     cursor: pointer;
     position: relative;
+    white-space: nowrap;
     transition: color .16s ease, border-color .16s ease, background .16s ease;
   }
   .sign-top:hover { color: var(--text); border-color: color-mix(in srgb, var(--text-3) 50%, transparent); }
@@ -270,7 +271,13 @@
   .m-close { background: none; border: 0; color: var(--text-3); font-size: 13px; cursor: pointer; }
 
   /* 账号列表单独滚动，底部「OAuth 授权 / 刷新 / 关闭」始终可见 */
-  #a-accounts { max-height: 330px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  #a-accounts { max-height: 230px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  #agy-accounts { max-height: 180px; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
+  .a-sec-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 12px 0 6px; font-size: 12px; font-weight: 620; color: var(--text-2);
+  }
+  .a-sec-head:first-of-type { margin-top: 2px; }
   .a-hidden-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 11.5px; }
   .a-hidden-bar[hidden] { display: none; }
   .a-hidden-tip { color: var(--text-3); }

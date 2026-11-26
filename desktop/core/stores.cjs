@@ -36,9 +36,16 @@ async function initStore(ctx, paths, baseline) {
     cipher: ctx.makeCipher(ctx)
   });
 
-  // 实时额度：只读本机已有的 Codex auth.json，首次拉取后立即覆盖本地快照
+  // 实时额度：只读本机已有的 Codex auth.json 与 Antigravity 凭据，首次拉取后立即覆盖本地快照
   ctx.codexAuthStore = ctx.createCodexAuthStore({ hiddenFile: paths.codexHiddenAccounts });
   ctx.refreshLiveQuota(ctx, true).catch(() => {});
+
+  ctx.agyQuotaStore = ctx.createAntigravityQuotaStore({
+    cacheFile: paths.antigravityQuotaCache,
+    ccSwitchAccountsFile: paths.ccSwitchAgyAccounts,
+    appVersion: ctx.app.getVersion()
+  });
+  ctx.refreshAntigravityQuota(ctx, true).catch(() => {});
 
   // 单价数据：首次运行把内置表写到 userData，之后用户改文件即可更新价格
   ensureTableFile(paths.pricing);
@@ -89,6 +96,7 @@ async function initStore(ctx, paths, baseline) {
   const snapshot = await ctx.store.init({ full: false });
   ctx.latestStatus = snapshot;
   ctx.attachLiveQuota(ctx);
+  ctx.attachAntigravityQuota(ctx);
   ctx.updateTray(ctx);
   ctx.pushStatusToPopover(ctx);
   // 后台补齐历史：先让弹窗秒开，再静默把全量索引跑完并推一次更新
@@ -96,6 +104,7 @@ async function initStore(ctx, paths, baseline) {
     .then(fullSnapshot => {
       ctx.latestStatus = fullSnapshot;
       ctx.attachLiveQuota(ctx);
+      ctx.attachAntigravityQuota(ctx);
       ctx.updateTray(ctx);
       ctx.pushStatusToPopover(ctx);
       // 再补一次明细：拿到「线程累计」口径（含被清理的早期历史），
@@ -103,6 +112,7 @@ async function initStore(ctx, paths, baseline) {
       return ctx.store.buildDetail().then(() => {
         ctx.latestStatus = ctx.store.snapshot();
         ctx.attachLiveQuota(ctx);
+        ctx.attachAntigravityQuota(ctx);
         ctx.updateTray(ctx);
         ctx.pushStatusToPopover(ctx);
       });

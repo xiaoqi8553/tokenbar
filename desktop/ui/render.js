@@ -192,7 +192,8 @@
 
     const hints = [];
     if (recentSpeed) hints.push("近 14 天 " + recentSpeed.tps.toFixed(1) + " tok/s");
-    if (todaySpeed && todaySpeed.ttftMs) hints.push("首字 " + fmtSpeed(todaySpeed.ttftMs));
+    const ttft = (todaySpeed && todaySpeed.ttftMs) || (speed && speed.ttftMs) || null;
+    if (ttft) hints.push("首字 " + fmtSpeed(ttft));
 
     return {
       label: "输出速度",
@@ -314,14 +315,82 @@
     ];
   }
 
+  function agyQuotaCard(title, group, planType, fallbackErr, scopeHint) {
+    const primary = group && group.primary ? group.primary : null;
+    const winShort = primary
+      ? (primary.window === "5h" ? "5 小时" : primary.window === "argon" ? "Argon 周" : "每周")
+      : "";
+    const windowParts = [planType || "", winShort, primary ? "实时" : ""].filter(Boolean);
+    const windowLabel = windowParts.length ? windowParts.join(" · ") : "实时窗口";
+
+    if (!primary) {
+      return {
+        label: title,
+        window: windowLabel,
+        num: "—",
+        unit: "",
+        hideMeter: true,
+        foot: fallbackErr ? "查询失败" : "暂无额度快照",
+        hints: [fallbackErr || scopeHint || "登录 Antigravity 后自动同步"]
+      };
+    }
+
+    const used = Math.max(0, Math.min(100, primary.usedPercent));
+    const remaining = Math.max(0, 100 - used);
+    const pace = quotaPace(primary);
+    const totalMs = primary.windowMinutes ? primary.windowMinutes * 60000 : 0;
+    const resetMs = primary.resetsAt ? primary.resetsAt * 1000 : null;
+    const elapsedPercent = resetMs && totalMs
+      ? Math.max(0, Math.min(100, ((totalMs - (resetMs - Date.now())) / totalMs) * 100))
+      : null;
+
+    const hints = [];
+    const others = (group.tiers || []).filter(t => t.id !== primary.id);
+    if (others.length) {
+      hints.push(others.map(t => {
+        const shortName = t.window === "5h" ? "5h" : t.window === "argon" ? "Argon" : "每周";
+        return shortName + " 已用 " + fmtPercent(t.usedPercent);
+      }).join(" · "));
+    } else if (scopeHint) {
+      hints.push(scopeHint);
+    }
+    if (resetMs) {
+      hints.push(fmtClock(resetMs) + " 重置" + (pace ? " · " + pace.text : ""));
+    } else if (scopeHint && others.length) {
+      hints.push(scopeHint);
+    }
+
+    const tipLines = (group.tiers || []).map(t =>
+      t.label + "：已用 " + t.usedPercent.toFixed(1) + "% · 剩余 " + t.remainingPercent.toFixed(1) + "%" +
+      (t.resetsAt ? "（" + fmtClock(t.resetsAt * 1000) + " 重置）" : "")
+    );
+
+    return {
+      label: title,
+      window: windowLabel,
+      num: fmtPercent(used),
+      unit: "已用",
+      percent: used,
+      pace: elapsedPercent,
+      title: tipLines.join("\n"),
+      foot: [
+        '<span class="dot" data-tone="' + (pace ? pace.tone : "muted") + '"></span>',
+        "剩余 <b>" + fmtPercent(remaining) + "</b>",
+        resetMs ? " · " + fmtClock(resetMs) + " 重置" : ""
+      ].join(""),
+      hints
+    };
+  }
+
   function antigravityCards() {
     const detail = state.detail;
     const totals = detail.totals;
     const today = detail.today;
     const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
     const todayRate = today && today.inputTokens ? (today.cachedInputTokens / today.inputTokens) * 100 : 0;
-    const ttftMs = detail.throughput && detail.throughput.ttftMs;
-    const ttftTurns = detail.throughput && detail.throughput.turns ? detail.throughput.turns : 0;
+    const agyQuota = state.status && state.status.antigravityQuota;
+    const agyQuotaErr = state.status && state.status.antigravityQuotaError;
+    const planType = agyQuota && agyQuota.planType;
     const rootHint = (detail.roots || [])
       .filter(item => item.files > 0)
       .map(item => {
@@ -333,6 +402,8 @@
       .join(" + ") || "~/.gemini/antigravity";
 
     return [
+      agyQuotaCard("Gemini 额度", agyQuota && agyQuota.gemini, planType, agyQuotaErr, "Gemini 4 · Flash 共享池"),
+      agyQuotaCard("Claude / GPT 额度", agyQuota && agyQuota.thirdParty, planType, agyQuotaErr, "Claude · GPT-OSS 共享池"),
       {
         label: "今日用量",
         window: "00:00 起",
@@ -353,7 +424,7 @@
         unit: "tokens",
         hideMeter: true,
         foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
-        hints: ["来源 " + rootHint]
+        hints: ["缓存命中 " + fmtPercent(cacheRate, 1), "来源 " + rootHint]
       },
       {
         label: "等价花费",
@@ -365,27 +436,6 @@
         title: "美元计价 · 按官方 API 刊例价折算",
         foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
         hints: ["按 CC Switch 同口径折算"]
-      },
-      {
-        label: "缓存命中率",
-        window: "输入口径",
-        num: fmtPercent(cacheRate, 1),
-        unit: "命中",
-        percent: cacheRate,
-        level: "ok",
-        foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
-        hints: ["input 已含缓存还原，不重复扣除"]
-      },
-      {
-        label: "首字延迟",
-        window: "TTFT 中位数",
-        num: ttftMs !== null && ttftMs !== undefined ? fmtSpeed(ttftMs) : "—",
-        unit: "",
-        hideMeter: true,
-        foot: ttftTurns
-          ? "<b>" + fmtCount(ttftTurns) + "</b> 轮带原生计时"
-          : "暂无原生计时样本",
-        hints: ["来自 conversations/*.db"]
       },
       speedCard()
     ];
@@ -1089,6 +1139,7 @@
         (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "") +
         (agyToday > 0 ? " · Antigravity " + fmtTokens(agyToday) + " 今日" : "");
     }
+    if (typeof syncAuthTopLabel === "function") syncAuthTopLabel();
   }
 
   function renderAll() {

@@ -29,7 +29,7 @@ TokenBar 没有账号，也没有服务端。会话内容不会离开这台机�
 TokenBar tries to achieve the following goals:
 
 - **本地优先**：tokens、速度、模型 / 项目分布只读本地日志，不上传；应用无后端、无账号体系。
-- **复用已有授权**：实时额度直接读本机 Codex 登录查官方 5 小时 / 每周额度，不新增一套登录，30 秒刷新一次。
+- **复用已有授权**：实时额度直接读本机 Codex 登录与 Antigravity 登录（`gemini:antigravity` 钥匙串）查官方实时额度，不新增一套登录，30 秒刷新一次。
 - **口径透明**：累计、花费、速度怎么算都写在下面，去重前后的数字和取舍都有记录，可以自己对账。
 - **多源聚合**：Codex、WorkBuddy（国内 / 国际版）与 Antigravity 的日志汇到同一套图表，按会话与请求去重。
 - **隐私默认**：token 不出主进程，凭证用系统密钥库加密，隐藏账号只从看板隐藏、不删本地文件。
@@ -40,12 +40,12 @@ TokenBar tries to achieve the following goals:
 
 | 功能 | 一句话 |
 | --- | --- |
-| 额度窗口 | 5 小时 / 7 天已用、剩余、重置时刻，进度条标出时间走到哪；拿到实时额度时标注「实时」。 |
+| 额度窗口 | Codex（5h / 7 天）与 Antigravity（Gemini、Claude / GPT 两组 5h / 每周）已用、剩余与重置时刻；拿到实时额度时标注「实时」。 |
 | 今日与趋势 | 今日用量、请求数、缓存命中率与 14 天迷你柱图；看板趋势可切 7 / 14 / 30 天与全部，0 token 日保留占位。 |
 | 模型 / 项目分布 | 全量列出，行尾带金额与 tok/s，点行展开新增输入 / 缓存命中 / 输出 / 请求 / 花费 / 速度。 |
 | 活跃时段 | 24 小时 × 用量，或切到 tok/s 看每个整点的输出速度。 |
 | 会话记录 | 「会话」按模型展开明细；「请求明细」一行一个「会话 × 模型」的扁平日志，视图选择会被记住。 |
-| 实时额度 | 列出本机检测到的 Codex 账号，点脱敏邮箱即查官方额度；可选 OAuth 设备码添加账号。 |
+| 实时额度 | 列出本机检测到的 Codex 与 Antigravity 账号，点脱敏邮箱即查官方额度；Codex 可选 OAuth 设备码添加账号。 |
 | 科研通签到 | 多账号串行签到，状态徽标、积分与连续天数，密码加密只存本机。 |
 | 双主题 | 「月之亮面」/「月之暗面」，选择记住；没选过时跟随系统明暗。 |
 
@@ -85,7 +85,7 @@ npm run desktop:shortcut   # 桌面快捷方式
 ```bash
 npm install
 npm start                  # Electron 开发模式
-npm test                   # 数据层 + UI 断言，115 个测试
+npm test                   # 数据层 + UI 断言，120 个测试
 npm run desktop:smoke      # 启动、托盘、窗口生命周期
 ```
 
@@ -186,7 +186,7 @@ Codex Desktop 的云端线程在 `~/.codex/sqlite/codex.db` 里 `source_kind = '
 
 ## Contributing
 
-欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（115 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
+欢迎提 issue 和 PR。改动数据口径请附上本机日志的前后对比数字（像 Accounting 里那样），UI 改动请跑 `npm test`（120 个测试）和 `npm run desktop:smoke`。文档截图由 `npm run docs:shots` 生成，改界面后记得更新。
 
 ## License
 

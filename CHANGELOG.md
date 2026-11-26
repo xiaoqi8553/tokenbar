@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format base
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-26
+
+新增 **Antigravity 官方实时额度查询与展示**（对齐 CC Switch `agy_account` 口径），支持 Gemini 与 Claude / GPT 双额度池、5 小时 / 每周 / Argon 窗口与套餐档位显示，单元测试扩展到 **120** 个。
+
+### Added
+
+- **Antigravity 凭据读取与额度查询**：新增 `desktop/data/antigravity-quota-store.cjs`，只读读取系统钥匙串 `gemini:antigravity`（Windows 凭据管理器 / macOS Keychain）及 `~/.cc-switch/agy_accounts.json`，按 CC Switch 协议请求 `https://daily-cloudcode-pa.googleapis.com/v1internal`（`:loadCodeAssist` + `:retrieveUserQuotaSummary`），支持提取套餐（`AI Pro`、`AI Ultra 5x/20x`、`Free`、`Paid`）以及 `gemini-5h`、`gemini-weekly`、`gemini-argon-wtu-weekly`、`3p-5h`、`3p-weekly` 五个官方额度桶。
+- **令牌无损续期缓存**：`access_token` 临近过期或返回 401 时使用 Antigravity OAuth 客户端静默续期，续期副本仅缓存在 `%APPDATA%/TokenBar/data/antigravity-quota-cache.json`，绝不回写系统钥匙串或 CC Switch 原文件。
+- **桌面全链路额度展示**：
+  - **看板 Antigravity 标签**：新增 `Gemini 额度` 与 `Claude / GPT 额度` 两张实时进度卡，展示最紧张窗口占比、剩余百分比、重置时刻、消费节奏与另一窗口余量。
+  - **托盘弹窗与右键菜单**：弹窗显示 `Antigravity 额度` 双进度条与套餐徽标，托盘右键菜单同步显示 Gemini / Claude 剩余百分比。
+  - **实时额度管理弹窗**：新增 `antigravity-auth:*` IPC 通道，在「实时额度」面板展示 Antigravity 账号脱敏邮箱、套餐与各窗口详情并支持点击手动刷新。
+
+### Fixed
+
+- 修正看板顶栏「实时额度」「科研通签到」按钮在三数据源并排时的换行问题（补充 `white-space: nowrap`）。
+
 ## [3.1.0] - 2026-11-26
 
 新增 **Antigravity** 数据源完整支持（对齐 CC Switch 计算口径），零新增生产依赖，单元测试扩展到 **115** 个。
@@ -53,6 +70,7 @@ All notable changes to this project will be documented in this file. Format base
 - **隐藏不等于删除**：用户问「这些玩意怎么清除啊」——隐藏账号只写 TokenBar 自己的配置，`~/.codex` 授权文件一个字节不碰；科研通密码仍走 `safeStorage`（Windows DPAPI）→ AES-256-GCM 降级，密文只存本机 `userData`。
 - **凭证零入库**：全量扫描历史与工作区，API Key / token / 真实邮箱均未进入仓库；测试一律使用 `alice@example.com` 等假邮箱。
 
+[3.2.0]: https://github.com/xiaoqi8553/tokenbar/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/xiaoqi8553/tokenbar/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/xiaoqi8553/tokenbar/compare/v2.6.1...v3.0.0
-[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.2.0...HEAD

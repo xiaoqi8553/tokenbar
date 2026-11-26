@@ -815,10 +815,12 @@ function createCodexAuthStore(options = {}) {
 module.exports = {
   createCodexAuthStore,
   DEVICE_AUTH_STATE,
+  curlRequest,
   maskEmail,
   normalizeQuota,
   extractRateLimits,
   isTokenExpired,
+  jwtClaims,
   jwtClaim,
   chatgptAccountId
 };

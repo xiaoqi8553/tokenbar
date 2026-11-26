@@ -81,6 +81,64 @@ function attachLiveQuota(ctx) {
   }
 }
 
+/** 把 Antigravity 实时额度挂到 latestStatus.antigravityQuota，弹窗与看板共用 */
+function applyAntigravityQuota(ctx, result) {
+  if (!result || !result.quota || !ctx.latestStatus) return;
+  ctx.latestStatus.antigravityQuota = {
+    ...result.quota,
+    source: "api",
+    account: result.email,
+    fetchedAt: result.fetchedAt,
+    error: null
+  };
+  ctx.updateTray(ctx);
+  ctx.pushStatusToPopover(ctx);
+  if (ctx.mainWindow && !ctx.mainWindow.isDestroyed()) {
+    ctx.mainWindow.webContents.send("dashboard:status", ctx.latestStatus);
+  }
+}
+
+/** 后台静默刷新 Antigravity 实时额度：失败保留已有缓存或记下错误原因 */
+async function refreshAntigravityQuota(ctx, force = false) {
+  if (!ctx.agyQuotaStore) return;
+  try {
+    const result = await ctx.agyQuotaStore.activeQuota({ force });
+    if (result && result.quota) ctx.applyAntigravityQuota(ctx, result);
+  } catch (error) {
+    ctx.log(ctx, `antigravity quota refresh failed: ${error.message}`);
+    if (ctx.latestStatus && !ctx.latestStatus.antigravityQuota) {
+      ctx.latestStatus.antigravityQuotaError = error.message;
+      ctx.pushStatusToPopover(ctx);
+    }
+  }
+}
+
+/** 把缓存的 Antigravity 实时额度重新挂到最新快照 */
+function attachAntigravityQuota(ctx) {
+  if (!ctx.latestStatus || !ctx.agyQuotaStore) return;
+  try {
+    const live = ctx.agyQuotaStore.bestCachedQuota();
+    if (live) {
+      ctx.latestStatus.antigravityQuota = live;
+      delete ctx.latestStatus.antigravityQuotaError;
+    }
+  } catch {
+    /* 覆盖失败保留旧状态 */
+  }
+}
+
+function formatAgyQuotaLine(quota) {
+  if (!quota) return "Antigravity 额度：暂无数据";
+  const parts = [];
+  if (quota.gemini && quota.gemini.primary) {
+    parts.push(`Gemini 剩 ${Math.round(quota.gemini.primary.remainingPercent)}%`);
+  }
+  if (quota.thirdParty && quota.thirdParty.primary) {
+    parts.push(`Claude 剩 ${Math.round(quota.thirdParty.primary.remainingPercent)}%`);
+  }
+  return parts.length ? `Antigravity 额度：${parts.join(" · ")}` : "Antigravity 额度：暂无数据";
+}
+
 function formatTokens(ctx, value) {
   const number = Number(value) || 0;
   if (number >= 1e9) return `${(number / 1e9).toFixed(number >= 1e10 ? 1 : 2).replace(/0+$/, "").replace(/\.$/, "")}B`;
@@ -132,6 +190,7 @@ function updateTray(ctx) {
     { label: `累计用量：${ctx.formatTokens(ctx, data?.totals?.totalTokens)} tokens`, enabled: false },
     { label: `WorkBuddy 今日：${ctx.formatTokens(ctx, data?.workbuddy?.today?.totalTokens)} tokens`, enabled: false },
     { label: `Antigravity 今日：${ctx.formatTokens(ctx, data?.antigravity?.today?.totalTokens)} tokens`, enabled: false },
+    { label: formatAgyQuotaLine(data?.antigravityQuota), enabled: false },
     { type: "separator" },
     { label: "立即同步数据", click: () => { ctx.refreshTrayStatus(ctx, true); } },
     {
@@ -183,8 +242,9 @@ function createTray(ctx) {
 function installTray(ctx) {
   Object.assign(ctx, {
     pushStatusToPopover, pushAbleSciChanged, pushDetailProgress, attachWorkBuddySummary, attachAntigravitySummary,
-    applyLiveQuota, refreshLiveQuota, attachLiveQuota, formatTokens, runTraySign,
-    updateTray, createTray
+    applyLiveQuota, refreshLiveQuota, attachLiveQuota,
+    applyAntigravityQuota, refreshAntigravityQuota, attachAntigravityQuota,
+    formatTokens, runTraySign, updateTray, createTray
   });
   return ctx;
 }
@@ -192,5 +252,6 @@ function installTray(ctx) {
 module.exports = {
   installTray, pushStatusToPopover, pushAbleSciChanged, pushDetailProgress,
   attachWorkBuddySummary, attachAntigravitySummary, applyLiveQuota, refreshLiveQuota, attachLiveQuota,
+  applyAntigravityQuota, refreshAntigravityQuota, attachAntigravityQuota,
   formatTokens, runTraySign, updateTray, createTray
 };
