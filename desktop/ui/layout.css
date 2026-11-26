@@ -59,6 +59,9 @@
     height: 100%;
     display: grid;
     grid-template-rows: auto 1fr auto;
+    background:
+      radial-gradient(880px 260px at 8% -4%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+      radial-gradient(640px 220px at 92% 0%, color-mix(in srgb, var(--c-output) 5%, transparent), transparent 72%);
   }
 
   .app[hidden] { display: none; }
@@ -114,13 +117,18 @@
     background: transparent;
     color: var(--text-2);
     font: inherit;
-    font-size: 14px;
-    padding: 5px 12px;
+    font-size: 13.5px;
+    padding: 5px 11px;
     border-radius: 7px;
     cursor: pointer;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     transition: background .16s ease, color .16s ease;
   }
+  .range.source button svg { opacity: .72; flex: none; }
+  .range.source button[aria-pressed="true"] svg { opacity: 1; color: var(--accent); }
 
   .range button:hover { color: var(--text); }
   .range button[aria-pressed="true"] {
@@ -336,10 +344,14 @@
 
   .card-head h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 620;
+    font-size: 15.5px;
+    font-weight: 640;
     letter-spacing: -.2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
   }
+  .card-head h2 svg { color: var(--accent); opacity: .88; flex: none; }
 
   .card-head .sub {
     margin: 3px 0 0;
@@ -378,24 +390,41 @@
     padding: 13px 14px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
     min-width: 0;
     /* 两个数据源的提示行数不同，固定下限保证切换时卡片不忽高忽低 */
     min-height: 148px;
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+  .stat:hover {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+    box-shadow: var(--shadow-hover);
   }
 
   .stat-top {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
     flex-wrap: nowrap;
     min-width: 0;
   }
 
+  .stat-ico {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    color: var(--accent);
+    flex: none;
+  }
+  .stat-ico svg { width: 11px; height: 11px; }
+
   .stat-label {
-    font-size: 14.5px;
+    font-size: 13.5px;
     color: var(--text-2);
-    font-weight: 560;
+    font-weight: 580;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -406,7 +435,7 @@
     margin-left: auto;
     flex: none;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--text-3);
     padding: 2px 6px;
     border-radius: 5px;
@@ -415,9 +444,43 @@
 
   .stat-value {
     display: flex;
-    align-items: baseline;
-    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 38px;
   }
+  .stat-val-main { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+  .stat-ring { width: 36px; height: 36px; flex: none; }
+  .stat-ring circle { fill: none; stroke-width: 3.4; }
+  .stat-ring .ring-bg { stroke: var(--line-soft); }
+  .stat-ring .ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
+  .stat-ring .ring-fg[data-level="high"] { stroke: var(--warn); }
+  .stat-ring .ring-fg[data-level="full"] { stroke: var(--danger); }
+  .stat-ring .ring-fg[data-level="ok"] { stroke: var(--ok); }
+  .stat-delta {
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: var(--line-soft);
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .stat-delta.up { background: rgba(217, 130, 43, .14); color: var(--warn); }
+  .stat-delta.down { background: rgba(31, 157, 99, .14); color: var(--ok); }
+
+  .seg-meter {
+    display: flex;
+    gap: 2px;
+    height: 5px;
+    border-radius: 4px;
+    background: var(--line-soft);
+    overflow: hidden;
+  }
+  .seg-meter i { display: block; height: 100%; border-radius: 2px; min-width: 2px; }
+  .seg-in { background: var(--c-input); }
+  .seg-cache { background: var(--c-cached); }
+  .seg-out { background: var(--c-output); }
 
   .stat-num {
     font-size: 33px;
@@ -686,15 +749,20 @@
     border-radius: 4px;
     background: var(--line-soft);
     overflow: hidden;
+    display: flex;
+    gap: 1px;
   }
 
   .bar-track i {
     display: block;
     height: 100%;
-    border-radius: 4px;
+    border-radius: 2px;
     background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--accent-3)));
     transition: width .4s cubic-bezier(.3, .8, .3, 1);
   }
+  .bar-track i.seg-in { background: var(--c-input); }
+  .bar-track i.seg-cache { background: var(--c-cached); }
+  .bar-track i.seg-out { background: var(--c-output); }
 
   /* 点行展开的四档 token 明细；hidden 必须显式声明，否则会被下面的 display 覆盖 */
   .bar-detail {

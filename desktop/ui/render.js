@@ -59,22 +59,63 @@
    * 额度卡：已用百分比 + 剩余 + 本窗口真实消耗 + 重置时刻 + 节奏。
    * 只给一个百分比太单薄，看不出「这个窗口里到底花了多少」。
    */
+  function statIconSvg(kind) {
+    switch (kind) {
+      case "quota": return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.8V8l2.2 1.2"/></svg>';
+      case "today": return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 4.5 9h3.8L7 14l4.5-7H7.7Z"/></svg>';
+      case "total": return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5.5 8 2.5l5.5 3L8 8.5ZM2.5 8.5 8 11.5l5.5-3M2.5 11.5 8 14.5l5.5-3"/></svg>';
+      case "cost": return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.8"/><path d="M8 4.4v7.2M9.8 6.2c0-.7-.8-1.1-1.8-1.1s-1.8.4-1.8 1.1c0 .8.8 1.1 1.8 1.3 1 .2 1.8.5 1.8 1.3s-.8 1.2-1.8 1.2-1.8-.5-1.8-1.2"/></svg>';
+      case "speed": return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 11.5a5.5 5.5 0 1 1 10 0"/><path d="M8 8.8 10.6 6.2"/><circle cx="8" cy="9.2" r=".9" fill="currentColor"/></svg>';
+      default: return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M5.5 8.2 7.2 9.9 10.7 6.4"/></svg>';
+    }
+  }
+
+  function svgRingGauge(percent, level) {
+    const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+    const r = 14;
+    const c = 2 * Math.PI * r;
+    const offset = c * (1 - pct / 100);
+    return '<svg class="stat-ring" viewBox="0 0 36 36" aria-hidden="true">' +
+      '<circle class="ring-bg" cx="18" cy="18" r="' + r + '"/>' +
+      '<circle class="ring-fg" data-level="' + escapeHtml(level || "ok") + '" cx="18" cy="18" r="' + r + '" ' +
+      'stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '" transform="rotate(-90 18 18)"/>' +
+      '</svg>';
+  }
+
+  function segBarHtml(inputTokens, cachedInputTokens, outputTokens) {
+    const input = Math.max(0, Number(inputTokens) || 0);
+    const cached = Math.min(input, Math.max(0, Number(cachedInputTokens) || 0));
+    const fresh = Math.max(0, input - cached);
+    const out = Math.max(0, Number(outputTokens) || 0);
+    const sum = fresh + cached + out;
+    if (!sum) return "";
+    const pIn = (fresh / sum) * 100;
+    const pCache = (cached / sum) * 100;
+    const pOut = (out / sum) * 100;
+    return '<div class="seg-meter" title="新增输入 ' + fmtTokens(fresh) + ' · 缓存 ' + fmtTokens(cached) + ' · 输出 ' + fmtTokens(out) + '">' +
+      (pIn > 0 ? '<i class="seg-in" style="width:' + pIn.toFixed(1) + '%"></i>' : '') +
+      (pCache > 0 ? '<i class="seg-cache" style="width:' + pCache.toFixed(1) + '%"></i>' : '') +
+      (pOut > 0 ? '<i class="seg-out" style="width:' + pOut.toFixed(1) + '%"></i>' : '') +
+      '</div>';
+  }
+
   function quotaCard(title, fallbackWindow, quotaWindow) {
     const windowLabel = quotaWindow && quotaWindow.windowMinutes
       ? (quotaWindow.windowMinutes >= 1440
-        ? Math.round(quotaWindow.windowMinutes / 1440) + " 天窗口"
-        : Math.round(quotaWindow.windowMinutes / 60) + " 小时窗口")
+        ? Math.round(quotaWindow.windowMinutes / 1440) + " 天"
+        : Math.round(quotaWindow.windowMinutes / 60) + " 小时")
       : fallbackWindow;
 
     if (!quotaWindow) {
       return {
+        icon: "quota",
         label: title,
         window: windowLabel,
         num: "—",
         unit: "",
         hideMeter: true,
-        foot: "暂无配额快照",
-        hints: ["跑一次 Codex 就能拿到额度"]
+        foot: "暂无快照",
+        hints: []
       };
     }
 
@@ -90,10 +131,12 @@
       : null;
 
     const hints = [];
-    if (tokens !== null) hints.push("窗口内 " + fmtTokens(tokens) + " tokens");
+    if (tokens !== null) hints.push("窗口 " + fmtTokens(tokens));
     if (resetMs) hints.push(fmtClock(resetMs) + " 重置");
 
     return {
+      icon: "quota",
+      ring: true,
       label: title,
       window: windowLabel,
       num: fmtPercent(used),
@@ -121,24 +164,31 @@
     const yesterdaySameTime = Array.isArray(yesterdayHours)
       ? yesterdayHours.slice(0, nowHour + 1).reduce((acc, value) => acc + (value || 0), 0)
       : 0;
-    let deltaText = "昨日同期无数据";
+    let deltaBadge = "";
+    let deltaText = "";
     if (yesterdaySameTime > 0) {
       const delta = ((total - yesterdaySameTime) / yesterdaySameTime) * 100;
-      deltaText = "较昨日同期 " + (delta >= 0 ? "+" : "") + Math.round(delta) + "%";
+      const rounded = Math.round(delta);
+      deltaText = "较昨日 " + (rounded >= 0 ? "+" : "") + rounded + "%";
+      deltaBadge = '<span class="stat-delta ' + (rounded > 5 ? "up" : rounded < -5 ? "down" : "") + '">' +
+        (rounded >= 0 ? "↑ " : "↓ ") + Math.abs(rounded) + "%</span>";
     }
 
     const freshInput = today ? Math.max(0, today.inputTokens - today.cachedInputTokens) : 0;
     return {
+      icon: "today",
       label: "今日用量",
-      window: "00:00 起",
+      window: "00:00+",
       num: today ? fmtTokens(total) : "—",
       unit: "tokens",
+      rightHtml: deltaBadge,
+      seg: today ? segBarHtml(today.inputTokens, today.cachedInputTokens, today.outputTokens) : "",
       hideMeter: true,
       foot: today
-        ? "<b>" + fmtCount(today.records) + "</b> 次请求 · 缓存命中 <b>" + fmtPercent(cacheRate) + "</b>"
-        : "今天还没有记录",
+        ? "<b>" + fmtCount(today.records) + "</b> 请求 · 命中 <b>" + fmtPercent(cacheRate) + "</b>"
+        : "暂无记录",
       hints: today
-        ? [deltaText, "新增输入 " + fmtTokens(freshInput) + " · 输出 " + fmtTokens(today.outputTokens)]
+        ? ["新增输入 " + fmtTokens(freshInput) + " · 输出 " + fmtTokens(today.outputTokens), deltaText]
         : []
     };
   }
@@ -149,25 +199,28 @@
     const totals = detail && detail.totals ? detail.totals : null;
     if (!totals) {
       return {
+        icon: "total",
         label: "累计用量",
-        window: "全部时间",
+        window: "全部",
         num: "—",
         unit: "tokens",
         hideMeter: true,
-        foot: "暂无历史数据",
+        foot: "暂无数据",
         hints: []
       };
     }
     const days = detail.series ? detail.series.length : 0;
     const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
     return {
+      icon: "total",
       label: "累计用量",
       window: days + " 天",
       num: fmtTokens(totals.totalTokens),
       unit: "tokens",
+      seg: segBarHtml(totals.inputTokens, totals.cachedInputTokens, totals.outputTokens),
       hideMeter: true,
-      foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次请求",
-      hints: ["缓存命中 " + fmtPercent(cacheRate)]
+      foot: "<b>" + fmtCount(totals.sessions) + "</b> 会话 · <b>" + fmtCount(totals.records) + "</b> 请求",
+      hints: ["命中 " + fmtPercent(cacheRate)]
     };
   }
 
@@ -191,19 +244,20 @@
       : null;
 
     const hints = [];
-    if (recentSpeed) hints.push("近 14 天 " + recentSpeed.tps.toFixed(1) + " tok/s");
+    if (recentSpeed) hints.push("14 日 " + recentSpeed.tps.toFixed(1) + " tok/s");
     const ttft = (todaySpeed && todaySpeed.ttftMs) || (speed && speed.ttftMs) || null;
     if (ttft) hints.push("首字 " + fmtSpeed(ttft));
 
     return {
+      icon: "speed",
       label: "输出速度",
-      window: "整轮口径",
+      window: "整轮",
       num: todaySpeed ? todaySpeed.tps.toFixed(1) : "—",
       unit: todaySpeed ? "tok/s" : "",
       hideMeter: true,
       foot: todaySpeed
-        ? "<b>" + fmtCount(todaySpeed.turns) + "</b> 轮完成"
-        : "今天还没有完成的轮次",
+        ? "<b>" + fmtCount(todaySpeed.turns) + "</b> 轮"
+        : "暂无样本",
       hints
     };
   }
@@ -214,12 +268,13 @@
     const cost = detail && detail.cost;
     if (!cost) {
       return {
+        icon: "cost",
         label: "等价花费",
-        window: "API 刊例价",
+        window: "USD",
         num: "—",
         unit: "",
         hideMeter: true,
-        foot: "还没算过价格",
+        foot: "—",
         hints: []
       };
     }
@@ -228,18 +283,18 @@
     const estimatedShare = totalTokens ? (cost.estimatedTokens || 0) / totalTokens : 0;
 
     return {
+      icon: "cost",
       label: "等价花费",
-      window: "累计 " + days + " 天",
+      window: days + " 天",
       num: fmtMoney(cost.cny),
       money: true,
       unit: "",
       hideMeter: true,
-      // 详情都收进 tooltip：卡片上只留「多少钱 + 今日多少」
-      title: "美元计价 · 按官方 API 刊例价折算" +
-        (estimatedShare >= 0.005 ? " · 含 " + fmtPercent(estimatedShare * 100, 1) + " 估算用量" : ""),
-      foot: "今日 <b>" + fmtMoney(cost.todayCny) + "</b> · " + fmtTokens(totalTokens) + " tokens",
+      title: "USD 刊例价折算" +
+        (estimatedShare >= 0.005 ? " · 含 " + fmtPercent(estimatedShare * 100, 1) + " 估算" : ""),
+      foot: "今日 <b>" + fmtMoney(cost.todayCny) + "</b> · " + fmtTokens(totalTokens),
       hints: detail.totals && detail.totals.records
-        ? ["单次请求均摊 " + fmtMoney(cost.cny / detail.totals.records)]
+        ? ["均摊 " + fmtMoney(cost.cny / detail.totals.records)]
         : []
     };
   }
@@ -251,7 +306,6 @@
     const cacheRate = totals.inputTokens ? (totals.cachedInputTokens / totals.inputTokens) * 100 : 0;
     const todayRate = today && today.inputTokens ? (today.cachedInputTokens / today.inputTokens) * 100 : 0;
     const credits = detail.credits || { total: 0 };
-    // 国际版写 ~/.workbuddy-ai，国内版写 ~/.workbuddy；同名会话只算体积更大的一份
     const rootHint = (detail.roots || [])
       .filter(item => item.files > 0)
       .map(item => "~/" + String(item.root).split(/[\\/]/).filter(Boolean).pop() + "/projects")
@@ -259,58 +313,64 @@
 
     return [
       {
+        icon: "today",
         label: "今日用量",
-        window: "00:00 起",
+        window: "00:00+",
         num: today ? fmtTokens(today.totalTokens) : "—",
         unit: "tokens",
+        seg: today ? segBarHtml(today.inputTokens, today.cachedInputTokens, today.outputTokens) : "",
         hideMeter: true,
         foot: today
-          ? "<b>" + fmtCount(today.records) + "</b> 次调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
-          : "今天还没有记录",
+          ? "<b>" + fmtCount(today.records) + "</b> 调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
+          : "暂无记录",
         hints: today
           ? ["输出 " + fmtTokens(today.outputTokens) + " · 推理 " + fmtTokens(today.reasoningOutputTokens)]
           : []
       },
       {
+        icon: "total",
         label: "累计用量",
         window: detail.series.length + " 天",
         num: fmtTokens(totals.totalTokens),
         unit: "tokens",
+        seg: segBarHtml(totals.inputTokens, totals.cachedInputTokens, totals.outputTokens),
         hideMeter: true,
-        foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
-        hints: ["来源 " + rootHint]
+        foot: "<b>" + fmtCount(totals.sessions) + "</b> 会话 · <b>" + fmtCount(totals.records) + "</b> 调用",
+        hints: [rootHint]
       },
       {
+        icon: "cost",
         label: "等价花费",
-        window: "累计",
+        window: "USD",
         num: fmtMoney(detail.cost ? detail.cost.cny : 0),
         money: true,
         unit: "",
         hideMeter: true,
-        title: "美元计价 · 按官方 API 刊例价折算",
-        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
-        hints: []
+        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens),
+        hints: totals.records ? ["均摊 " + fmtMoney((detail.cost ? detail.cost.cny : 0) / totals.records)] : []
       },
       {
+        icon: "total",
         label: "积分消耗",
-        window: "按调用累加",
+        window: "累计",
         num: credits.total ? credits.total.toFixed(0) : "—",
         unit: "积分",
         hideMeter: true,
         foot: "今日 <b>" + (credits.today ? credits.today.toFixed(0) : "0") + "</b> 积分",
-        hints: ["WorkBuddy 自己的计费口径"]
+        hints: []
       },
       {
+        icon: "cache",
         label: "缓存命中率",
-        window: "输入口径",
+        window: "输入",
         num: fmtPercent(cacheRate, 1),
         unit: "命中",
+        ring: true,
         percent: cacheRate,
         level: "ok",
         foot: "命中 <b>" + fmtTokens(totals.cachedInputTokens) + "</b> · 输入 <b>" + fmtTokens(totals.inputTokens) + "</b>",
-        hints: ["每轮重发上下文，命中越高越省"]
+        hints: []
       },
-      // 速度：function_call → function_call_result 的时间差算出来的整轮吞吐
       speedCard()
     ];
   }
@@ -318,20 +378,21 @@
   function agyQuotaCard(title, group, planType, fallbackErr, scopeHint) {
     const primary = group && group.primary ? group.primary : null;
     const winShort = primary
-      ? (primary.window === "5h" ? "5 小时" : primary.window === "argon" ? "Argon 周" : "每周")
+      ? (primary.window === "5h" ? "5h" : primary.window === "argon" ? "Argon" : "周")
       : "";
     const windowParts = [planType || "", winShort, primary ? "实时" : ""].filter(Boolean);
-    const windowLabel = windowParts.length ? windowParts.join(" · ") : "实时窗口";
+    const windowLabel = windowParts.length ? windowParts.join(" · ") : "实时";
 
     if (!primary) {
       return {
+        icon: "quota",
         label: title,
         window: windowLabel,
         num: "—",
         unit: "",
         hideMeter: true,
-        foot: fallbackErr ? "查询失败" : "暂无额度快照",
-        hints: [fallbackErr || scopeHint || "登录 Antigravity 后自动同步"]
+        foot: fallbackErr ? "查询失败" : "暂无快照",
+        hints: [fallbackErr || scopeHint || ""]
       };
     }
 
@@ -349,23 +410,23 @@
     if (others.length) {
       hints.push(others.map(t => {
         const shortName = t.window === "5h" ? "5h" : t.window === "argon" ? "Argon" : "每周";
-        return shortName + " 已用 " + fmtPercent(t.usedPercent);
+        return shortName + " " + fmtPercent(t.usedPercent);
       }).join(" · "));
     } else if (scopeHint) {
       hints.push(scopeHint);
     }
     if (resetMs) {
       hints.push(fmtClock(resetMs) + " 重置" + (pace ? " · " + pace.text : ""));
-    } else if (scopeHint && others.length) {
-      hints.push(scopeHint);
     }
 
     const tipLines = (group.tiers || []).map(t =>
-      t.label + "：已用 " + t.usedPercent.toFixed(1) + "% · 剩余 " + t.remainingPercent.toFixed(1) + "%" +
-      (t.resetsAt ? "（" + fmtClock(t.resetsAt * 1000) + " 重置）" : "")
+      t.label + "：" + t.usedPercent.toFixed(1) + "% · 剩 " + t.remainingPercent.toFixed(1) + "%" +
+      (t.resetsAt ? "（" + fmtClock(t.resetsAt * 1000) + "）" : "")
     );
 
     return {
+      icon: "quota",
+      ring: true,
       label: title,
       window: windowLabel,
       num: fmtPercent(used),
@@ -376,7 +437,7 @@
       foot: [
         '<span class="dot" data-tone="' + (pace ? pace.tone : "muted") + '"></span>',
         "剩余 <b>" + fmtPercent(remaining) + "</b>",
-        resetMs ? " · " + fmtClock(resetMs) + " 重置" : ""
+        resetMs ? " · " + fmtClock(resetMs) : ""
       ].join(""),
       hints
     };
@@ -402,40 +463,44 @@
       .join(" + ") || "~/.gemini/antigravity";
 
     return [
-      agyQuotaCard("Gemini 额度", agyQuota && agyQuota.gemini, planType, agyQuotaErr, "Gemini 4 · Flash 共享池"),
-      agyQuotaCard("Claude / GPT 额度", agyQuota && agyQuota.thirdParty, planType, agyQuotaErr, "Claude · GPT-OSS 共享池"),
+      agyQuotaCard("Gemini 额度", agyQuota && agyQuota.gemini, planType, agyQuotaErr, "Gemini 4 · Flash"),
+      agyQuotaCard("Claude / GPT 额度", agyQuota && agyQuota.thirdParty, planType, agyQuotaErr, "Claude · GPT-OSS"),
       {
+        icon: "today",
         label: "今日用量",
-        window: "00:00 起",
+        window: "00:00+",
         num: today ? fmtTokens(today.totalTokens) : "—",
         unit: "tokens",
+        seg: today ? segBarHtml(today.inputTokens, today.cachedInputTokens, today.outputTokens) : "",
         hideMeter: true,
         foot: today
-          ? "<b>" + fmtCount(today.records) + "</b> 次调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
-          : "今天还没有记录",
+          ? "<b>" + fmtCount(today.records) + "</b> 调用 · 缓存 <b>" + fmtPercent(todayRate) + "</b>"
+          : "暂无记录",
         hints: today
           ? ["新增输入 " + fmtTokens(Math.max(0, today.inputTokens - today.cachedInputTokens)) + " · 输出 " + fmtTokens(today.outputTokens)]
           : []
       },
       {
+        icon: "total",
         label: "累计用量",
         window: detail.series.length + " 天",
         num: fmtTokens(totals.totalTokens),
         unit: "tokens",
+        seg: segBarHtml(totals.inputTokens, totals.cachedInputTokens, totals.outputTokens),
         hideMeter: true,
-        foot: "<b>" + fmtCount(totals.sessions) + "</b> 个会话 · <b>" + fmtCount(totals.records) + "</b> 次调用",
-        hints: ["缓存命中 " + fmtPercent(cacheRate, 1), "来源 " + rootHint]
+        foot: "<b>" + fmtCount(totals.sessions) + "</b> 会话 · <b>" + fmtCount(totals.records) + "</b> 调用",
+        hints: ["命中 " + fmtPercent(cacheRate, 1), rootHint]
       },
       {
+        icon: "cost",
         label: "等价花费",
-        window: "累计",
+        window: "USD",
         num: fmtMoney(detail.cost ? detail.cost.cny : 0),
         money: true,
         unit: "",
         hideMeter: true,
-        title: "美元计价 · 按官方 API 刊例价折算",
-        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens) + " tokens",
-        hints: ["按 CC Switch 同口径折算"]
+        foot: "今日 <b>" + fmtMoney(detail.cost ? detail.cost.todayCny : 0) + "</b> · " + fmtTokens(totals.totalTokens),
+        hints: totals.records ? ["均摊 " + fmtMoney((detail.cost ? detail.cost.cny : 0) / totals.records)] : []
       },
       speedCard()
     ];
@@ -471,17 +536,27 @@
       const hints = (card.hints || []).filter(Boolean).slice(0, 2);
       while (hints.length < 2) hints.push("");
       const footText = card.foot.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      const rightVisual = card.ring && Number.isFinite(card.percent)
+        ? svgRingGauge(card.percent, level)
+        : (card.rightHtml || "");
+      const meterBlock = card.seg
+        ? card.seg
+        : '<div class="meter"' + (card.hideMeter ? ' style="visibility:hidden"' : '') + '><i data-level="' + level + '" style="width:' + Math.max(2, Math.min(100, card.percent)) + '%"></i>' + pace + '</div>';
       return [
         '<div class="stat"' + (card.title ? ' title="' + escapeHtml(card.title) + '"' : '') + '>',
         '  <div class="stat-top">',
+        card.icon ? '    <span class="stat-ico">' + statIconSvg(card.icon) + '</span>' : '',
         '    <span class="stat-label">' + escapeHtml(card.label) + '</span>',
         card.window ? '    <span class="stat-window">' + escapeHtml(card.window) + '</span>' : '',
         '  </div>',
         '  <div class="stat-value">',
-        '    <span class="stat-num' + (card.money ? ' money' : '') + '">' + card.num + '</span>',
-        '    <span class="stat-unit">' + (card.unit || "") + '</span>',
+        '    <div class="stat-val-main">',
+        '      <span class="stat-num' + (card.money ? ' money' : '') + '">' + card.num + '</span>',
+        '      <span class="stat-unit">' + (card.unit || "") + '</span>',
+        '    </div>',
+        rightVisual,
         '  </div>',
-        '<div class="meter"' + (card.hideMeter ? ' style="visibility:hidden"' : '') + '><i data-level="' + level + '" style="width:' + Math.max(2, Math.min(100, card.percent)) + '%"></i>' + pace + '</div>',
+        meterBlock,
         '  <div class="stat-foot" title="' + escapeHtml(footText) + '">' + card.foot + '</div>',
         hints.map(text => '  <div class="stat-hint"' + (text ? ' title="' + escapeHtml(text) + '"' : '') + '>' +
           (text ? escapeHtml(text) : '&nbsp;') + '</div>').join(""),
@@ -662,7 +737,7 @@
 
     // 环比：跟紧挨着的前一段等长区间比
     let compareValue = "—";
-    let compareNote = "缺少上一周期数据";
+    let compareNote = "—";
     const detail = state.detail;
     if (detail && detail.series) {
       if (days > 0) {
@@ -679,11 +754,11 @@
           compareValue = delta >= 300 || delta <= -90
             ? "×" + ratio.toFixed(ratio >= 10 ? 0 : 1)
             : (delta >= 0 ? "+" : "") + Math.round(delta) + "%";
-          compareNote = "上一周期 " + fmtTokens(prevSum) + " · 含历史索引";
+          compareNote = "上期 " + fmtTokens(prevSum);
         }
       } else {
         compareValue = series.length + " 天";
-        compareNote = "最早 " + dayLabel(firstDay);
+        compareNote = "自 " + dayLabel(firstDay);
       }
     }
 
@@ -692,8 +767,8 @@
 
     const cells = [
       ["区间用量", fmtTokens(sumRange), series.length + " 天"],
-      ["区间花费", fmtMoney(costRange), "美元 · 刊例价"],
-      ["日均", fmtTokens(avg), activeDays + " 天 · " + fmtCount(sumRecords) + " 次请求"],
+      ["区间花费", fmtMoney(costRange), "USD"],
+      ["日均", fmtTokens(avg), activeDays + " 天 · " + fmtCount(sumRecords) + " 请求"],
       ["单日峰值", peak ? fmtTokens(peak.totalTokens) : "—", peak ? dayLabel(peak.day) : ""],
       ["环比", compareValue, compareNote]
     ];
@@ -733,7 +808,7 @@
       const uncached = Math.max(0, (item.inputTokens || 0) - cached);
       const speed = state.detail && state.detail.throughput ? state.detail.throughput.days[item.day] : null;
       const rows = (empty
-        ? ['<div class="tip-row"><span>状态</span><b>这天没有 token 记录</b></div>']
+        ? ['<div class="tip-row"><span>状态</span><b>无记录</b></div>']
         : [
           '<div class="tip-row"><span>合计</span><b>' + fmtTokens(item.totalTokens) + '</b></div>',
           '<div class="tip-row"><span>缓存命中</span><b>' + fmtTokens(cached) + '</b></div>',
@@ -786,12 +861,22 @@
       const label = decorated.label || item.label || "";
       const detail = options.detail ? options.detail(item) : "";
       const open = openName !== null && openName === item[nameKey] && detail;
+      const input = Math.max(0, Number(item.inputTokens) || 0);
+      const cached = Math.min(input, Math.max(0, Number(item.cachedInputTokens) || 0));
+      const fresh = Math.max(0, input - cached);
+      const out = Math.max(0, Number(item.outputTokens) || 0);
+      const sum = fresh + cached + out;
+      const trackHtml = sum > 0
+        ? '<i class="seg-in" style="width:' + ((fresh / sum) * width).toFixed(1) + '%"></i>' +
+          '<i class="seg-cache" style="width:' + ((cached / sum) * width).toFixed(1) + '%"></i>' +
+          '<i class="seg-out" style="width:' + ((out / sum) * width).toFixed(1) + '%"></i>'
+        : '<i style="width:' + width.toFixed(1) + '%"></i>';
       return [
         '<div class="bar-row' + (open ? ' open' : '') + '" data-name="' + escapeHtml(item[nameKey]) + '"' + (label ? ' title="' + escapeHtml(label) + '"' : '') + '>',
         '  <span class="bar-name">' + escapeHtml(item[nameKey]) + '</span>',
         '  <span class="bar-val"><b>' + fmtPercent(item.share * 100, 1) + '</b> · ' + fmtTokens(item.totalTokens) +
           (extraHtml ? ' · <span class="bar-extra">' + extraHtml + '</span>' : '') + '</span>',
-        '  <span class="bar-track"><i style="width:' + width.toFixed(1) + '%"></i></span>',
+        '  <span class="bar-track">' + trackHtml + '</span>',
         detail ? '  <div class="bar-detail"' + (open ? '' : ' hidden') + '>' + detail + '</div>' : '',
         '</div>'
       ].join("");
@@ -1126,18 +1211,18 @@
     const legacyDays = detail.baseline && detail.baseline.days ? detail.baseline.days : detail.series.length;
     if (detail.source === "workbuddy" || detail.source === "antigravity") {
       const todayTokens = detail.today ? detail.today.totalTokens : 0;
-      $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
-        (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
-        " · " + legacyDays + " 天" +
+      $("brand-sub").textContent = fmtTokens(detail.totals.totalTokens) +
+        (detail.cost ? " · " + fmtMoney(detail.cost.cny) : "") +
+        " · " + legacyDays + "d" +
         (legacyDays > 1 && todayTokens > 0 ? " · 今日 " + fmtTokens(todayTokens) : "");
     } else {
       const wbToday = workbuddyTodayTokens();
       const agyToday = antigravityTodayTokens();
-      $("brand-sub").textContent = "累计 " + fmtTokens(detail.totals.totalTokens) +
-        (detail.cost ? " ≈ " + fmtMoney(detail.cost.cny) : "") +
-        (legacyDays ? " · " + legacyDays + " 天" : "") +
-        (wbToday > 0 ? " · WorkBuddy " + fmtTokens(wbToday) + " 今日" : "") +
-        (agyToday > 0 ? " · Antigravity " + fmtTokens(agyToday) + " 今日" : "");
+      $("brand-sub").textContent = fmtTokens(detail.totals.totalTokens) +
+        (detail.cost ? " · " + fmtMoney(detail.cost.cny) : "") +
+        (legacyDays ? " · " + legacyDays + "d" : "") +
+        (wbToday > 0 ? " · WB " + fmtTokens(wbToday) : "") +
+        (agyToday > 0 ? " · AGY " + fmtTokens(agyToday) : "");
     }
     if (typeof syncAuthTopLabel === "function") syncAuthTopLabel();
   }

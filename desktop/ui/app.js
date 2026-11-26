@@ -39,9 +39,9 @@
     else if (signed === accounts.length) { badge.textContent = "今日已签 ✓"; badge.className = "m-badge done"; }
     else { badge.textContent = `${signed}/${accounts.length} 已签`; badge.className = "m-badge todo"; }
     $("m-sub").textContent = accounts.length
-      ? `${accounts.length} 个账号 · ${signed} 个今日已签到`
-      : "添加科研通账号，一键签到领积分（凭证本机加密保存）";
-    $("m-sign").textContent = accounts.length ? "立即签到" : "添加账号后签到";
+      ? `${accounts.length} 个账号 · ${signed} 已签`
+      : "本机加密保存";
+    $("m-sign").textContent = accounts.length ? "立即签到" : "添加账号";
     // 账号列表
     const list = $("m-accounts");
     if (!accounts.length) {

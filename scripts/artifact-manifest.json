@@ -2,11 +2,11 @@
   "version": 3,
   "target": "source",
   "files": {
-    "package.json": "28c3ff7fc0ebe5deda20f4b9a8e1ab64b032e086d85a24f55d57f42152b1782a",
+    "package.json": "36f6ce01409cff668c6b37bbe9c54b870eda10de9d3a56e4b75cdee642c73fbe",
     "desktop/main.cjs": "b12a9945193a307db05b58c32890f038cba8fd4bf77df7e1c50f56a4e71ff4d7",
     "desktop/preload.cjs": "6f299218b5b138c1274e7c61bfdd6ef5ae9bc45311cd7e637021fcb5775dcefb",
-    "desktop/popover.html": "e9c05fdf0ea8f8cc5500ccc789662c04d131c8c2170b1f875e068f2604b61ca8",
-    "desktop/dashboard.html": "060f93a804b9a7066874d9807aa5f5e6f57e2f195040adf9c1c197ede2e21814",
+    "desktop/popover.html": "a09242b959ab53375c0a2cfbb0b48ac05618003d0845e82ab6ed8940b5e6ca72",
+    "desktop/dashboard.html": "45d5362018c40b45a9da64bec42c3791afcd46ca231eb2a85b05e2369baaa9aa",
     "desktop/dashboard-preload.cjs": "927c2fc6f5e969491adfaef71a0272f0d48bdac1aa922aa349b24d2804d60bc8",
     "desktop/icon.png": "96383a786495439e534d2f1e049d2d7ee5ae178ee07698ac29af57b28483e845",
     "desktop/data/ablesci-store.cjs": "e7e233faabece4e69367ed368df6fb2d8088ff1881c721a119a6da48221f79e1",
@@ -37,6 +37,6 @@
     "desktop/data/codex-store/aggregate.cjs": "6a2c41384cabbfa509b0947b758d8efc7065a89d053ced62a2b60fde0a262ea7",
     "desktop/data/codex-store/builder.cjs": "b8e50aa69d30318f4abe31d258bf572db1048de2c111e6a4163f572a3dc59e28",
     "README.md": "c9f2ebc76dd9c1dfff16be2035a4ca7e38c533baa0b32eb45da38d194638eb1f",
-    "CHANGELOG.md": "1f99749eee2f68d598f1a3af6142368efacdf5b749bf6f57588e9b9e8e811184"
+    "CHANGELOG.md": "eae6d17258f03150dc18a7db069e534f88cdd551d22e54dd2f9de7592b589a51"
   }
 }

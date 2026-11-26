@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. Format base
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-11-26
+
+全面重塑桌面看板与托盘弹窗视觉及交互精简：去除冗长解释性文案，增加环形仪表、分段构成条与图标体系。
+
+### Changed
+
+- **视觉与图形化升级**：
+  - **看板指标卡**：额度卡（Codex 5h / 7 天与 Antigravity Gemini / Claude）新增 SVG 环形进度仪表；今日用量 / 累计用量增加「新增输入 / 缓存 / 输出」三色分段构成条与昨日对比涨跌胶囊；所有卡片标题与顶栏数据源按钮、模块标题统一配备 SVG 图标。
+  - **分布条**：模型与项目分布由单色条升级为三段比例构成条，直观展示输入、缓存命中与输出构成。
+  - **托盘弹窗**：Codex 额度改版为双列并排环形仪表卡片，精简文案与倒计时格式（`4h 23m` / `剩余% · 正常`）。
+  - **文案去冗余**：清理卡片、弹窗、空态、提示语与模态框中的解释性长句，突出关键数值与图标状态。
+
 ## [3.2.0] - 2026-11-26
 
 新增 **Antigravity 官方实时额度查询与展示**（对齐 CC Switch `agy_account` 口径），支持 Gemini 与 Claude / GPT 双额度池、5 小时 / 每周 / Argon 窗口与套餐档位显示，单元测试扩展到 **120** 个。
@@ -70,7 +82,8 @@ All notable changes to this project will be documented in this file. Format base
 - **隐藏不等于删除**：用户问「这些玩意怎么清除啊」——隐藏账号只写 TokenBar 自己的配置，`~/.codex` 授权文件一个字节不碰；科研通密码仍走 `safeStorage`（Windows DPAPI）→ AES-256-GCM 降级，密文只存本机 `userData`。
 - **凭证零入库**：全量扫描历史与工作区，API Key / token / 真实邮箱均未进入仓库；测试一律使用 `alice@example.com` 等假邮箱。
 
+[3.2.1]: https://github.com/xiaoqi8553/tokenbar/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/xiaoqi8553/tokenbar/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/xiaoqi8553/tokenbar/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/xiaoqi8553/tokenbar/compare/v2.6.1...v3.0.0
-[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/xiaoqi8553/tokenbar/compare/v3.2.1...HEAD
