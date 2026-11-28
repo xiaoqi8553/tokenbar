@@ -1112,6 +1112,64 @@
         }
       }
     },
+    "projectModelDays": {
+      "2026-07-23": {
+        "thesis": {
+          "gpt-5.5": {
+            "inputTokens": 800,
+            "cachedInputTokens": 0,
+            "outputTokens": 200,
+            "reasoningOutputTokens": 0,
+            "totalTokens": 1000,
+            "records": 1
+          }
+        }
+      },
+      "2026-07-24": {
+        "thesis": {
+          "gpt-6.1-sol": {
+            "inputTokens": 300,
+            "cachedInputTokens": 100,
+            "outputTokens": 100,
+            "reasoningOutputTokens": 20,
+            "totalTokens": 400,
+            "records": 1
+          }
+        },
+        "codex": {
+          "o3": {
+            "inputTokens": 500,
+            "cachedInputTokens": 50,
+            "outputTokens": 150,
+            "reasoningOutputTokens": 0,
+            "totalTokens": 650,
+            "records": 1
+          }
+        }
+      },
+      "2026-07-25": {
+        "thesis": {
+          "gpt-5.5": {
+            "inputTokens": 100,
+            "cachedInputTokens": 0,
+            "outputTokens": 20,
+            "reasoningOutputTokens": 0,
+            "totalTokens": 120,
+            "records": 1
+          }
+        },
+        "demo": {
+          "gpt-6.1-sol": {
+            "inputTokens": 50,
+            "cachedInputTokens": 10,
+            "outputTokens": 30,
+            "reasoningOutputTokens": 5,
+            "totalTokens": 80,
+            "records": 1
+          }
+        }
+      }
+    },
     "hourly": [
       0,
       0,
@@ -1354,7 +1412,7 @@
     },
     "baseline": null,
     "today": {
-      "day": "2026-11-26",
+      "day": "2026-11-28",
       "totalTokens": 0,
       "inputTokens": 0,
       "cachedInputTokens": 0,
@@ -1363,7 +1421,7 @@
       "records": 0
     },
     "yesterday": {
-      "day": "2026-11-25",
+      "day": "2026-11-27",
       "totalTokens": 0,
       "inputTokens": 0,
       "cachedInputTokens": 0,
@@ -1372,24 +1430,6 @@
       "records": 0
     },
     "series": [
-      {
-        "day": "2026-11-13",
-        "totalTokens": 0,
-        "inputTokens": 0,
-        "cachedInputTokens": 0,
-        "outputTokens": 0,
-        "reasoningOutputTokens": 0,
-        "records": 0
-      },
-      {
-        "day": "2026-11-14",
-        "totalTokens": 0,
-        "inputTokens": 0,
-        "cachedInputTokens": 0,
-        "outputTokens": 0,
-        "reasoningOutputTokens": 0,
-        "records": 0
-      },
       {
         "day": "2026-11-15",
         "totalTokens": 0,
@@ -1491,6 +1531,24 @@
       },
       {
         "day": "2026-11-26",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-27",
+        "totalTokens": 0,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "reasoningOutputTokens": 0,
+        "records": 0
+      },
+      {
+        "day": "2026-11-28",
         "totalTokens": 0,
         "inputTokens": 0,
         "cachedInputTokens": 0,

@@ -152,7 +152,8 @@
       cost: 0,
       turns: 0,
       speedOutput: 0,
-      speedDuration: 0
+      speedDuration: 0,
+      modelMap: new Map()
     });
 
     const totals = new Map();
@@ -161,6 +162,7 @@
       const byProject = (detail.projectDays || {})[day];
       if (!byProject) continue;
       const unit = dayUnit(day);
+      const pmByProject = (detail.projectModelDays || {})[day] || {};
       for (const [project, bucket] of Object.entries(byProject)) {
         const current = totals.get(project) || blank(project);
         current.totalTokens += bucket.totalTokens || 0;
@@ -169,6 +171,30 @@
         current.outputTokens += bucket.outputTokens || 0;
         current.records += bucket.records || 0;
         if (unit) current.cost += bucketCost(bucket, unit);
+        const byModel = pmByProject[project];
+        if (byModel) {
+          for (const [model, mb] of Object.entries(byModel)) {
+            let mCell = current.modelMap.get(model);
+            if (!mCell) {
+              mCell = {
+                model,
+                totalTokens: 0,
+                inputTokens: 0,
+                cachedInputTokens: 0,
+                outputTokens: 0,
+                records: 0,
+                cost: 0
+              };
+              current.modelMap.set(model, mCell);
+            }
+            mCell.totalTokens += mb.totalTokens || 0;
+            mCell.inputTokens += mb.inputTokens || 0;
+            mCell.cachedInputTokens += mb.cachedInputTokens || 0;
+            mCell.outputTokens += mb.outputTokens || 0;
+            mCell.records += mb.records || 0;
+            mCell.cost += bucketCost(mb, unitFor(model));
+          }
+        }
         totals.set(project, current);
         grand += bucket.totalTokens || 0;
       }
@@ -189,10 +215,17 @@
     }
 
     return [...totals.values()]
-      .map(item => ({
-        ...item,
-        share: grand ? item.totalTokens / grand : 0,
-        tps: item.speedDuration > 0 ? item.speedOutput * 1000 / item.speedDuration : null
-      }))
+      .map(item => {
+        const { modelMap, ...rest } = item;
+        const models = [...modelMap.values()]
+          .map(m => ({ ...m, share: item.totalTokens ? m.totalTokens / item.totalTokens : 0 }))
+          .sort((a, b) => b.totalTokens - a.totalTokens);
+        return {
+          ...rest,
+          models,
+          share: grand ? item.totalTokens / grand : 0,
+          tps: item.speedDuration > 0 ? item.speedOutput * 1000 / item.speedDuration : null
+        };
+      })
       .sort((a, b) => b.totalTokens - a.totalTokens);
   }

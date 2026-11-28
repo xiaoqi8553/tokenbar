@@ -69,16 +69,36 @@
       localStorage.setItem("codex.source", state.source);
       applySourceTabs();
       state.hover = -1;
+      if (state.source === "overview") {
+        state.data.overview = buildOverviewDetail(state.data);
+        if (state.data.overview) {
+          state.detail = state.data.overview;
+          renderAll();
+          const missing = AGENT_SOURCES.filter(src => !state.data[src]);
+          if (missing.length) {
+            Promise.all(missing.map(src => loadSource(src).catch(() => null))).then(() => {
+              state.data.overview = buildOverviewDetail(state.data);
+              if (state.source === "overview") {
+                state.detail = state.data.overview;
+                renderAll();
+              }
+            });
+          }
+          return;
+        }
+      }
       if (state.data[state.source]) {
         state.detail = state.data[state.source];
         renderAll();
         return;
       }
-      $("status-text").textContent = state.source === "workbuddy"
-        ? "正在读取 WorkBuddy 日志…"
-        : state.source === "antigravity"
-          ? "正在读取 Antigravity 日志…"
-          : "正在读取 Codex 日志…";
+      $("status-text").textContent = state.source === "overview"
+        ? "正在汇总全部数据源…"
+        : state.source === "workbuddy"
+          ? "正在读取 WorkBuddy 日志…"
+          : state.source === "antigravity"
+            ? "正在读取 Antigravity 日志…"
+            : "正在读取 Codex 日志…";
       loadSource(state.source).then(() => {
         state.detail = state.data[state.source];
         renderAll();
@@ -91,7 +111,11 @@
   async function loadSource(source, { refresh } = {}) {
     const api = window.dashboard;
     let detail;
-    if (source === "workbuddy") {
+    if (source === "overview") {
+      await Promise.all(AGENT_SOURCES.map(src => loadSource(src, { refresh }).catch(() => null)));
+      detail = buildOverviewDetail(state.data);
+      state.data.overview = detail;
+    } else if (source === "workbuddy") {
       if (!api.workbuddyDetail) throw new Error("当前版本不支持 WorkBuddy 数据源");
       detail = refresh && api.workbuddyRefresh ? await api.workbuddyRefresh() : await api.workbuddyDetail();
       if (!detail) throw new Error("WorkBuddy 数据层尚未初始化");
@@ -105,6 +129,7 @@
       detail = refresh ? await api.refresh() : await api.getDetail();
       state.data.codex = detail;
     }
+    if (source !== "overview") state.data.overview = buildOverviewDetail(state.data);
     return detail;
   }
 
@@ -112,27 +137,33 @@
     const button = $("btn-refresh");
     button.dataset.busy = "1";
     try {
-      await loadSource("codex", { refresh });
-      if (state.source !== "codex") {
-        const label = state.source === "antigravity" ? "Antigravity" : "WorkBuddy";
-        $("status-text").textContent = "正在读取 " + label + " 日志…";
-        await loadSource(state.source, { refresh }).catch(() => {});
+      if (state.source === "overview") {
+        await Promise.all(AGENT_SOURCES.map(src => loadSource(src, { refresh }).catch(() => null)));
+        state.data.overview = buildOverviewDetail(state.data);
+      } else {
+        await loadSource("codex", { refresh });
+        if (state.source !== "codex") {
+          const label = state.source === "antigravity" ? "Antigravity" : "WorkBuddy";
+          $("status-text").textContent = "正在读取 " + label + " 日志…";
+          await loadSource(state.source, { refresh }).catch(() => {});
+        }
       }
       try {
         state.status = await window.dashboard.getStatus();
       } catch {
         /* 配额快照拿不到不影响其余部分 */
       }
-      state.detail = state.data[state.source] || state.data.codex;
+      state.detail = state.data[state.source] || state.data.overview || state.data.codex;
       $("app").hidden = false;
       renderAll();
       hideBoot();
       // 后台预热其余数据源，切换时不用等扫描
-      for (const other of SOURCES) {
+      for (const other of AGENT_SOURCES) {
         if (other === state.source || state.data[other]) continue;
         loadSource(other).then(() => {
-          if (state.source === other) {
-            state.detail = state.data[other];
+          state.data.overview = buildOverviewDetail(state.data);
+          if (state.source === other || state.source === "overview") {
+            state.detail = state.data[state.source];
             renderAll();
           } else {
             renderStatus();

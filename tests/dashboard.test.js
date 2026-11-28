@@ -289,3 +289,12 @@ test("2.3 补零按本地日历逐日，跨月不漏天", () => {
     cachedInputTokens: 0, outputTokens: 0, records: 0
   });
 });
+
+test("3.3 顶栏固定对称、支持总览选项卡与项目模型占比明细", () => {
+  assert.match(dashboard, /data-source="overview"/);
+  assert.match(dashboard, /function buildOverviewDetail/);
+  assert.match(dashboard, /function overviewCards/);
+  assert.match(dashboard, /function projectDetail/);
+  assert.match(dashboard, /class="proj-models"/);
+  assert.match(dashboard, /\.brand\s*\{[\s\S]*?width:\s*224px;/);
+});

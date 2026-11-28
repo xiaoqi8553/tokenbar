@@ -420,6 +420,7 @@ class WorkBuddyStore {
     const days = new Map();
     const modelDays = {};
     const projectDays = {};
+    const projectModelDays = {};
     const dailyHours = {};
     const sum = zeroBucket();
     const seenKeys = new Set();
@@ -513,9 +514,13 @@ class WorkBuddyStore {
         addBucket(days.get(day), bucket);
 
         if (!modelDays[day]) modelDays[day] = {};
+        if (!projectModelDays[day]) projectModelDays[day] = {};
+        if (!projectModelDays[day][projectKey]) projectModelDays[day][projectKey] = {};
         for (const [model, cell] of Object.entries(detail.modelDays[day] || {})) {
           if (!modelDays[day][model]) modelDays[day][model] = zeroBucket();
           addBucket(modelDays[day][model], cell);
+          if (!projectModelDays[day][projectKey][model]) projectModelDays[day][projectKey][model] = zeroBucket();
+          addBucket(projectModelDays[day][projectKey][model], cell);
         }
 
         if (!projectDays[day]) projectDays[day] = {};
@@ -687,6 +692,7 @@ class WorkBuddyStore {
       projects,
       modelDays,
       projectDays,
+      projectModelDays,
       hourly,
       dailyHours,
       sessionList,

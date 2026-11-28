@@ -263,6 +263,8 @@ function detailSnapshot(store) {
   const modelDays = {};
   /** @type {Record<string, Record<string, object>>} 天 → 项目 → 桶 */
   const projectDays = {};
+  /** @type {Record<string, Record<string, Record<string, object>>>} 天 → 项目 → 模型 → 桶 */
+  const projectModelDays = {};
   const hours = new Array(24).fill(0);
   /** @type {Record<string, number[]>} 天 → 24 小时桶，用于「昨日同期」这类对比 */
   const dailyHours = {};
@@ -401,9 +403,13 @@ function detailSnapshot(store) {
 
     for (const [day, byModel] of Object.entries(detail.modelDays || {})) {
       if (!modelDays[day]) modelDays[day] = {};
+      if (!projectModelDays[day]) projectModelDays[day] = {};
+      if (!projectModelDays[day][projectKey]) projectModelDays[day][projectKey] = {};
       for (const [model, bucket] of Object.entries(byModel)) {
         if (!modelDays[day][model]) modelDays[day][model] = zeroBucket();
         for (const key of Object.keys(zeroBucket())) modelDays[day][model][key] += bucket[key] || 0;
+        if (!projectModelDays[day][projectKey][model]) projectModelDays[day][projectKey][model] = zeroBucket();
+        for (const key of Object.keys(zeroBucket())) projectModelDays[day][projectKey][model][key] += bucket[key] || 0;
       }
     }
 
@@ -458,6 +464,7 @@ function detailSnapshot(store) {
 
       // 项目维度同理
       if (!projectDays[day]) projectDays[day] = {};
+      if (!projectModelDays[day]) projectModelDays[day] = {};
       for (const cell of Object.values(baseDay.sessions || {})) {
         const project = cell.project || "历史索引";
         if (!projectDays[day][project]) projectDays[day][project] = zeroBucket();
@@ -467,6 +474,13 @@ function detailSnapshot(store) {
         target.cachedInputTokens += cell.cachedInputTokens || 0;
         target.outputTokens += cell.outputTokens || 0;
         target.records += cell.records || 0;
+
+        if (!projectModelDays[day][project]) projectModelDays[day][project] = {};
+        for (const [model, mBucket] of Object.entries(cell.models || {})) {
+          if (!projectModelDays[day][project][model]) projectModelDays[day][project][model] = zeroBucket();
+          const mTarget = projectModelDays[day][project][model];
+          for (const key of Object.keys(zeroBucket())) mTarget[key] += mBucket[key] || 0;
+        }
       }
 
       // 小时分布：两边互补，逐小时相加而不是让基线整天覆盖日志
@@ -706,6 +720,7 @@ function detailSnapshot(store) {
     projects: projectList,
     modelDays,
     projectDays,
+    projectModelDays,
     hourly: hours,
     dailyHours,
     sessionList: sessions,

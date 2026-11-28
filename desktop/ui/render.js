@@ -506,12 +506,217 @@
     ];
   }
 
+  /** 合并 Codex / Antigravity / WorkBuddy 三个数据源，供「总览」选项卡使用 */
+  function buildOverviewDetail(dataMap) {
+    const defs = [
+      ["codex", "Codex"],
+      ["antigravity", "Antigravity"],
+      ["workbuddy", "WorkBuddy"]
+    ];
+    const items = defs.map(([key, label]) => ({ key, label, detail: dataMap && dataMap[key] })).filter(x => x.detail);
+    if (!items.length) return null;
+
+    const addInto = (dest, src) => {
+      dest.inputTokens = (dest.inputTokens || 0) + (src.inputTokens || 0);
+      dest.cachedInputTokens = (dest.cachedInputTokens || 0) + (src.cachedInputTokens || 0);
+      dest.outputTokens = (dest.outputTokens || 0) + (src.outputTokens || 0);
+      dest.totalTokens = (dest.totalTokens || 0) + (src.totalTokens || 0);
+      dest.records = (dest.records || 0) + (src.records || 0);
+    };
+    const blankBucket = () => ({ inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, records: 0 });
+    const mergeSpeed = (dest, cell) => {
+      dest.turns = (dest.turns || 0) + (cell.turns || 0);
+      dest.outputTokens = (dest.outputTokens || 0) + (cell.outputTokens || 0);
+      dest.durationMs = (dest.durationMs || 0) + (cell.durationMs || 0);
+      dest.tps = dest.durationMs > 0 ? (dest.outputTokens * 1000) / dest.durationMs : null;
+    };
+
+    const totals = { ...blankBucket(), sessions: 0, cost: 0 };
+    const cost = { cny: 0, usd: 0, todayCny: 0, estimatedTokens: 0, rate: 7.25 };
+    const pricing = {};
+    const dayMap = new Map();
+    const modelDays = {};
+    const projectDays = {};
+    const projectModelDays = {};
+    const dailyHours = {};
+    const speed = { turns: 0, outputTokens: 0, durationMs: 0, days: {}, projectDays: {}, modelDays: {}, dayHours: {} };
+    const sessionList = [];
+    const sourceBreakdown = {};
+    let builtAt = null;
+    let scannedFiles = 0;
+
+    for (const { key, detail } of items) {
+      if (detail.builtAt && (!builtAt || String(detail.builtAt) > String(builtAt))) builtAt = detail.builtAt;
+      scannedFiles += detail.scannedFiles || 0;
+      const t = detail.totals || {};
+      addInto(totals, t);
+      totals.sessions += t.sessions || detail.sessions || 0;
+      totals.cost += t.cost || (detail.cost && detail.cost.cny) || 0;
+      if (detail.cost) {
+        cost.cny += detail.cost.cny || 0;
+        cost.usd += detail.cost.usd || 0;
+        cost.todayCny += detail.cost.todayCny || 0;
+        cost.estimatedTokens += detail.cost.estimatedTokens || 0;
+        if (detail.cost.rate) cost.rate = detail.cost.rate;
+      }
+      if (detail.pricing) Object.assign(pricing, detail.pricing);
+      sourceBreakdown[key] = {
+        totalTokens: t.totalTokens || 0,
+        todayTokens: detail.today ? (detail.today.totalTokens || 0) : 0,
+        costCny: (detail.cost && detail.cost.cny) || 0,
+        sessions: t.sessions || detail.sessions || 0
+      };
+
+      for (const s of (detail.series || [])) {
+        let row = dayMap.get(s.day);
+        if (!row) {
+          row = { day: s.day, ...blankBucket(), cost: 0 };
+          dayMap.set(s.day, row);
+        }
+        addInto(row, s);
+        row.cost += s.cost || 0;
+      }
+
+      for (const [day, byModel] of Object.entries(detail.modelDays || {})) {
+        if (!modelDays[day]) modelDays[day] = {};
+        for (const [model, b] of Object.entries(byModel)) {
+          if (!modelDays[day][model]) modelDays[day][model] = blankBucket();
+          addInto(modelDays[day][model], b);
+        }
+      }
+
+      for (const [day, byProj] of Object.entries(detail.projectDays || {})) {
+        if (!projectDays[day]) projectDays[day] = {};
+        for (const [proj, b] of Object.entries(byProj)) {
+          if (!projectDays[day][proj]) projectDays[day][proj] = blankBucket();
+          addInto(projectDays[day][proj], b);
+        }
+      }
+
+      for (const [day, byProj] of Object.entries(detail.projectModelDays || {})) {
+        if (!projectModelDays[day]) projectModelDays[day] = {};
+        for (const [proj, byModel] of Object.entries(byProj)) {
+          if (!projectModelDays[day][proj]) projectModelDays[day][proj] = {};
+          for (const [model, b] of Object.entries(byModel)) {
+            if (!projectModelDays[day][proj][model]) projectModelDays[day][proj][model] = blankBucket();
+            addInto(projectModelDays[day][proj][model], b);
+          }
+        }
+      }
+
+      for (const [day, arr] of Object.entries(detail.dailyHours || {})) {
+        if (!dailyHours[day]) dailyHours[day] = new Array(24).fill(0);
+        for (let h = 0; h < 24; h += 1) dailyHours[day][h] += arr[h] || 0;
+      }
+
+      const tp = detail.throughput;
+      if (tp && tp.durationMs > 0) {
+        mergeSpeed(speed, tp);
+        for (const [day, cell] of Object.entries(tp.days || {})) {
+          if (!speed.days[day]) speed.days[day] = { turns: 0, outputTokens: 0, durationMs: 0, tps: null };
+          mergeSpeed(speed.days[day], cell);
+        }
+        for (const [day, byProj] of Object.entries(tp.projectDays || {})) {
+          if (!speed.projectDays[day]) speed.projectDays[day] = {};
+          for (const [proj, cell] of Object.entries(byProj)) {
+            if (!speed.projectDays[day][proj]) speed.projectDays[day][proj] = { turns: 0, outputTokens: 0, durationMs: 0, tps: null };
+            mergeSpeed(speed.projectDays[day][proj], cell);
+          }
+        }
+        for (const [day, byModel] of Object.entries(tp.modelDays || {})) {
+          if (!speed.modelDays[day]) speed.modelDays[day] = {};
+          for (const [model, cell] of Object.entries(byModel)) {
+            if (!speed.modelDays[day][model]) speed.modelDays[day][model] = { turns: 0, outputTokens: 0, durationMs: 0, tps: null };
+            mergeSpeed(speed.modelDays[day][model], cell);
+          }
+        }
+        for (const [day, hours] of Object.entries(tp.dayHours || {})) {
+          if (!speed.dayHours[day]) speed.dayHours[day] = new Array(24).fill(null);
+          for (let h = 0; h < 24; h += 1) {
+            const cell = hours && hours[h];
+            if (!cell) continue;
+            if (!speed.dayHours[day][h]) speed.dayHours[day][h] = { turns: 0, outputTokens: 0, durationMs: 0, tps: null };
+            mergeSpeed(speed.dayHours[day][h], cell);
+          }
+        }
+      }
+
+      for (const sess of (detail.sessionList || [])) {
+        sessionList.push(sess);
+      }
+    }
+
+    sessionList.sort((a, b) => String(b.lastAt || "").localeCompare(String(a.lastAt || "")));
+    const series = [...dayMap.values()].sort((a, b) => a.day.localeCompare(b.day));
+    const todayKey = localDayKey(new Date());
+    const throughput = speed.durationMs > 0
+      ? { ...speed, tps: (speed.outputTokens * 1000) / speed.durationMs }
+      : null;
+
+    return {
+      ok: true,
+      source: "overview",
+      builtAt,
+      sessions: totals.sessions,
+      scannedFiles,
+      totals,
+      cost,
+      pricing,
+      series,
+      modelDays,
+      projectDays,
+      projectModelDays,
+      dailyHours,
+      throughput,
+      sessionList,
+      sourceBreakdown,
+      today: series.find(item => item.day === todayKey) || null
+    };
+  }
+
+  function overviewCards() {
+    const detail = state.detail;
+    const sb = (detail && detail.sourceBreakdown) || {};
+    const quota = (state.status && state.status.quota) || null;
+    const codexWin = (quota && (quota.session || quota.weekly)) || null;
+    const codexLive = quota && quota.source === "api" ? " · 实时" : "";
+    const agyQuota = state.status && state.status.antigravityQuota;
+    const agyQuotaErr = state.status && state.status.antigravityQuotaError;
+
+    const todayCardObj = todayCard();
+    const todayParts = [
+      sb.codex && sb.codex.todayTokens ? "Codex " + fmtTokens(sb.codex.todayTokens) : "",
+      sb.antigravity && sb.antigravity.todayTokens ? "AGY " + fmtTokens(sb.antigravity.todayTokens) : "",
+      sb.workbuddy && sb.workbuddy.todayTokens ? "WB " + fmtTokens(sb.workbuddy.todayTokens) : ""
+    ].filter(Boolean);
+    if (todayParts.length) todayCardObj.hints = [todayParts.join(" · ")];
+
+    const totalCardObj = totalCard();
+    const totalParts = [
+      sb.codex ? "Codex " + fmtTokens(sb.codex.totalTokens) : "",
+      sb.antigravity ? "AGY " + fmtTokens(sb.antigravity.totalTokens) : "",
+      sb.workbuddy ? "WB " + fmtTokens(sb.workbuddy.totalTokens) : ""
+    ].filter(Boolean);
+    if (totalParts.length) totalCardObj.hints = [totalParts.join(" · "), totalCardObj.hints && totalCardObj.hints[0]].filter(Boolean);
+
+    return [
+      todayCardObj,
+      totalCardObj,
+      costCard(),
+      speedCard(),
+      quotaCard("Codex 额度", (quota && quota.session ? "5h" : "7d") + codexLive, codexWin),
+      agyQuotaCard("AGY 额度", agyQuota && agyQuota.gemini, agyQuota && agyQuota.planType, agyQuotaErr, "Gemini · Claude")
+    ];
+  }
+
   function renderStats() {
     const detail = state.detail;
-    if (!detail && (state.source === "workbuddy" || state.source === "antigravity")) return;
+    if (!detail && (state.source === "overview" || state.source === "workbuddy" || state.source === "antigravity")) return;
 
     let cards;
-    if (state.source === "workbuddy") {
+    if (state.source === "overview") {
+      cards = overviewCards();
+    } else if (state.source === "workbuddy") {
       cards = workbuddyCards();
     } else if (state.source === "antigravity") {
       cards = antigravityCards();
@@ -777,11 +982,13 @@
       (note ? '<small>' + note + '</small>' : '') + '</div></div>'
     ).join("");
 
-    $("chart-badge").textContent = state.source === "workbuddy"
-      ? "WorkBuddy · 本地日志"
-      : state.source === "antigravity"
-        ? "Antigravity · 本地日志"
-        : "Codex · 本地日志";
+    $("chart-badge").textContent = state.source === "overview"
+      ? "全平台汇总 · 本地日志"
+      : state.source === "workbuddy"
+        ? "WorkBuddy · 本地日志"
+        : state.source === "antigravity"
+          ? "Antigravity · 本地日志"
+          : "Codex · 本地日志";
   }
 
   // 悬停提示
@@ -923,6 +1130,24 @@
     return parts.join(' · ');
   }
 
+  /** 项目分布展开：四档明细 + 该项目使用的模型及占比 */
+  function projectDetail(item) {
+    const summary = distDetail(item);
+    const models = item.models || [];
+    if (!models.length) return summary;
+    const rows = models.map(m => {
+      const pct = Math.max(0, Math.min(100, (m.share || 0) * 100));
+      return [
+        '<div class="proj-model-row">',
+        '  <span class="proj-model-name">' + escapeHtml(m.model) + '</span>',
+        '  <span class="proj-model-bar"><i style="width:' + Math.max(2, pct).toFixed(1) + '%"></i></span>',
+        '  <span class="proj-model-stat"><b>' + fmtPercent(pct, 1) + '</b> · ' + fmtTokens(m.totalTokens) + ' · ' + fmtMoney(m.cost || 0) + '</span>',
+        '</div>'
+      ].join("");
+    }).join("");
+    return summary + '<div class="proj-models">' + rows + '</div>';
+  }
+
   function renderModels() {
     const models = rangeModels();
     for (const item of models) {
@@ -950,7 +1175,7 @@
       nameKey: "project",
       empty: "此区间没有项目数据",
       openName: state.openBars.projects,
-      detail: distDetail,
+      detail: projectDetail,
       decorate: item => ({ extraHtml: distExtra(item), label: distLabel(item) })
     });
     const totalCost = projects.reduce((acc, item) => acc + (item.cost || 0), 0);
@@ -1198,32 +1423,22 @@
       return;
     }
     dot.setAttribute("data-tone", detail.builtAt ? "" : "muted");
-    const sourcePrefix = detail.source === "workbuddy"
-      ? "WorkBuddy · "
-      : detail.source === "antigravity"
-        ? "Antigravity · "
-        : "Codex · ";
+    const sourcePrefix = detail.source === "overview"
+      ? "总览 · "
+      : detail.source === "workbuddy"
+        ? "WorkBuddy · "
+        : detail.source === "antigravity"
+          ? "Antigravity · "
+          : "Codex · ";
     $("status-text").textContent =
       sourcePrefix +
       detail.scannedFiles + " 个日志 · " + detail.sessions + " 个会话 · " +
       (detail.builtAt ? new Date(detail.builtAt).toLocaleString("zh-CN", { hour12: false }) : "—");
 
     const legacyDays = detail.baseline && detail.baseline.days ? detail.baseline.days : detail.series.length;
-    if (detail.source === "workbuddy" || detail.source === "antigravity") {
-      const todayTokens = detail.today ? detail.today.totalTokens : 0;
-      $("brand-sub").textContent = fmtTokens(detail.totals.totalTokens) +
-        (detail.cost ? " · " + fmtMoney(detail.cost.cny) : "") +
-        " · " + legacyDays + "d" +
-        (legacyDays > 1 && todayTokens > 0 ? " · 今日 " + fmtTokens(todayTokens) : "");
-    } else {
-      const wbToday = workbuddyTodayTokens();
-      const agyToday = antigravityTodayTokens();
-      $("brand-sub").textContent = fmtTokens(detail.totals.totalTokens) +
-        (detail.cost ? " · " + fmtMoney(detail.cost.cny) : "") +
-        (legacyDays ? " · " + legacyDays + "d" : "") +
-        (wbToday > 0 ? " · WB " + fmtTokens(wbToday) : "") +
-        (agyToday > 0 ? " · AGY " + fmtTokens(agyToday) : "");
-    }
+    $("brand-sub").textContent = fmtTokens(detail.totals.totalTokens) +
+      (detail.cost ? " · " + fmtMoney(detail.cost.cny) : "") +
+      (legacyDays ? " · " + legacyDays + "d" : "");
     if (typeof syncAuthTopLabel === "function") syncAuthTopLabel();
   }
 

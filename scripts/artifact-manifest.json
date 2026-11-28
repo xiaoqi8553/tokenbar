@@ -2,11 +2,11 @@
   "version": 3,
   "target": "source",
   "files": {
-    "package.json": "36f6ce01409cff668c6b37bbe9c54b870eda10de9d3a56e4b75cdee642c73fbe",
+    "package.json": "c87e6566e41c8e55d9db9ee24a94e439c5263a3ce945929d47afa4fc6ccb48bb",
     "desktop/main.cjs": "b12a9945193a307db05b58c32890f038cba8fd4bf77df7e1c50f56a4e71ff4d7",
     "desktop/preload.cjs": "6f299218b5b138c1274e7c61bfdd6ef5ae9bc45311cd7e637021fcb5775dcefb",
     "desktop/popover.html": "a09242b959ab53375c0a2cfbb0b48ac05618003d0845e82ab6ed8940b5e6ca72",
-    "desktop/dashboard.html": "45d5362018c40b45a9da64bec42c3791afcd46ca231eb2a85b05e2369baaa9aa",
+    "desktop/dashboard.html": "cfe8feda7083c6b348437f91eca8451caf1a8afa5c5486162b17687bc4119b5b",
     "desktop/dashboard-preload.cjs": "927c2fc6f5e969491adfaef71a0272f0d48bdac1aa922aa349b24d2804d60bc8",
     "desktop/icon.png": "96383a786495439e534d2f1e049d2d7ee5ae178ee07698ac29af57b28483e845",
     "desktop/data/ablesci-store.cjs": "e7e233faabece4e69367ed368df6fb2d8088ff1881c721a119a6da48221f79e1",
@@ -15,9 +15,9 @@
     "desktop/data/event-dedupe.cjs": "b98b4ca7d8eba35945d756a8663ae64065ac56563fb61cd6bebb5c7a2c643b18",
     "desktop/data/history-baseline.cjs": "70aa6989b4c6ea6113a95f478a4d92c07244c1bb81b95ff230b73bcd975c3ace",
     "desktop/data/pricing.cjs": "55655a41c7866ce0960dda7c6c6d1c94afe77faf9cd7d984129dcc630d50c347",
-    "desktop/data/workbuddy-store.cjs": "40125ab95c41846f92a008d7d4375518919721dcc05435f436956b96970768d5",
+    "desktop/data/workbuddy-store.cjs": "0aead84ad8adc09ad402d120c789ba99409447fcf2cbc17633fbcf5a9131d678",
     "desktop/data/antigravity-native.cjs": "d09a133ee21d9205804a669cebf8c3bd8f55ed532410891d0be639ff7c7bcb38",
-    "desktop/data/antigravity-store.cjs": "da9d3aceb1bb696a23dcf23c4619f877e7ec92ea54bc5add91ff17c2552c46f6",
+    "desktop/data/antigravity-store.cjs": "68b35cc856dea36e9e6941e1603e16efda3d183b9c86518ee6dcd5bc114b82cf",
     "desktop/data/antigravity-quota-store.cjs": "6af25cae6fce948f24a3fab1809eeb3d95e4c4846ae14387e0c8c8775c082a5b",
     "desktop/core/logger.cjs": "0eb846b68dd8fa7a6ae10e4a91322d6a3e9ce559617ee7db993b7aee691a58ce",
     "desktop/core/error-boundary.cjs": "9644c54029c96133e26810f6c8c253bd041362807ec8bc018216daee88111e2b",
@@ -34,9 +34,9 @@
     "desktop/data/codex-store/parse.cjs": "a162fdb8f56d80426aba33be80bbb96ae52a224b7427d642c350fadc48ada420",
     "desktop/data/codex-store/cache.cjs": "a62e0549e3bd62c758af36faef100f0369f8be80025237d5472263fbb7341195",
     "desktop/data/codex-store/scan.cjs": "d8cdecb902c5bf1460c5e34dd8765e1511f39da79ec14f0b57e49bf5f15c17f7",
-    "desktop/data/codex-store/aggregate.cjs": "6a2c41384cabbfa509b0947b758d8efc7065a89d053ced62a2b60fde0a262ea7",
+    "desktop/data/codex-store/aggregate.cjs": "8dfd70517666c8046e0c03cc0b17ba8f19df245116251bb9b85aef7e92a65cff",
     "desktop/data/codex-store/builder.cjs": "b8e50aa69d30318f4abe31d258bf572db1048de2c111e6a4163f572a3dc59e28",
     "README.md": "c9f2ebc76dd9c1dfff16be2035a4ca7e38c533baa0b32eb45da38d194638eb1f",
-    "CHANGELOG.md": "eae6d17258f03150dc18a7db069e534f88cdd551d22e54dd2f9de7592b589a51"
+    "CHANGELOG.md": "db16894e36ed1f44721b25362a3cc9fd61a0158c64e360455b5639655f69631e"
   }
 }

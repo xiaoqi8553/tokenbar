@@ -16,15 +16,16 @@
   /** 用户是否显式选过「月之亮面 / 月之暗面」；选过就以用户选择为准 */
   let themeExplicit = localStorage.getItem("codex.theme") === "light" || localStorage.getItem("codex.theme") === "dark";
 
-  const SOURCES = ["codex", "workbuddy", "antigravity"];
+  const AGENT_SOURCES = ["codex", "antigravity", "workbuddy"];
+  const SOURCES = ["overview", ...AGENT_SOURCES];
   const savedSource = localStorage.getItem("codex.source");
 
   const state = {
     /** 当前展示的数据源明细（等于 data[source]） */
     detail: null,
-    /** 三个数据源各自缓存一份，切换时不用重新扫描 */
-    data: { codex: null, workbuddy: null, antigravity: null },
-    source: SOURCES.includes(savedSource) ? savedSource : "codex",
+    /** 三个数据源各自缓存一份，外加合并后的总览 */
+    data: { overview: null, codex: null, workbuddy: null, antigravity: null },
+    source: SOURCES.includes(savedSource) ? savedSource : "overview",
     status: null,
     meta: null,
     range: Number(localStorage.getItem("codex.range") || 14) || 14,

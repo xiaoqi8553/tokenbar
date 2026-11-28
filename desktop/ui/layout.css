@@ -83,8 +83,12 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 224px;
+    flex: none;
     min-width: 0;
   }
+
+  .brand > div:last-child { min-width: 0; flex: 1; }
 
   .brand-mark {
     width: 30px;
@@ -99,8 +103,15 @@
     flex: none;
   }
 
-  .brand-title { font-size: 17px; font-weight: 640; letter-spacing: -.3px; }
-  .brand-sub { font-size: 13.5px; color: var(--text-3); }
+  .brand-title { font-size: 17px; font-weight: 640; letter-spacing: -.3px; white-space: nowrap; }
+  .brand-sub {
+    font-size: 13px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
 
   .spacer { flex: 1; }
 
@@ -127,8 +138,15 @@
     gap: 5px;
     transition: background .16s ease, color .16s ease;
   }
-  .range.source button svg { opacity: .72; flex: none; }
+  .range.source button {
+    min-width: 88px;
+    justify-content: center;
+  }
+  .range.source button svg { opacity: .78; flex: none; }
   .range.source button[aria-pressed="true"] svg { opacity: 1; color: var(--accent); }
+  .range.source button[data-source="codex"][aria-pressed="true"] svg { color: #10a37f; }
+  .range.source button[data-source="antigravity"][aria-pressed="true"] svg { color: #4285f4; }
+  .range.source button[data-source="workbuddy"][aria-pressed="true"] svg { color: #01c886; }
 
   .range button:hover { color: var(--text); }
   .range button[aria-pressed="true"] {
@@ -778,6 +796,46 @@
 
   .bar-detail b { color: var(--text-2); font-weight: 560; }
   .bar-detail[hidden] { display: none; }
+
+  .proj-models {
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .proj-model-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(56px, .9fr) auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .proj-model-name {
+    color: var(--text-2);
+    font-weight: 540;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .proj-model-bar {
+    height: 5px;
+    border-radius: 3px;
+    background: var(--line-soft);
+    overflow: hidden;
+  }
+  .proj-model-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--accent-3)));
+  }
+  .proj-model-stat {
+    color: var(--text-3);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
 
   .empty {
     color: var(--text-3);

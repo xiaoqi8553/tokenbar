@@ -251,7 +251,7 @@ async function main() {
     assert.ok(info.hasSignModal, "完整看板应该有科研通签到面板");
     assert.ok(info.signApi, "看板 preload 应暴露签到 API");
     assert.match(info.title, /TokenBar/);
-    assert.deepEqual(info.sources.sort(), ["antigravity", "codex", "workbuddy"]);
+    assert.deepEqual(info.sources.sort(), ["antigravity", "codex", "overview", "workbuddy"]);
     assert.deepEqual(info.ranges.sort(), ["0", "14", "30", "7"]);
     assert.deepEqual(info.hourMetrics.sort(), ["speed", "tokens"]);
     assert.notEqual(info.hourBadge.trim(), "—", "时段徽标应该已经有数据");
