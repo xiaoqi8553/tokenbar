@@ -2795,7 +2795,7 @@
 
     const totals = { ...blankBucket(), sessions: 0, cost: 0 };
     const cost = { cny: 0, usd: 0, todayCny: 0, estimatedTokens: 0, rate: 7.25 };
-    const pricing = {};
+    const pricing = { models: {}, fallback: null };
     const dayMap = new Map();
     const modelDays = {};
     const projectDays = {};
@@ -2821,7 +2821,10 @@
         cost.estimatedTokens += detail.cost.estimatedTokens || 0;
         if (detail.cost.rate) cost.rate = detail.cost.rate;
       }
-      if (detail.pricing) Object.assign(pricing, detail.pricing);
+      if (detail.pricing) {
+        if (detail.pricing.models) Object.assign(pricing.models, detail.pricing.models);
+        if (detail.pricing.fallback && !pricing.fallback) pricing.fallback = detail.pricing.fallback;
+      }
       sourceBreakdown[key] = {
         totalTokens: t.totalTokens || 0,
         todayTokens: detail.today ? (detail.today.totalTokens || 0) : 0,

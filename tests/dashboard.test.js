@@ -316,4 +316,5 @@ test("4.0 左侧边栏工作台、高对比三色与直达完整看板", () => {
   assert.match(dashboard, /#f59e0b/);
   assert.match(dashboard, /#10b981/);
   assert.match(read("desktop/core/tray.cjs"), /toggleWindow/);
+  assert.match(dashboard, /Object\.assign\(pricing\.models,\s*detail\.pricing\.models\)/);
 });

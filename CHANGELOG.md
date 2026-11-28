@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format base
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-11-28
+
+### Fixed
+
+- **修复「总览」区间花费偏低的问题**：`buildOverviewDetail()` 合并多数据源单价表时，原先 `Object.assign(pricing, detail.pricing)` 会用后加载数据源的 `pricing.models` 整包覆盖先加载的数据源，导致 Codex 等模型退回兜底单价；现已改为深度合并 `pricing.models`，使「总览」区间花费、模型花费与各平台合计完全一致。
+
 ## [4.0.0] - 2026-11-28
 
 **V4.0 架构级重塑：左侧边栏工作台 + 托盘直达完整看板 + 高对比度三色视觉体系**。

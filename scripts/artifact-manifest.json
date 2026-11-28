@@ -2,11 +2,11 @@
   "version": 3,
   "target": "source",
   "files": {
-    "package.json": "4513e27adf38ac74908c5c31bd468c733e126537a63d7774588aa65ccc457c51",
+    "package.json": "86c5b92cdbedf0502ea2221fd4cbc7e3267f26db0e79f1e7e9ed6e015ef9a236",
     "desktop/main.cjs": "b402e24fee85419da07aa04b34e34fea35ca676e8c78e83e28b0cafe5e6c11b7",
     "desktop/preload.cjs": "6f299218b5b138c1274e7c61bfdd6ef5ae9bc45311cd7e637021fcb5775dcefb",
     "desktop/popover.html": "a09242b959ab53375c0a2cfbb0b48ac05618003d0845e82ab6ed8940b5e6ca72",
-    "desktop/dashboard.html": "6ec1626214d015f0844bc755ceb683103c821a23cd4bd81f9c9842b1c37b7841",
+    "desktop/dashboard.html": "f4a8177b95559fbd5785cd5acf1b78fbe9bcfd2d3a0503a28b300170752d2399",
     "desktop/dashboard-preload.cjs": "927c2fc6f5e969491adfaef71a0272f0d48bdac1aa922aa349b24d2804d60bc8",
     "desktop/icon.png": "96383a786495439e534d2f1e049d2d7ee5ae178ee07698ac29af57b28483e845",
     "desktop/data/ablesci-store.cjs": "e7e233faabece4e69367ed368df6fb2d8088ff1881c721a119a6da48221f79e1",
@@ -37,6 +37,6 @@
     "desktop/data/codex-store/aggregate.cjs": "8dfd70517666c8046e0c03cc0b17ba8f19df245116251bb9b85aef7e92a65cff",
     "desktop/data/codex-store/builder.cjs": "b8e50aa69d30318f4abe31d258bf572db1048de2c111e6a4163f572a3dc59e28",
     "README.md": "c9f2ebc76dd9c1dfff16be2035a4ca7e38c533baa0b32eb45da38d194638eb1f",
-    "CHANGELOG.md": "aa302a4c7c187865efe3cc453415c615affa42949ca92c37825e5346c5322917"
+    "CHANGELOG.md": "8f0ba1ab8462dee48bcaef839638c004e98757c77d99ad967263850ef976f947"
   }
 }
