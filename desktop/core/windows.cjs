@@ -159,6 +159,14 @@ async function showWindow(ctx) {
   win.focus();
 }
 
+async function toggleWindow(ctx) {
+  if (ctx.mainWindow && !ctx.mainWindow.isDestroyed() && ctx.mainWindow.isVisible() && ctx.mainWindow.isFocused()) {
+    ctx.mainWindow.hide();
+    return;
+  }
+  await showWindow(ctx);
+}
+
 function installWindows(ctx) {
   ctx.loadingPage = loadingPage;
   ctx.createWindow = createWindow;
@@ -168,10 +176,11 @@ function installWindows(ctx) {
   ctx.hidePopover = hidePopover;
   ctx.togglePopover = togglePopover;
   ctx.showWindow = showWindow;
+  ctx.toggleWindow = toggleWindow;
   return ctx;
 }
 
 module.exports = {
   installWindows, loadingPage, createWindow, createPopover, popoverPosition,
-  showPopover, hidePopover, togglePopover, showWindow
+  showPopover, hidePopover, togglePopover, showWindow, toggleWindow
 };

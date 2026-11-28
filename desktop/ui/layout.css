@@ -58,7 +58,8 @@
   .app {
     height: 100%;
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 236px minmax(0, 1fr);
+    overflow: hidden;
     background:
       radial-gradient(880px 260px at 8% -4%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
       radial-gradient(640px 220px at 92% 0%, color-mix(in srgb, var(--c-output) 5%, transparent), transparent 72%);
@@ -66,11 +67,133 @@
 
   .app[hidden] { display: none; }
 
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 14px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+
+  .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-group button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 540;
+    cursor: pointer;
+    text-align: left;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .nav-group button:hover {
+    background: var(--panel-soft);
+    color: var(--text);
+  }
+  .nav-group button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+    color: var(--text);
+    font-weight: 620;
+  }
+  .nav-group button[data-source="codex"][aria-pressed="true"] svg { color: #6366f1; }
+  .nav-group button[data-source="antigravity"][aria-pressed="true"] svg { color: #f59e0b; }
+  .nav-group button[data-source="workbuddy"][aria-pressed="true"] svg { color: #10b981; }
+  .nav-group button[data-source="overview"][aria-pressed="true"] svg { color: var(--accent); }
+  .nav-label { flex: 1; min-width: 0; }
+  .nav-pill {
+    font-size: 11.5px;
+    color: var(--text-3);
+    background: var(--line-soft);
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sidebar-quotas {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 11px;
+    border-radius: 11px;
+    background: var(--panel-soft);
+    border: 1px solid var(--line-soft);
+  }
+  .sidebar-quotas:empty { display: none; }
+  .sq-row { display: flex; flex-direction: column; gap: 4px; }
+  .sq-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-2);
+    font-weight: 560;
+  }
+  .sq-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .sq-bar {
+    height: 5px;
+    border-radius: 99px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .sq-bar i { display: block; height: 100%; border-radius: 99px; }
+
+  .sidebar-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .side-btn {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel-soft);
+    color: var(--text-2);
+    font: 540 13px/1 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    cursor: pointer;
+    position: relative;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .side-btn:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 36%, var(--line)); }
+  .side-btn svg { color: var(--accent); flex: none; }
+  .sidebar-foot .range.theme { width: 100%; }
+  .sidebar-foot .range.theme button { flex: 1; justify-content: center; }
+
+  .workspace {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .top-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .top-title { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.2px; }
+
   .topbar {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px 18px;
+    padding: 12px 20px;
     background: var(--glass);
     border-bottom: 1px solid var(--line);
     backdrop-filter: saturate(160%) blur(16px);
@@ -1023,9 +1146,10 @@
   }
 
   /* 窄窗口把「时长」收起来，别把项目名挤成几个点 */
-  @media (max-width: 1000px) {
+  @media (max-width: 1260px) {
     .col-duration { display: none; }
   }
+  #session-table { min-width: 860px; }
 
   @media (max-width: 860px) {
     .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -181,7 +181,6 @@ function updateTray(ctx) {
     : ctx.startupError || "TokenBar · 正在读取用量";
   ctx.tray.setToolTip(tooltip.slice(0, 127));
   ctx.trayMenu = ctx.Menu.buildFromTemplate([
-    { label: "打开用量速览", click: () => { ctx.showPopover(ctx); } },
     { label: "打开完整看板", click: () => { ctx.showWindow(ctx); } },
     { type: "separator" },
     { label: quota && quota.session ? `会话额度：${Math.round(quota.session.usedPercent)}% 已用` : "会话额度：暂无数据", enabled: false },
@@ -230,8 +229,8 @@ function updateTray(ctx) {
 function createTray(ctx) {
   const image = ctx.nativeImage.createFromPath(ctx.path.join(ctx.DESKTOP_DIR, "icon.png")).resize({ width: 32, height: 32 });
   ctx.tray = new ctx.Tray(image);
-  ctx.tray.setToolTip(`${ctx.PRODUCT_NAME} · 点击查看用量速览`);
-  ctx.tray.on("click", () => ctx.togglePopover(ctx));
+  ctx.tray.setToolTip(`${ctx.PRODUCT_NAME} · 点击打开看板`);
+  ctx.tray.on("click", () => ctx.toggleWindow(ctx));
   ctx.tray.on("double-click", () => { ctx.showWindow(ctx); });
   ctx.tray.on("right-click", () => {
     if (ctx.trayMenu) ctx.tray.popUpContextMenu(ctx.trayMenu);

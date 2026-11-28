@@ -308,3 +308,12 @@ test("3.5 视觉与交互大升级：Sparklines / 多Agent条 / Donut / 趋势�
   assert.match(dashboard, /data-metric="heatmap"/);
   assert.match(dashboard, /id="session-search"/);
 });
+
+test("4.0 左侧边栏工作台、高对比三色与直达完整看板", () => {
+  assert.match(dashboard, /class="sidebar"/);
+  assert.match(dashboard, /id="sidebar-quotas"/);
+  assert.match(dashboard, /#6366f1/);
+  assert.match(dashboard, /#f59e0b/);
+  assert.match(dashboard, /#10b981/);
+  assert.match(read("desktop/core/tray.cjs"), /toggleWindow/);
+});

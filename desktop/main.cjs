@@ -67,7 +67,7 @@ const ctx = {
   startupError: "",
   statusTimer: null,
   smokeExitTimer: null,
-  preferences: { launchAtLogin: false, startMode: "popover", popoverOnly: true },
+  preferences: { launchAtLogin: false, startMode: "dashboard", popoverOnly: false },
   store: null,
   wbStore: null,
   agyStore: null,
@@ -184,8 +184,7 @@ async function start(ctx) {
   ctx.createPopover(ctx);
   ctx.log(ctx, "creating tray");
   ctx.createTray(ctx);
-  // 完整看板窗口延后创建：弹窗是主入口，不需要先起一个大窗口
-  if (ctx.preferences.startMode === "dashboard" && !ctx.SMOKE) ctx.createWindow(ctx);
+  if (!ctx.SMOKE) ctx.createWindow(ctx);
 
   ctx.initStore(ctx, paths, ctx.resolveBaseline(ctx, paths)).catch(error => {
     ctx.log(ctx, `initStore failed: ${error.stack || error.message}`);
@@ -194,7 +193,7 @@ async function start(ctx) {
     ctx.pushStatusToPopover(ctx);
   });
 
-  if (ctx.preferences.startMode === "dashboard" && !ctx.SMOKE) {
+  if (!ctx.SMOKE) {
     ctx.showWindow(ctx).catch(() => {});
   } else {
     ctx.showPopover(ctx);
