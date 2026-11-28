@@ -42,6 +42,9 @@
     openSession: null,
     /** 两张分布卡各自点开的行名（切区间 / 刷新后仍保持展开） */
     openBars: { models: null, projects: null },
+    chartType: localStorage.getItem("codex.chartType") === "bar" ? "bar" : "area",
+    chartMetric: localStorage.getItem("codex.chartMetric") === "cost" ? "cost" : "tokens",
+    sessionQuery: "",
     hover: -1
   };
 

@@ -253,7 +253,7 @@ async function main() {
     assert.match(info.title, /TokenBar/);
     assert.deepEqual(info.sources.sort(), ["antigravity", "codex", "overview", "workbuddy"]);
     assert.deepEqual(info.ranges.sort(), ["0", "14", "30", "7"]);
-    assert.deepEqual(info.hourMetrics.sort(), ["speed", "tokens"]);
+    assert.deepEqual(info.hourMetrics.sort(), ["heatmap", "speed", "tokens"]);
     assert.notEqual(info.hourBadge.trim(), "—", "时段徽标应该已经有数据");
     assert.match(info.bodyText, /等价花费/);
     assert.equal(info.legacyButton, false, "旧版网页看板按钮应该已经删除");

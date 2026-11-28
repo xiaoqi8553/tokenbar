@@ -27,8 +27,11 @@
     --ok: #1f9d63;
     --danger: #d9534f;
     --shadow: 0 1px 2px rgba(19, 24, 40, .04), 0 8px 24px rgba(19, 24, 40, .05);
-    --shadow-hover: 0 2px 6px rgba(19, 24, 40, .06), 0 12px 28px rgba(63, 110, 240, .09);
-    --radius: 14px;
+    --shadow-hover: 0 4px 12px rgba(19, 24, 40, .06), 0 16px 32px rgba(63, 110, 240, .12);
+    --ambient: radial-gradient(900px 340px at 16% -6%, rgba(63, 110, 240, .10), transparent 70%),
+               radial-gradient(760px 300px at 84% -8%, rgba(16, 163, 127, .08), transparent 68%);
+    --glass: rgba(255, 255, 255, .82);
+    --radius: 15px;
   }
 
   html[data-theme="dark"] {
@@ -52,7 +55,10 @@
     --ok: #38b57e;
     --danger: #e06c68;
     --shadow: 0 1px 2px rgba(0, 0, 0, .34), 0 12px 34px rgba(0, 0, 0, .38);
-    --shadow-hover: 0 2px 8px rgba(0, 0, 0, .4), 0 14px 36px rgba(91, 132, 255, .14);
+    --shadow-hover: 0 4px 14px rgba(0, 0, 0, .45), 0 18px 40px rgba(91, 132, 255, .18);
+    --ambient: radial-gradient(920px 360px at 18% -6%, rgba(91, 132, 255, .14), transparent 72%),
+               radial-gradient(760px 320px at 84% -8%, rgba(16, 163, 127, .10), transparent 70%);
+    --glass: rgba(24, 25, 32, .82);
   }
 
   * { box-sizing: border-box; }
@@ -64,7 +70,8 @@
   }
 
   body {
-    background: var(--bg);
+    background: var(--ambient), var(--bg);
+    background-attachment: fixed;
     color: var(--text);
     font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Microsoft YaHei UI", sans-serif;
     font-variant-numeric: tabular-nums;
@@ -154,9 +161,9 @@
     align-items: center;
     gap: 12px;
     padding: 13px 18px;
-    background: color-mix(in srgb, var(--panel) 82%, transparent);
+    background: var(--glass);
     border-bottom: 1px solid var(--line);
-    backdrop-filter: saturate(140%) blur(10px);
+    backdrop-filter: saturate(160%) blur(16px);
     -webkit-app-region: drag;
   }
 
@@ -491,6 +498,13 @@
     padding: 13px 14px;
     display: flex;
     flex-direction: column;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  }
     gap: 7px;
     min-width: 0;
     /* 两个数据源的提示行数不同，固定下限保证切换时卡片不忽高忽低 */
@@ -1107,6 +1121,234 @@
   @media (max-width: 620px) {
     .stat-row { grid-template-columns: 1fr; }
   }
+
+  /* ---------------- V3.5 视觉增强：Sparkline / 多Agent条 / Donut / 热力图 / 搜索 ---------------- */
+
+  .stat-spark {
+    width: 60px;
+    height: 28px;
+    flex: none;
+    overflow: visible;
+  }
+
+  .agent-strip {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .agent-bar {
+    height: 10px;
+    border-radius: 99px;
+    background: var(--line-soft);
+    overflow: hidden;
+    display: flex;
+    gap: 2px;
+  }
+  .agent-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    transition: opacity .18s ease, filter .18s ease;
+    cursor: pointer;
+  }
+  .agent-bar > i.is-dim { opacity: .35; }
+  .agent-chips {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .agent-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    background: var(--panel-soft);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+  }
+  .agent-chip:hover {
+    border-color: color-mix(in srgb, var(--agent-color, var(--accent)) 45%, var(--line));
+    background: color-mix(in srgb, var(--agent-color, var(--accent)) 6%, var(--panel));
+    transform: translateY(-1px);
+  }
+  .agent-chip-ico {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    background: color-mix(in srgb, var(--agent-color, var(--accent)) 14%, transparent);
+    color: var(--agent-color, var(--accent));
+  }
+  .agent-chip-meta { min-width: 0; flex: 1; }
+  .agent-chip-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .agent-chip-sub {
+    font-size: 12px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chart-tools, .session-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    height: 28px;
+    width: 170px;
+    padding: 0 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--panel-soft);
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color .16s ease, width .18s ease;
+  }
+  .search-input:focus {
+    border-color: var(--accent);
+    width: 210px;
+  }
+  .search-input::placeholder { color: var(--text-3); }
+
+  .donut-box {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    padding: 8px 10px 12px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .donut-box:empty { display: none; }
+  .donut-svg { width: 108px; height: 108px; display: block; }
+  .donut-slice {
+    cursor: pointer;
+    transition: opacity .16s ease, stroke-width .16s ease;
+  }
+  .donut-slice.is-dim { opacity: .35; }
+  .donut-center-num {
+    fill: var(--text);
+    font-size: 16px;
+    font-weight: 680;
+  }
+  .donut-center-sub {
+    fill: var(--text-3);
+    font-size: 10.5px;
+  }
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .donut-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: background .14s ease;
+  }
+  .donut-item:hover { background: var(--panel-soft); color: var(--text); }
+  .donut-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .donut-name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .donut-pct {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bar-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+
+  .heatmap-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
+    padding: 4px 2px;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 13px);
+    grid-auto-columns: 13px;
+    gap: 3px;
+  }
+  .hm-cell {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    background: var(--line-soft);
+    transition: transform .12s ease, outline .12s ease;
+  }
+  .hm-cell:hover {
+    transform: scale(1.22);
+    outline: 1.5px solid var(--accent);
+    z-index: 2;
+  }
+  .hm-cell[data-lv="1"] { background: color-mix(in srgb, var(--accent) 24%, var(--line-soft)); }
+  .hm-cell[data-lv="2"] { background: color-mix(in srgb, var(--accent) 46%, var(--line-soft)); }
+  .hm-cell[data-lv="3"] { background: color-mix(in srgb, var(--accent) 72%, var(--line-soft)); }
+  .hm-cell[data-lv="4"] { background: var(--accent); }
+  .heatmap-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .heatmap-scale {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .heatmap-scale .hm-cell { width: 10px; height: 10px; }
 </style>
 </head>
 <body>
@@ -1177,6 +1419,7 @@
 
   <main>
     <section class="stat-row" id="stat-row"></section>
+    <section class="agent-strip" id="agent-strip" hidden></section>
 
     <section class="card">
       <div class="card-head">
@@ -1184,7 +1427,17 @@
           <h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5 5.5 8.5 8.5 10.2 13.8 4"/><path d="M11 4h2.8v2.8"/></svg>用量趋势</h2>
           <p class="sub" id="chart-sub">—</p>
         </div>
-        <span class="badge" id="chart-badge">—</span>
+        <div class="chart-tools">
+          <div class="range mini" id="chart-type" role="group" aria-label="图表形态">
+            <button type="button" data-type="area" aria-pressed="true">曲线</button>
+            <button type="button" data-type="bar" aria-pressed="false">柱状</button>
+          </div>
+          <div class="range mini" id="chart-metric" role="group" aria-label="趋势指标">
+            <button type="button" data-metric="tokens" aria-pressed="true">用量</button>
+            <button type="button" data-metric="cost" aria-pressed="false">花费</button>
+          </div>
+          <span class="badge" id="chart-badge">—</span>
+        </div>
       </div>
       <div class="summary" id="chart-summary"></div>
       <div class="chart-wrap" tabindex="0" role="group" aria-label="每日 token 用量趋势图">
@@ -1202,6 +1455,7 @@
           <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4" rx="1.2"/><rect x="2" y="9.5" width="12" height="4" rx="1.2"/><circle cx="4.5" cy="4.5" r=".7" fill="currentColor"/><circle cx="4.5" cy="11.5" r=".7" fill="currentColor"/></svg>模型分布</h2></div>
           <span class="badge" id="model-badge">—</span>
         </div>
+        <div class="donut-box" id="model-donut"></div>
         <div class="bars" id="models"></div>
       </section>
       <section class="card">
@@ -1209,6 +1463,7 @@
           <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5a1.5 1.5 0 0 1 1.5-1.5H6l1.4 1.5h5.1A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5Z"/></svg>项目分布</h2></div>
           <span class="badge" id="project-badge">—</span>
         </div>
+        <div class="donut-box" id="project-donut"></div>
         <div class="bars" id="projects"></div>
       </section>
     </div>
@@ -1221,6 +1476,7 @@
           <div class="range mini" id="hour-tabs" role="group" aria-label="时段指标">
             <button type="button" data-metric="tokens" aria-pressed="true">用量</button>
             <button type="button" data-metric="speed" aria-pressed="false">速度</button>
+            <button type="button" data-metric="heatmap" aria-pressed="false">热力图</button>
           </div>
         </div>
       </div>
@@ -1230,11 +1486,14 @@
     <section class="card">
       <div class="card-head">
         <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6.5"/></svg>会话记录</h2></div>
-        <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
-          <button type="button" data-view="sessions" aria-pressed="true">会话</button>
-          <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+        <div class="session-tools">
+          <input class="search-input" id="session-search" type="search" placeholder="筛选项目 / 模型…" aria-label="筛选会话">
+          <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
+            <button type="button" data-view="sessions" aria-pressed="true">会话</button>
+            <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+          </div>
+          <span class="badge" id="session-badge">—</span>
         </div>
-        <span class="badge" id="session-badge">—</span>
       </div>
       <div class="table-wrap">
         <table id="session-table">
@@ -1396,6 +1655,9 @@
     openSession: null,
     /** 两张分布卡各自点开的行名（切区间 / 刷新后仍保持展开） */
     openBars: { models: null, projects: null },
+    chartType: localStorage.getItem("codex.chartType") === "bar" ? "bar" : "area",
+    chartMetric: localStorage.getItem("codex.chartMetric") === "cost" ? "cost" : "tokens",
+    sessionQuery: "",
     hover: -1
   };
 
@@ -1912,6 +2174,39 @@
       '</div>';
   }
 
+  function svgSparkline(values, color, uid) {
+    const list = (values || []).map(v => Math.max(0, Number(v) || 0));
+    if (list.length < 2 || list.every(v => v === 0)) return "";
+    const w = 60, h = 28, pad = 3;
+    const max = Math.max.apply(null, list) || 1;
+    const min = Math.min.apply(null, list);
+    const span = max - min || max || 1;
+    const pts = list.map((v, i) => ({
+      x: (i / (list.length - 1)) * (w - pad * 2) + pad,
+      y: h - pad - ((v - min) / span) * (h - pad * 2)
+    }));
+    const d = pts.map((p, i) => (i === 0 ? "M " : "L ") + p.x.toFixed(1) + " " + p.y.toFixed(1)).join(" ");
+    const area = d + " L " + pts[pts.length - 1].x.toFixed(1) + " " + (h - 1) + " L " + pts[0].x.toFixed(1) + " " + (h - 1) + " Z";
+    const last = pts[pts.length - 1];
+    const gid = "sp-" + uid;
+    return '<svg class="stat-spark" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">' +
+      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.34"/>' +
+      '<stop offset="100%" stop-color="' + color + '" stop-opacity="0.02"/>' +
+      '</linearGradient></defs>' +
+      '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="2.2" fill="' + color + '"/>' +
+      '</svg>';
+  }
+
+  function recentSeriesValues(pick) {
+    const detail = state.detail;
+    const s = detail && detail.series;
+    if (!s || !s.length) return [];
+    return s.slice(-14).map(pick);
+  }
+
   function quotaCard(title, fallbackWindow, quotaWindow) {
     const windowLabel = quotaWindow && quotaWindow.windowMinutes
       ? (quotaWindow.windowMinutes >= 1440
@@ -2030,6 +2325,7 @@
       window: days + " 天",
       num: fmtTokens(totals.totalTokens),
       unit: "tokens",
+      rightHtml: svgSparkline(recentSeriesValues(d => d.totalTokens), "var(--accent)", "total"),
       seg: segBarHtml(totals.inputTokens, totals.cachedInputTokens, totals.outputTokens),
       hideMeter: true,
       foot: "<b>" + fmtCount(totals.sessions) + "</b> 会话 · <b>" + fmtCount(totals.records) + "</b> 请求",
@@ -2061,12 +2357,17 @@
     const ttft = (todaySpeed && todaySpeed.ttftMs) || (speed && speed.ttftMs) || null;
     if (ttft) hints.push("首字 " + fmtSpeed(ttft));
 
+    const speedVals = speed && detail.series
+      ? detail.series.slice(-14).map(d => (speed.days[d.day] && speed.days[d.day].tps) || 0)
+      : [];
+
     return {
       icon: "speed",
       label: "输出速度",
       window: "整轮",
       num: todaySpeed ? todaySpeed.tps.toFixed(1) : "—",
       unit: todaySpeed ? "tok/s" : "",
+      rightHtml: svgSparkline(speedVals, "var(--ok)", "speed"),
       hideMeter: true,
       foot: todaySpeed
         ? "<b>" + fmtCount(todaySpeed.turns) + "</b> 轮"
@@ -2102,6 +2403,7 @@
       num: fmtMoney(cost.cny),
       money: true,
       unit: "",
+      rightHtml: svgSparkline(recentSeriesValues(d => d.cost || 0), "var(--c-output)", "cost"),
       hideMeter: true,
       title: "USD 刊例价折算" +
         (estimatedShare >= 0.005 ? " · 含 " + fmtPercent(estimatedShare * 100, 1) + " 估算" : ""),
@@ -2522,6 +2824,59 @@
     ];
   }
 
+  function renderAgentStrip() {
+    const el = $("agent-strip");
+    if (!el) return;
+    if (state.source !== "overview" || !state.detail || !state.detail.sourceBreakdown) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    const sb = state.detail.sourceBreakdown;
+    const total = Math.max(1, (state.detail.totals && state.detail.totals.totalTokens) || 0);
+    const agents = [
+      {
+        key: "codex",
+        name: "Codex",
+        color: "#10a37f",
+        ico: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M21.55 10.004a5.416 5.416 0 00-.478-4.501c-1.217-2.09-3.662-3.166-6.05-2.66A5.59 5.59 0 0010.831 1C8.39.995 6.224 2.546 5.473 4.838A5.553 5.553 0 001.76 7.496a5.487 5.487 0 00.691 6.5 5.416 5.416 0 00.477 4.502c1.217 2.09 3.662 3.165 6.05 2.66A5.586 5.586 0 0013.168 23c2.443.006 4.61-1.546 5.361-3.84a5.553 5.553 0 003.715-2.66 5.488 5.488 0 00-.693-6.497v.001zm-8.381 11.558a4.199 4.199 0 01-2.675-.954c.034-.018.093-.05.132-.074l4.44-2.53a.71.71 0 00.364-.623v-6.176l1.877 1.069c.02.01.033.029.036.05v5.115c-.003 2.274-1.87 4.118-4.174 4.123zM4.192 17.78a4.059 4.059 0 01-.498-2.763c.032.02.09.055.131.078l4.44 2.53c.225.13.504.13.73 0l5.42-3.088v2.138a.068.068 0 01-.027.057L9.9 19.288c-1.999 1.136-4.552.46-5.707-1.51h-.001zM3.023 8.216A4.15 4.15 0 015.198 6.41l-.002.151v5.06a.711.711 0 00.364.624l5.42 3.087-1.876 1.07a.067.067 0 01-.063.005l-4.489-2.559c-1.995-1.14-2.679-3.658-1.53-5.63h.001zm15.417 3.54l-5.42-3.088L14.896 7.6a.067.067 0 01.063-.006l4.489 2.557c1.998 1.14 2.683 3.662 1.529 5.633a4.163 4.163 0 01-2.174 1.807V12.38a.71.71 0 00-.363-.623zm1.867-2.773a6.04 6.04 0 00-.132-.078l-4.44-2.53a.731.731 0 00-.729 0l-5.42 3.088V7.325a.068.068 0 01.027-.057L14.1 4.713c2-1.137 4.555-.46 5.707 1.513.487.833.664 1.809.499 2.757h.001zm-11.741 3.81l-1.877-1.068a.065.065 0 01-.036-.051V6.559c.001-2.277 1.873-4.122 4.181-4.12.976 0 1.92.338 2.671.954-.034.018-.092.05-.131.073l-4.44 2.53a.71.71 0 00-.365.623l-.003 6.173v.002zm1.02-2.168L12 9.25l2.414 1.375v2.75L12 14.75l-2.415-1.375v-2.75z"/></svg>'
+      },
+      {
+        key: "antigravity",
+        name: "Antigravity",
+        color: "#4285f4",
+        ico: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M21.751 22.607c1.34 1.005 3.35.335 1.508-1.508C17.73 15.74 18.904 1 12.037 1 5.17 1 6.342 15.74.815 21.1c-2.01 2.009.167 2.511 1.507 1.506 5.192-3.517 4.857-9.714 9.715-9.714 4.857 0 4.522 6.197 9.714 9.715z"/></svg>'
+      },
+      {
+        key: "workbuddy",
+        name: "WorkBuddy",
+        color: "#01c886",
+        ico: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="2.2" y="2.2" width="19.6" height="19.6" rx="5.5" stroke="currentColor" stroke-width="2"/><path d="M6.4 8.2l2.3 7.6 3.3-5.2 3.3 5.2 2.3-7.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      }
+    ];
+    const barHtml = agents.map(a => {
+      const info = sb[a.key] || { totalTokens: 0 };
+      const pct = (info.totalTokens / total) * 100;
+      if (pct <= 0) return "";
+      return '<i data-jump="' + a.key + '" style="width:' + Math.max(1.5, pct).toFixed(2) + '%;background:' + a.color + '" title="' + a.name + ' · ' + fmtPercent(pct, 1) + '"></i>';
+    }).join("");
+    const chipsHtml = agents.map(a => {
+      const info = sb[a.key] || { totalTokens: 0, todayTokens: 0, costCny: 0, sessions: 0 };
+      const pct = (info.totalTokens / total) * 100;
+      return [
+        '<button type="button" class="agent-chip" data-jump="' + a.key + '" style="--agent-color:' + a.color + '">',
+        '  <span class="agent-chip-ico">' + a.ico + '</span>',
+        '  <span class="agent-chip-meta">',
+        '    <span class="agent-chip-name"><span>' + a.name + '</span><span>' + fmtPercent(pct, 1) + '</span></span>',
+        '    <span class="agent-chip-sub">' + fmtTokens(info.totalTokens) + ' · ' + fmtMoney(info.costCny) + ' · ' + fmtCount(info.sessions) + ' 会话</span>',
+        '  </span>',
+        '</button>'
+      ].join("");
+    }).join("");
+    el.innerHTML = '<div class="agent-bar">' + barHtml + '</div><div class="agent-chips">' + chipsHtml + '</div>';
+    el.hidden = false;
+  }
+
   function renderStats() {
     const detail = state.detail;
     if (!detail && (state.source === "overview" || state.source === "workbuddy" || state.source === "antigravity")) return;
@@ -2644,19 +2999,24 @@
       return;
     }
 
+    const isCost = state.chartMetric === "cost";
+    const isBar = state.chartType === "bar";
+    const valOf = item => isCost ? (item.cost || 0) : item.totalTokens;
+    const fmtVal = v => isCost ? fmtMoney(v) : fmtTokens(v);
+
     let max = 0;
-    for (const item of series) max = Math.max(max, item.totalTokens);
+    for (const item of series) max = Math.max(max, valOf(item));
 
     // 纵轴不跟着单日尖峰走：拿 p95 / 中位数撑出一个「日常看得见」的上限。
     // 极个别超出上限的日子贴顶画，并打上尖角标记，真实值仍在 tooltip 和副标题里。
-    const positives = series.map(item => item.totalTokens).filter(value => value > 0).sort((a, b) => a - b);
+    const positives = series.map(valOf).filter(value => value > 0).sort((a, b) => a - b);
     const percentile = q => positives.length
       ? positives[Math.min(positives.length - 1, Math.floor(q * (positives.length - 1)))]
       : 0;
     const hardCeiling = niceCeil(max * 1.06 || 1);
     const softCeiling = niceCeil(Math.max(percentile(0.95) * 1.8, percentile(0.5) * 4) || 1);
     const ceiling = Math.min(hardCeiling, softCeiling);
-    const clipped = series.filter(item => item.totalTokens > ceiling);
+    const clipped = series.filter(item => valOf(item) > ceiling);
     const activeCount = series.filter(item => item.totalTokens > 0).length;
     const blankCount = series.length - activeCount;
 
@@ -2673,10 +3033,10 @@
       if (i > 0 && i < 4) {
         parts.push('<line class="grid-line" x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (padL + innerW) + '" y2="' + y.toFixed(1) + '"/>');
       }
-      parts.push('<text class="axis-text" x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtTokens((ceiling * i) / 4) + '</text>');
+      parts.push('<text class="axis-text" x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtVal((ceiling * i) / 4) + '</text>');
     }
 
-    const points = series.map((item, index) => ({ x: xAt(index), y: yAt(item.totalTokens) }));
+    const points = series.map((item, index) => ({ x: xAt(index), y: yAt(valOf(item)) }));
     const line = smoothPath(points, padT, bottom);
     const area = line +
       " L " + points[points.length - 1].x.toFixed(1) + " " + bottom.toFixed(1) +
@@ -2684,14 +3044,44 @@
 
     parts.push('<defs>');
     parts.push('<linearGradient id="g-area" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.32"/>' +
-      '<stop offset="70%" stop-color="var(--accent)" stop-opacity="0.08"/>' +
-      '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0.01"/>' +
+      '<stop offset="0%" stop-color="' + (isCost ? 'var(--c-output)' : 'var(--accent)') + '" stop-opacity="0.34"/>' +
+      '<stop offset="70%" stop-color="' + (isCost ? 'var(--c-output)' : 'var(--accent)') + '" stop-opacity="0.08"/>' +
+      '<stop offset="100%" stop-color="' + (isCost ? 'var(--c-output)' : 'var(--accent)') + '" stop-opacity="0.01"/>' +
       '</linearGradient>');
     parts.push('</defs>');
 
-    parts.push('<path d="' + area + '" fill="url(#g-area)"/>');
-    parts.push('<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>');
+    if (isBar) {
+      const bw = Math.max(4, Math.min(26, (innerW / Math.max(1, series.length)) * 0.64));
+      series.forEach((item, index) => {
+        const v = valOf(item);
+        if (v <= 0) return;
+        const cx = xAt(index);
+        const bx = cx - bw / 2;
+        const topY = yAt(v);
+        const totalH = Math.max(2, bottom - topY);
+        const opacity = state.hover === -1 || state.hover === index ? "1" : "0.45";
+        if (isCost) {
+          parts.push('<rect x="' + bx.toFixed(1) + '" y="' + topY.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + totalH.toFixed(1) + '" rx="3" fill="var(--c-output)" opacity="' + opacity + '"/>');
+        } else {
+          const input = Math.max(0, item.inputTokens || 0);
+          const cached = Math.min(input, Math.max(0, item.cachedInputTokens || 0));
+          const fresh = Math.max(0, input - cached);
+          const out = Math.max(0, item.outputTokens || 0);
+          const sum = fresh + cached + out || 1;
+          const hOut = (out / sum) * totalH;
+          const hCache = (cached / sum) * totalH;
+          const hIn = totalH - hOut - hCache;
+          parts.push('<g opacity="' + opacity + '">' +
+            '<rect x="' + bx.toFixed(1) + '" y="' + (bottom - hIn).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, hIn).toFixed(1) + '" fill="var(--c-input)"/>' +
+            '<rect x="' + bx.toFixed(1) + '" y="' + (bottom - hIn - hCache).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, hCache).toFixed(1) + '" fill="var(--c-cached)"/>' +
+            '<rect x="' + bx.toFixed(1) + '" y="' + topY.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, hOut).toFixed(1) + '" rx="2" fill="var(--c-output)"/>' +
+            '</g>');
+        }
+      });
+    } else {
+      parts.push('<path d="' + area + '" fill="url(#g-area)"/>');
+      parts.push('<path d="' + line + '" fill="none" stroke="' + (isCost ? 'var(--c-output)' : 'var(--accent)') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>');
+    }
 
     // 0 token 的日子占着 X 轴上的一格，曲线自己落到基线就够了。
     // 不再给每个空日子打点：一天一个空心圈连成串，比空白本身还扎眼。
@@ -2699,12 +3089,12 @@
 
     // 超出纵轴的日子在顶部打一个橙色尖角：平顶不等于「峰值就这么高」
     series.forEach((item, index) => {
-      if (item.totalTokens <= ceiling) return;
+      if (valOf(item) <= ceiling) return;
       const x = points[index].x;
       parts.push('<path d="M ' + (x - 4.5).toFixed(1) + ' ' + (padT + 6).toFixed(1) +
         ' L ' + x.toFixed(1) + ' ' + (padT - 1).toFixed(1) +
         ' L ' + (x + 4.5).toFixed(1) + ' ' + (padT + 6).toFixed(1) + ' Z" fill="var(--warn)">' +
-        '<title>' + dayLabel(item.day) + ' 实际 ' + fmtTokens(item.totalTokens) + '，超出纵轴</title></path>');
+        '<title>' + dayLabel(item.day) + ' 实际 ' + fmtVal(valOf(item)) + '，超出纵轴</title></path>');
     });
 
     // 今天：实心点；正在悬停：竖线 + 空心点
@@ -2961,21 +3351,79 @@
     return summary + '<div class="proj-models">' + rows + '</div>';
   }
 
+  const DONUT_COLORS = ["#3f6ef0", "#10a37f", "#f0a33c", "#8b5cf6", "#ec4899", "#94a3b8"];
+
+  function renderDonut(container, items, nameKey, unitWord) {
+    if (!container) return;
+    if (!items || !items.length) {
+      container.innerHTML = "";
+      return;
+    }
+    const top = items.slice(0, 5);
+    const rest = items.slice(5);
+    const slices = top.map((it, idx) => ({
+      name: it[nameKey],
+      share: it.share || 0,
+      tokens: it.totalTokens || 0,
+      color: DONUT_COLORS[idx % DONUT_COLORS.length],
+      clickable: true
+    }));
+    if (rest.length) {
+      const restShare = rest.reduce((a, b) => a + (b.share || 0), 0);
+      const restTokens = rest.reduce((a, b) => a + (b.totalTokens || 0), 0);
+      slices.push({
+        name: "其余 " + rest.length + " 项",
+        share: restShare,
+        tokens: restTokens,
+        color: DONUT_COLORS[5],
+        clickable: false
+      });
+    }
+    const r = 38, c = 2 * Math.PI * r;
+    let offset = 0;
+    const arcs = slices.map((s, idx) => {
+      const len = Math.max(0, s.share) * c;
+      const dash = len.toFixed(2) + " " + Math.max(0, c - len).toFixed(2);
+      const rot = ((offset / c) * 360 - 90).toFixed(2);
+      offset += len;
+      return '<circle class="donut-slice" data-idx="' + idx + '"' +
+        (s.clickable ? ' data-pick="' + escapeHtml(s.name) + '"' : '') +
+        ' cx="54" cy="54" r="' + r + '" fill="none" stroke="' + s.color + '" stroke-width="12" ' +
+        'stroke-dasharray="' + dash + '" transform="rotate(' + rot + ' 54 54)">' +
+        '<title>' + escapeHtml(s.name) + ' · ' + fmtPercent(s.share * 100, 1) + ' (' + fmtTokens(s.tokens) + ')</title></circle>';
+    }).join("");
+
+    const lead = slices[0];
+    const svg = '<svg class="donut-svg" viewBox="0 0 108 108" aria-hidden="true">' +
+      '<circle cx="54" cy="54" r="' + r + '" fill="none" stroke="var(--line-soft)" stroke-width="12"/>' +
+      arcs +
+      '<text class="donut-center-num" x="54" y="53" text-anchor="middle">' + fmtPercent((lead ? lead.share : 0) * 100, 0) + '</text>' +
+      '<text class="donut-center-sub" x="54" y="67" text-anchor="middle">' + items.length + ' ' + unitWord + '</text>' +
+      '</svg>';
+
+    const legend = '<div class="donut-legend">' + slices.map((s, idx) =>
+      '<div class="donut-item" data-idx="' + idx + '"' + (s.clickable ? ' data-pick="' + escapeHtml(s.name) + '"' : '') + '>' +
+      '<span class="donut-dot" style="background:' + s.color + '"></span>' +
+      '<span class="donut-name" title="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</span>' +
+      '<span class="donut-pct">' + fmtPercent(s.share * 100, 1) + '</span>' +
+      '</div>'
+    ).join("") + '</div>';
+
+    container.innerHTML = svg + legend;
+  }
+
   function renderModels() {
     const models = rangeModels();
     for (const item of models) {
       item.cost = bucketCost(item, unitFor(item.model));
     }
+    renderDonut($("model-donut"), models, "model", "模型");
     renderBars($("models"), models, {
       nameKey: "model",
       empty: "此区间没有模型数据",
       openName: state.openBars.models,
       detail: distDetail,
-      decorate: item => ({
-        extraHtml: distExtra(item),
-        // 模型行额外保留单价说明：鼠标停上去能看到输入 / 命中 / 输出三档
-        label: (item.tps ? item.tps.toFixed(1) + " tok/s · " : "") + unitText(item.model)
-      })
+      decorate: item => ({ extraHtml: distExtra(item), label: distLabel(item) })
     });
     const totalCost = models.reduce((acc, item) => acc + (item.cost || 0), 0);
     $("model-badge").textContent = fmtMoney(totalCost) + " · " +
@@ -2984,6 +3432,7 @@
 
   function renderProjects() {
     const projects = rangeProjects();
+    renderDonut($("project-donut"), projects, "project", "项目");
     renderBars($("projects"), projects, {
       nameKey: "project",
       empty: "此区间没有项目数据",
@@ -3004,9 +3453,58 @@
       return;
     }
     const hasSpeed = Boolean(detail.throughput);
+    const isHeatmap = state.hourMetric === "heatmap";
     const speedMode = hasSpeed && state.hourMetric === "speed";
-    $("hour-tabs").hidden = !hasSpeed;
-    $("hour-title").textContent = speedMode ? "活跃时段 · tok/s" : "活跃时段";
+    $("hour-tabs").hidden = false;
+    const speedBtn = $("hour-tabs").querySelector('button[data-metric="speed"]');
+    if (speedBtn) speedBtn.hidden = !hasSpeed;
+    $("hour-title").textContent = isHeatmap ? "活跃热力图" : speedMode ? "活跃时段 · tok/s" : "活跃时段";
+    if (isHeatmap) {
+      const series = detail.series || [];
+      const byDay = new Map(series.map(d => [d.day, d]));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const totalDays = 140;
+      const start = new Date(today);
+      start.setDate(start.getDate() - totalDays + 1);
+      // 对齐到周一作为网格第一行
+      const shift = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - shift);
+      const cells = [];
+      let maxVal = 0;
+      let activeDays = 0;
+      let sumTokens = 0;
+      for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+        const key = localDayKey(d);
+        const row = byDay.get(key);
+        const val = row ? (row.totalTokens || 0) : 0;
+        if (val > 0) {
+          activeDays += 1;
+          sumTokens += val;
+          if (val > maxVal) maxVal = val;
+        }
+        cells.push({ key, val, row });
+      }
+      const levelOf = v => {
+        if (v <= 0 || maxVal <= 0) return 0;
+        const r = v / maxVal;
+        if (r >= 0.75) return 4;
+        if (r >= 0.45) return 3;
+        if (r >= 0.18) return 2;
+        return 1;
+      };
+      $("hour-badge").textContent = "近 20 周 · " + activeDays + " 天活跃 · " + fmtTokens(sumTokens);
+      container.innerHTML = '<div class="heatmap-wrap">' +
+        '<div class="heatmap-grid">' +
+        cells.map(c => '<span class="hm-cell" data-lv="' + levelOf(c.val) + '" title="' + c.key + ' · ' +
+          (c.val > 0 ? fmtTokens(c.val) + ' tokens · ' + fmtMoney((c.row && c.row.cost) || 0) + ' · ' + fmtCount((c.row && c.row.records) || 0) + ' 请求' : '无用量') +
+          '"></span>').join("") +
+        '</div>' +
+        '<div class="heatmap-foot"><span>' + cells[0].key + ' – ' + cells[cells.length - 1].key + '</span>' +
+        '<span class="heatmap-scale">少<i class="hm-cell" data-lv="0"></i><i class="hm-cell" data-lv="1"></i><i class="hm-cell" data-lv="2"></i><i class="hm-cell" data-lv="3"></i><i class="hm-cell" data-lv="4"></i>多</span></div>' +
+        '</div>';
+      return;
+    }
     const days = rangeSeries().map(item => item.day);
     const values = new Array(24).fill(0);
     const turns = new Array(24).fill(0);
@@ -3132,6 +3630,16 @@
     ].join("");
   }
 
+  function filterSessions(list) {
+    const q = (state.sessionQuery || "").trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(item => {
+      if (String(item.project || "").toLowerCase().includes(q)) return true;
+      if (String(item.cwd || "").toLowerCase().includes(q)) return true;
+      return (item.models || []).some(m => String(m).toLowerCase().includes(q));
+    });
+  }
+
   /** 视图一：按会话汇总，模型名全部列出、不再折叠成 +N；点行展开明细 */
   function renderSessionRows() {
     const detail = state.detail;
@@ -3144,9 +3652,12 @@
 
     const isWorkBuddy = detail.source === "workbuddy";
     $("th-speed").textContent = "速度";
-    $("session-badge").textContent = detail.sessions + " 个会话";
+    const filtered = filterSessions(detail.sessionList);
+    $("session-badge").textContent = state.sessionQuery
+      ? filtered.length + " / " + detail.sessions + " 个会话"
+      : detail.sessions + " 个会话";
 
-    const rows = detail.sessionList.slice(0, 60);
+    const rows = filtered.slice(0, 60);
     body.innerHTML = rows.map(item => {
       const details = item.modelDetails || [];
       // 多模型时逐个 chips 换行列出，并带上该模型在本会话里的用量占比
@@ -3257,6 +3768,7 @@
 
   function renderAll() {
     renderStats();
+    renderAgentStrip();
     renderChart();
     renderModels();
     renderProjects();
@@ -3995,6 +4507,81 @@
     };
     $("models").addEventListener("click", toggleBarDetail);
     $("projects").addEventListener("click", toggleBarDetail);
+
+    // V3.5：多 Agent 汇总条点击跳转、趋势形态/指标切换、环形图联动、会话筛选
+    const syncPressed = (container, attr, val) => {
+      if (!container) return;
+      for (const btn of container.querySelectorAll("button")) {
+        btn.setAttribute("aria-pressed", String(btn.getAttribute(attr) === val));
+      }
+    };
+    const chartTypeEl = $("chart-type");
+    if (chartTypeEl) {
+      syncPressed(chartTypeEl, "data-type", state.chartType);
+      chartTypeEl.addEventListener("click", event => {
+        const btn = event.target.closest("button[data-type]");
+        if (!btn || btn.dataset.type === state.chartType) return;
+        state.chartType = btn.dataset.type;
+        localStorage.setItem("codex.chartType", state.chartType);
+        syncPressed(chartTypeEl, "data-type", state.chartType);
+        renderChart();
+      });
+    }
+    const chartMetricEl = $("chart-metric");
+    if (chartMetricEl) {
+      syncPressed(chartMetricEl, "data-metric", state.chartMetric);
+      chartMetricEl.addEventListener("click", event => {
+        const btn = event.target.closest("button[data-metric]");
+        if (!btn || btn.dataset.metric === state.chartMetric) return;
+        state.chartMetric = btn.dataset.metric;
+        localStorage.setItem("codex.chartMetric", state.chartMetric);
+        syncPressed(chartMetricEl, "data-metric", state.chartMetric);
+        renderChart();
+      });
+    }
+    const agentStrip = $("agent-strip");
+    if (agentStrip) {
+      agentStrip.addEventListener("click", event => {
+        const jump = event.target.closest("[data-jump]");
+        if (!jump) return;
+        const btn = $("source").querySelector('button[data-source="' + jump.dataset.jump + '"]');
+        if (btn) btn.click();
+      });
+    }
+    const bindDonut = (donutId, barKey, listId, renderer) => {
+      const box = $(donutId);
+      if (!box) return;
+      box.addEventListener("click", event => {
+        const pick = event.target.closest("[data-pick]");
+        if (!pick) return;
+        const name = pick.dataset.pick;
+        state.openBars[barKey] = state.openBars[barKey] === name ? null : name;
+        renderer();
+        const row = [...$(listId).querySelectorAll(".bar-row")].find(r => r.dataset.name === name);
+        if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+      box.addEventListener("mouseover", event => {
+        const node = event.target.closest("[data-idx]");
+        if (!node) return;
+        const idx = node.dataset.idx;
+        for (const s of box.querySelectorAll(".donut-slice")) {
+          s.classList.toggle("is-dim", s.dataset.idx !== idx);
+        }
+      });
+      box.addEventListener("mouseleave", () => {
+        for (const s of box.querySelectorAll(".donut-slice")) s.classList.remove("is-dim");
+      });
+    };
+    bindDonut("model-donut", "models", "models", renderModels);
+    bindDonut("project-donut", "projects", "projects", renderProjects);
+
+    const searchInput = $("session-search");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        state.sessionQuery = searchInput.value;
+        renderSessions();
+      });
+    }
     // 点会话行展开该会话的模型明细（对齐 CC Switch 请求日志的点开形式）
     $("session-body").addEventListener("click", event => {
       const row = event.target.closest("tr.session-row");

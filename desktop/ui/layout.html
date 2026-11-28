@@ -65,6 +65,7 @@
 
   <main>
     <section class="stat-row" id="stat-row"></section>
+    <section class="agent-strip" id="agent-strip" hidden></section>
 
     <section class="card">
       <div class="card-head">
@@ -72,7 +73,17 @@
           <h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5 5.5 8.5 8.5 10.2 13.8 4"/><path d="M11 4h2.8v2.8"/></svg>用量趋势</h2>
           <p class="sub" id="chart-sub">—</p>
         </div>
-        <span class="badge" id="chart-badge">—</span>
+        <div class="chart-tools">
+          <div class="range mini" id="chart-type" role="group" aria-label="图表形态">
+            <button type="button" data-type="area" aria-pressed="true">曲线</button>
+            <button type="button" data-type="bar" aria-pressed="false">柱状</button>
+          </div>
+          <div class="range mini" id="chart-metric" role="group" aria-label="趋势指标">
+            <button type="button" data-metric="tokens" aria-pressed="true">用量</button>
+            <button type="button" data-metric="cost" aria-pressed="false">花费</button>
+          </div>
+          <span class="badge" id="chart-badge">—</span>
+        </div>
       </div>
       <div class="summary" id="chart-summary"></div>
       <div class="chart-wrap" tabindex="0" role="group" aria-label="每日 token 用量趋势图">
@@ -90,6 +101,7 @@
           <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4" rx="1.2"/><rect x="2" y="9.5" width="12" height="4" rx="1.2"/><circle cx="4.5" cy="4.5" r=".7" fill="currentColor"/><circle cx="4.5" cy="11.5" r=".7" fill="currentColor"/></svg>模型分布</h2></div>
           <span class="badge" id="model-badge">—</span>
         </div>
+        <div class="donut-box" id="model-donut"></div>
         <div class="bars" id="models"></div>
       </section>
       <section class="card">
@@ -97,6 +109,7 @@
           <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5a1.5 1.5 0 0 1 1.5-1.5H6l1.4 1.5h5.1A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5Z"/></svg>项目分布</h2></div>
           <span class="badge" id="project-badge">—</span>
         </div>
+        <div class="donut-box" id="project-donut"></div>
         <div class="bars" id="projects"></div>
       </section>
     </div>
@@ -109,6 +122,7 @@
           <div class="range mini" id="hour-tabs" role="group" aria-label="时段指标">
             <button type="button" data-metric="tokens" aria-pressed="true">用量</button>
             <button type="button" data-metric="speed" aria-pressed="false">速度</button>
+            <button type="button" data-metric="heatmap" aria-pressed="false">热力图</button>
           </div>
         </div>
       </div>
@@ -118,11 +132,14 @@
     <section class="card">
       <div class="card-head">
         <div><h2><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6.5"/></svg>会话记录</h2></div>
-        <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
-          <button type="button" data-view="sessions" aria-pressed="true">会话</button>
-          <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+        <div class="session-tools">
+          <input class="search-input" id="session-search" type="search" placeholder="筛选项目 / 模型…" aria-label="筛选会话">
+          <div class="range mini" id="session-tabs" role="group" aria-label="日志视图">
+            <button type="button" data-view="sessions" aria-pressed="true">会话</button>
+            <button type="button" data-view="requests" aria-pressed="false">请求明细</button>
+          </div>
+          <span class="badge" id="session-badge">—</span>
         </div>
-        <span class="badge" id="session-badge">—</span>
       </div>
       <div class="table-wrap">
         <table id="session-table">

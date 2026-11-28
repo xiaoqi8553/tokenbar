@@ -167,6 +167,81 @@
     };
     $("models").addEventListener("click", toggleBarDetail);
     $("projects").addEventListener("click", toggleBarDetail);
+
+    // V3.5：多 Agent 汇总条点击跳转、趋势形态/指标切换、环形图联动、会话筛选
+    const syncPressed = (container, attr, val) => {
+      if (!container) return;
+      for (const btn of container.querySelectorAll("button")) {
+        btn.setAttribute("aria-pressed", String(btn.getAttribute(attr) === val));
+      }
+    };
+    const chartTypeEl = $("chart-type");
+    if (chartTypeEl) {
+      syncPressed(chartTypeEl, "data-type", state.chartType);
+      chartTypeEl.addEventListener("click", event => {
+        const btn = event.target.closest("button[data-type]");
+        if (!btn || btn.dataset.type === state.chartType) return;
+        state.chartType = btn.dataset.type;
+        localStorage.setItem("codex.chartType", state.chartType);
+        syncPressed(chartTypeEl, "data-type", state.chartType);
+        renderChart();
+      });
+    }
+    const chartMetricEl = $("chart-metric");
+    if (chartMetricEl) {
+      syncPressed(chartMetricEl, "data-metric", state.chartMetric);
+      chartMetricEl.addEventListener("click", event => {
+        const btn = event.target.closest("button[data-metric]");
+        if (!btn || btn.dataset.metric === state.chartMetric) return;
+        state.chartMetric = btn.dataset.metric;
+        localStorage.setItem("codex.chartMetric", state.chartMetric);
+        syncPressed(chartMetricEl, "data-metric", state.chartMetric);
+        renderChart();
+      });
+    }
+    const agentStrip = $("agent-strip");
+    if (agentStrip) {
+      agentStrip.addEventListener("click", event => {
+        const jump = event.target.closest("[data-jump]");
+        if (!jump) return;
+        const btn = $("source").querySelector('button[data-source="' + jump.dataset.jump + '"]');
+        if (btn) btn.click();
+      });
+    }
+    const bindDonut = (donutId, barKey, listId, renderer) => {
+      const box = $(donutId);
+      if (!box) return;
+      box.addEventListener("click", event => {
+        const pick = event.target.closest("[data-pick]");
+        if (!pick) return;
+        const name = pick.dataset.pick;
+        state.openBars[barKey] = state.openBars[barKey] === name ? null : name;
+        renderer();
+        const row = [...$(listId).querySelectorAll(".bar-row")].find(r => r.dataset.name === name);
+        if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+      box.addEventListener("mouseover", event => {
+        const node = event.target.closest("[data-idx]");
+        if (!node) return;
+        const idx = node.dataset.idx;
+        for (const s of box.querySelectorAll(".donut-slice")) {
+          s.classList.toggle("is-dim", s.dataset.idx !== idx);
+        }
+      });
+      box.addEventListener("mouseleave", () => {
+        for (const s of box.querySelectorAll(".donut-slice")) s.classList.remove("is-dim");
+      });
+    };
+    bindDonut("model-donut", "models", "models", renderModels);
+    bindDonut("project-donut", "projects", "projects", renderProjects);
+
+    const searchInput = $("session-search");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        state.sessionQuery = searchInput.value;
+        renderSessions();
+      });
+    }
     // 点会话行展开该会话的模型明细（对齐 CC Switch 请求日志的点开形式）
     $("session-body").addEventListener("click", event => {
       const row = event.target.closest("tr.session-row");

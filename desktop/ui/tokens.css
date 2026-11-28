@@ -19,8 +19,11 @@
     --ok: #1f9d63;
     --danger: #d9534f;
     --shadow: 0 1px 2px rgba(19, 24, 40, .04), 0 8px 24px rgba(19, 24, 40, .05);
-    --shadow-hover: 0 2px 6px rgba(19, 24, 40, .06), 0 12px 28px rgba(63, 110, 240, .09);
-    --radius: 14px;
+    --shadow-hover: 0 4px 12px rgba(19, 24, 40, .06), 0 16px 32px rgba(63, 110, 240, .12);
+    --ambient: radial-gradient(900px 340px at 16% -6%, rgba(63, 110, 240, .10), transparent 70%),
+               radial-gradient(760px 300px at 84% -8%, rgba(16, 163, 127, .08), transparent 68%);
+    --glass: rgba(255, 255, 255, .82);
+    --radius: 15px;
   }
 
   html[data-theme="dark"] {
@@ -44,7 +47,10 @@
     --ok: #38b57e;
     --danger: #e06c68;
     --shadow: 0 1px 2px rgba(0, 0, 0, .34), 0 12px 34px rgba(0, 0, 0, .38);
-    --shadow-hover: 0 2px 8px rgba(0, 0, 0, .4), 0 14px 36px rgba(91, 132, 255, .14);
+    --shadow-hover: 0 4px 14px rgba(0, 0, 0, .45), 0 18px 40px rgba(91, 132, 255, .18);
+    --ambient: radial-gradient(920px 360px at 18% -6%, rgba(91, 132, 255, .14), transparent 72%),
+               radial-gradient(760px 320px at 84% -8%, rgba(16, 163, 127, .10), transparent 70%);
+    --glass: rgba(24, 25, 32, .82);
   }
 
   * { box-sizing: border-box; }
@@ -56,7 +62,8 @@
   }
 
   body {
-    background: var(--bg);
+    background: var(--ambient), var(--bg);
+    background-attachment: fixed;
     color: var(--text);
     font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Microsoft YaHei UI", sans-serif;
     font-variant-numeric: tabular-nums;

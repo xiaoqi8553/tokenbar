@@ -71,9 +71,9 @@
     align-items: center;
     gap: 12px;
     padding: 13px 18px;
-    background: color-mix(in srgb, var(--panel) 82%, transparent);
+    background: var(--glass);
     border-bottom: 1px solid var(--line);
-    backdrop-filter: saturate(140%) blur(10px);
+    backdrop-filter: saturate(160%) blur(16px);
     -webkit-app-region: drag;
   }
 
@@ -408,6 +408,13 @@
     padding: 13px 14px;
     display: flex;
     flex-direction: column;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  }
     gap: 7px;
     min-width: 0;
     /* 两个数据源的提示行数不同，固定下限保证切换时卡片不忽高忽低 */
@@ -1024,3 +1031,231 @@
   @media (max-width: 620px) {
     .stat-row { grid-template-columns: 1fr; }
   }
+
+  /* ---------------- V3.5 视觉增强：Sparkline / 多Agent条 / Donut / 热力图 / 搜索 ---------------- */
+
+  .stat-spark {
+    width: 60px;
+    height: 28px;
+    flex: none;
+    overflow: visible;
+  }
+
+  .agent-strip {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .agent-bar {
+    height: 10px;
+    border-radius: 99px;
+    background: var(--line-soft);
+    overflow: hidden;
+    display: flex;
+    gap: 2px;
+  }
+  .agent-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    transition: opacity .18s ease, filter .18s ease;
+    cursor: pointer;
+  }
+  .agent-bar > i.is-dim { opacity: .35; }
+  .agent-chips {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .agent-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    background: var(--panel-soft);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+  }
+  .agent-chip:hover {
+    border-color: color-mix(in srgb, var(--agent-color, var(--accent)) 45%, var(--line));
+    background: color-mix(in srgb, var(--agent-color, var(--accent)) 6%, var(--panel));
+    transform: translateY(-1px);
+  }
+  .agent-chip-ico {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    background: color-mix(in srgb, var(--agent-color, var(--accent)) 14%, transparent);
+    color: var(--agent-color, var(--accent));
+  }
+  .agent-chip-meta { min-width: 0; flex: 1; }
+  .agent-chip-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .agent-chip-sub {
+    font-size: 12px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chart-tools, .session-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    height: 28px;
+    width: 170px;
+    padding: 0 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--panel-soft);
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color .16s ease, width .18s ease;
+  }
+  .search-input:focus {
+    border-color: var(--accent);
+    width: 210px;
+  }
+  .search-input::placeholder { color: var(--text-3); }
+
+  .donut-box {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    padding: 8px 10px 12px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .donut-box:empty { display: none; }
+  .donut-svg { width: 108px; height: 108px; display: block; }
+  .donut-slice {
+    cursor: pointer;
+    transition: opacity .16s ease, stroke-width .16s ease;
+  }
+  .donut-slice.is-dim { opacity: .35; }
+  .donut-center-num {
+    fill: var(--text);
+    font-size: 16px;
+    font-weight: 680;
+  }
+  .donut-center-sub {
+    fill: var(--text-3);
+    font-size: 10.5px;
+  }
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .donut-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: background .14s ease;
+  }
+  .donut-item:hover { background: var(--panel-soft); color: var(--text); }
+  .donut-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .donut-name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .donut-pct {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bar-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+
+  .heatmap-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    overflow-x: auto;
+    padding: 4px 2px;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 13px);
+    grid-auto-columns: 13px;
+    gap: 3px;
+  }
+  .hm-cell {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    background: var(--line-soft);
+    transition: transform .12s ease, outline .12s ease;
+  }
+  .hm-cell:hover {
+    transform: scale(1.22);
+    outline: 1.5px solid var(--accent);
+    z-index: 2;
+  }
+  .hm-cell[data-lv="1"] { background: color-mix(in srgb, var(--accent) 24%, var(--line-soft)); }
+  .hm-cell[data-lv="2"] { background: color-mix(in srgb, var(--accent) 46%, var(--line-soft)); }
+  .hm-cell[data-lv="3"] { background: color-mix(in srgb, var(--accent) 72%, var(--line-soft)); }
+  .hm-cell[data-lv="4"] { background: var(--accent); }
+  .heatmap-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .heatmap-scale {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .heatmap-scale .hm-cell { width: 10px; height: 10px; }

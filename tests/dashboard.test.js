@@ -298,3 +298,13 @@ test("3.3 顶栏固定对称、支持总览选项卡与项目模型占比明细"
   assert.match(dashboard, /class="proj-models"/);
   assert.match(dashboard, /\.brand\s*\{[\s\S]*?width:\s*224px;/);
 });
+
+test("3.5 视觉与交互大升级：Sparklines / 多Agent条 / Donut / 趋势模式 / 热力图 / 会话搜索", () => {
+  assert.match(dashboard, /id="agent-strip"/);
+  assert.match(dashboard, /function svgSparkline/);
+  assert.match(dashboard, /function renderDonut/);
+  assert.match(dashboard, /id="chart-type"/);
+  assert.match(dashboard, /id="chart-metric"/);
+  assert.match(dashboard, /data-metric="heatmap"/);
+  assert.match(dashboard, /id="session-search"/);
+});
