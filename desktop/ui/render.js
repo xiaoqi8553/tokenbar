@@ -715,33 +715,15 @@
   }
 
   function overviewCards() {
-    const detail = state.detail;
-    const sb = (detail && detail.sourceBreakdown) || {};
     const quota = (state.status && state.status.quota) || null;
     const codexWin = (quota && (quota.session || quota.weekly)) || null;
     const codexLive = quota && quota.source === "api" ? " · 实时" : "";
     const agyQuota = state.status && state.status.antigravityQuota;
     const agyQuotaErr = state.status && state.status.antigravityQuotaError;
 
-    const todayCardObj = todayCard();
-    const todayParts = [
-      sb.codex && sb.codex.todayTokens ? "Codex " + fmtTokens(sb.codex.todayTokens) : "",
-      sb.antigravity && sb.antigravity.todayTokens ? "AGY " + fmtTokens(sb.antigravity.todayTokens) : "",
-      sb.workbuddy && sb.workbuddy.todayTokens ? "WB " + fmtTokens(sb.workbuddy.todayTokens) : ""
-    ].filter(Boolean);
-    if (todayParts.length) todayCardObj.hints = [todayParts.join(" · ")];
-
-    const totalCardObj = totalCard();
-    const totalParts = [
-      sb.codex ? "Codex " + fmtTokens(sb.codex.totalTokens) : "",
-      sb.antigravity ? "AGY " + fmtTokens(sb.antigravity.totalTokens) : "",
-      sb.workbuddy ? "WB " + fmtTokens(sb.workbuddy.totalTokens) : ""
-    ].filter(Boolean);
-    if (totalParts.length) totalCardObj.hints = [totalParts.join(" · "), totalCardObj.hints && totalCardObj.hints[0]].filter(Boolean);
-
     return [
-      todayCardObj,
-      totalCardObj,
+      todayCard(),
+      totalCard(),
       costCard(),
       speedCard(),
       quotaCard("Codex 额度", (quota && quota.session ? "5h" : "7d") + codexLive, codexWin),

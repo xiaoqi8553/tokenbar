@@ -395,9 +395,13 @@
 
   .stat-row {
     display: grid;
-    /* Codex 5 张卡、WorkBuddy 6 张（多一张速度卡），固定 6 列保证标题不换行 */
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 10px;
+    /* 默认 3 列×2 行，留足呼吸空间；超宽屏再铺成 6 列 */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  @media (min-width: 1560px) {
+    .stat-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   }
 
   .stat {
@@ -405,9 +409,10 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 13px 14px;
+    padding: 15px 16px;
     display: flex;
     flex-direction: column;
+    gap: 7px;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   }
   .stat:hover {
@@ -1035,7 +1040,7 @@
   /* ---------------- V3.5 视觉增强：Sparkline / 多Agent条 / Donut / 热力图 / 搜索 ---------------- */
 
   .stat-spark {
-    width: 60px;
+    width: 72px;
     height: 28px;
     flex: none;
     overflow: visible;

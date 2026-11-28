@@ -6,7 +6,7 @@
     "desktop/main.cjs": "b12a9945193a307db05b58c32890f038cba8fd4bf77df7e1c50f56a4e71ff4d7",
     "desktop/preload.cjs": "6f299218b5b138c1274e7c61bfdd6ef5ae9bc45311cd7e637021fcb5775dcefb",
     "desktop/popover.html": "a09242b959ab53375c0a2cfbb0b48ac05618003d0845e82ab6ed8940b5e6ca72",
-    "desktop/dashboard.html": "a9468bb90382aa6075142fcbd3b0f3166ffe073297b305425a2b29647248ed05",
+    "desktop/dashboard.html": "8dfce49cd55b379229aa32315fb6a255ebde31e498d529be15cc8a7fc233d33f",
     "desktop/dashboard-preload.cjs": "927c2fc6f5e969491adfaef71a0272f0d48bdac1aa922aa349b24d2804d60bc8",
     "desktop/icon.png": "96383a786495439e534d2f1e049d2d7ee5ae178ee07698ac29af57b28483e845",
     "desktop/data/ablesci-store.cjs": "e7e233faabece4e69367ed368df6fb2d8088ff1881c721a119a6da48221f79e1",
